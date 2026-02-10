@@ -6,16 +6,18 @@ import {
   createStyles,
   MantineProvider
 } from "@mantine/core";
-import { useLocalStorage } from "@mantine/hooks";
+import { useLocalStorage, useMediaQuery } from "@mantine/hooks";
 import { NotificationsProvider } from "@mantine/notifications";
+import { useEffect } from "react";
 import NotificationDrawer from "./components/drawer/NotificationDrawer";
 import Sidebar from "./components/sidebar/Sidebar";
 import SearchPage from "./pages/SearchPage";
+import { setSidebarOpen } from "./state/stateSlice";
 import { useAppDispatch, useAppSelector } from "./state/store";
 
 const emotionCache = createEmotionCache({ key: "openbooks" });
 
-const useStyles = createStyles(() => ({
+const useStyles = createStyles((theme) => ({
   burger: {
     position: "absolute",
     bottom: 0,
@@ -26,7 +28,9 @@ const useStyles = createStyles(() => ({
     display: "flex",
     flexWrap: "nowrap",
     maxHeight: "100vh",
-    minHeight: "100vh"
+    minHeight: "100vh",
+    maxWidth: "100vw",
+    overflowX: "hidden"
   }
 }));
 
@@ -40,6 +44,14 @@ export default function App() {
 
   const dispatch = useAppDispatch();
   const open = useAppSelector((state) => state.state.isSidebarOpen);
+
+  // Close sidebar on mobile on initial load
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  useEffect(() => {
+    if (isMobile) {
+      dispatch(setSidebarOpen(false));
+    }
+  }, [isMobile]);
 
   return (
     <ColorSchemeProvider

@@ -1,13 +1,15 @@
 import {
+  ActionIcon,
   Button,
   Indicator,
   Loader,
   ScrollArea,
   Table,
   Text,
-  Tooltip
+  Tooltip,
+  useMantineTheme
 } from "@mantine/core";
-import { useElementSize, useMergedRef } from "@mantine/hooks";
+import { useElementSize, useMediaQuery, useMergedRef } from "@mantine/hooks";
 import {
   createColumnHelper,
   FilterFn,
@@ -20,7 +22,7 @@ import {
   useReactTable
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { MagnifyingGlass, User } from "phosphor-react";
+import { DownloadSimple, MagnifyingGlass, User } from "phosphor-react";
 import { useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { useGetServersQuery } from "../../state/api";
@@ -58,8 +60,51 @@ export default function BookTable({ books }: BookTableProps) {
   const virtualizerRef = useRef();
   const mergedRef = useMergedRef(elementSizeRef, virtualizerRef);
 
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+
   const columns = useMemo(() => {
     const cols = (cols: number) => (width / 12) * cols;
+
+    // Mobile: Show Author (4/12), Title (6/12), Download (2/12)
+    if (isMobile) {
+      return [
+        columnHelper.accessor("author", {
+          header: (props) => (
+            <TextFilter
+              icon={<User weight="bold" />}
+              placeholder="Author"
+              column={props.column}
+              table={props.table}
+            />
+          ),
+          size: cols(4),
+          enableColumnFilter: false
+        }),
+        columnHelper.accessor("title", {
+          header: (props) => (
+            <TextFilter
+              icon={<MagnifyingGlass weight="bold" />}
+              placeholder="Title"
+              column={props.column}
+              table={props.table}
+            />
+          ),
+          minSize: 20,
+          size: cols(6),
+          enableColumnFilter: false
+        }),
+        columnHelper.display({
+          header: "Download",
+          size: cols(2),
+          enableColumnFilter: false,
+          cell: ({ row }) => (
+            <DownloadButton book={row.original.full}></DownloadButton>
+          )
+        })
+      ];
+    }
+
+    // Desktop: Show all 6 columns
     return [
       columnHelper.accessor("server", {
         header: (props) => (
@@ -149,7 +194,7 @@ export default function BookTable({ books }: BookTableProps) {
         )
       })
     ];
-  }, [width, servers]);
+  }, [width, servers, isMobile]);
 
   const table = useReactTable({
     data: books,
@@ -256,6 +301,8 @@ export default function BookTable({ books }: BookTableProps) {
 
 function DownloadButton({ book }: { book: string }) {
   const dispatch = useAppDispatch();
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
   const [clicked, setClicked] = useState(false);
   const isInFlight = useSelector((state: RootState) =>
@@ -268,6 +315,24 @@ function DownloadButton({ book }: { book: string }) {
     dispatch(sendDownload(book));
     setClicked(true);
   };
+
+  // Compact icon button on mobile
+  if (isMobile) {
+    return (
+      <ActionIcon
+        color="brand"
+        variant="filled"
+        size="sm"
+        radius="sm"
+        onClick={onClick}>
+        {isInFlight ? (
+          <Loader size="xs" color="white" />
+        ) : (
+          <DownloadSimple size={16} weight="bold" />
+        )}
+      </ActionIcon>
+    );
+  }
 
   return (
     <Button

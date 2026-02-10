@@ -53,6 +53,9 @@ const stateSlice = createSlice({
     },
     toggleSidebar(state) {
       state.isSidebarOpen = !state.isSidebarOpen;
+    },
+    setSidebarOpen(state, action: PayloadAction<boolean>) {
+      state.isSidebarOpen = action.payload;
     }
   }
 });
@@ -126,7 +129,8 @@ export const {
   setUsername,
   addInFlightDownload,
   removeInFlightDownload,
-  toggleSidebar
+  toggleSidebar,
+  setSidebarOpen
 } = stateSlice.actions;
 
 export { stateSlice, sendMessage, sendDownload, sendSearch, setSearchResults };

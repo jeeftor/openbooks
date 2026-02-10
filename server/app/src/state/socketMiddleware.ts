@@ -27,33 +27,94 @@ import {
 import { AppDispatch, RootState } from "./store";
 import { displayNotification, downloadFile } from "./util";
 
-// Web socket redux middleware.
+const MAX_RETRIES = 10;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+const MAX_RETRY_DELAY = 30000; // 30 seconds
+
+// Web socket redux middleware with automatic reconnection.
 // Listens to socket and dispatches handlers.
 // Handles send_message actions by sending to socket.
 export const websocketConn =
   (wsUrl: string): Middleware =>
   ({ dispatch, getState }: MiddlewareAPI<AppDispatch, RootState>) => {
-    const socket = new WebSocket(wsUrl);
+    let socket: WebSocket | null = null;
+    let retryCount = 0;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let pendingMessages: string[] = []; // Queue for messages sent while disconnected
 
-    socket.onopen = () => onOpen(dispatch);
-    socket.onclose = () => onClose(dispatch);
-    socket.onmessage = (message) => route(dispatch, message);
-    socket.onerror = (event) =>
+    const connect = () => {
+      console.log(`WebSocket connecting to ${wsUrl}...`);
+
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        console.log("WebSocket connected.");
+        retryCount = 0; // Reset retry count on successful connection
+        dispatch(setConnectionState(true));
+        dispatch(sendMessage({ type: MessageType.CONNECT, payload: {} }));
+
+        // Send any queued messages
+        if (pendingMessages.length > 0) {
+          console.log(`Sending ${pendingMessages.length} queued message(s)...`);
+          pendingMessages.forEach((msg) => {
+            socket?.send(msg);
+          });
+          pendingMessages = [];
+        }
+      };
+
+      socket.onclose = (event) => {
+        console.log("WebSocket closed.", event.code, event.reason);
+        dispatch(setConnectionState(false));
+
+        // Don't retry if closed cleanly (code 1000) or if we've exceeded retries
+        if (event.code !== 1000 && retryCount < MAX_RETRIES) {
+          scheduleRetry();
+        }
+      };
+
+      socket.onerror = (event) => {
+        console.error("WebSocket error:", event);
+        // Don't show error notification on every error - onclose will handle retry
+      };
+
+      socket.onmessage = (message) => route(dispatch, message);
+    };
+
+    const scheduleRetry = () => {
+      retryCount++;
+      const delay = Math.min(
+        INITIAL_RETRY_DELAY * Math.pow(2, retryCount - 1),
+        MAX_RETRY_DELAY
+      );
+
+      console.log(`Reconnecting in ${delay / 1000}s (attempt ${retryCount}/${MAX_RETRIES})...`);
+
       displayNotification({
-        appearance: NotificationType.DANGER,
-        title: "Unable to connect to server.",
+        appearance: NotificationType.WARNING,
+        title: `Connection lost. Retrying in ${Math.round(delay / 1000)}s... (${retryCount}/${MAX_RETRIES})`,
         timestamp: new Date().getTime()
       });
+
+      retryTimeout = setTimeout(() => {
+        connect();
+      }, delay);
+    };
+
+    // Initial connection
+    connect();
 
     return (next: Dispatch<AnyAction>) => (action: PayloadAction<any>) => {
       // Send Message action? Send data to the socket.
       if (sendMessage.match(action)) {
-        if (socket.readyState === socket.OPEN) {
+        if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(action.payload.message);
         } else {
+          // Queue the message to be sent when reconnected
+          pendingMessages.push(action.payload.message);
           displayNotification({
             appearance: NotificationType.WARNING,
-            title: "Server connection closed. Reload page.",
+            title: "Not connected. Message queued - will send when reconnected.",
             timestamp: new Date().getTime()
           });
         }
@@ -62,17 +123,6 @@ export const websocketConn =
       return next(action);
     };
   };
-
-const onOpen = (dispatch: AppDispatch): void => {
-  console.log("WebSocket connected.");
-  dispatch(setConnectionState(true));
-  dispatch(sendMessage({ type: MessageType.CONNECT, payload: {} }));
-};
-
-const onClose = (dispatch: AppDispatch): void => {
-  console.log("WebSocket closed.");
-  dispatch(setConnectionState(false));
-};
 
 const route = (dispatch: AppDispatch, msg: MessageEvent<any>): void => {
   const getNotif = (): Notification => {

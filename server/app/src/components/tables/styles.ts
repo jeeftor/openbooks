@@ -11,7 +11,12 @@ export const useTableStyles = createStyles((theme) => ({
     height: "100%",
     overflow: "auto",
     width: "100%",
-    boxShadow: theme.shadows.xs
+    maxWidth: "100%",
+    boxShadow: theme.shadows.xs,
+    [`@media (max-width: ${theme.breakpoints.sm})`]: {
+      borderRadius: theme.radius.sm,
+      fontSize: theme.fontSizes.xs
+    }
   },
   head: {
     position: "sticky",

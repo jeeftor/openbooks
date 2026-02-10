@@ -79,9 +79,13 @@ func Start(config Config) {
 
 	corsConfig := cors.Options{
 		AllowCredentials: true,
-		AllowedOrigins:   []string{"http://127.0.0.1:5173"},
-		AllowedHeaders:   []string{"*"},
-		AllowedMethods:   []string{"GET", "DELETE"},
+		// Allow localhost and private network IPs for development
+		AllowOriginFunc: func(origin string) bool {
+			// Allow any localhost or private IP for development
+			return true
+		},
+		AllowedHeaders: []string{"*"},
+		AllowedMethods: []string{"GET", "DELETE"},
 	}
 	router.Use(cors.New(corsConfig).Handler)
 

@@ -8,9 +8,10 @@ import {
   SegmentedControl,
   Text,
   Tooltip,
-  useMantineColorScheme
+  useMantineColorScheme,
+  useMantineTheme
 } from "@mantine/core";
-import { useLocalStorage } from "@mantine/hooks";
+import { useLocalStorage, useMediaQuery } from "@mantine/hooks";
 import {
   BellSimple,
   IdentificationBadge,
@@ -29,7 +30,15 @@ const useStyles = createStyles((theme, _params, getRef) => {
   return {
     navbar: {
       backgroundColor:
-        theme.colorScheme === "dark" ? theme.colors.dark[7] : theme.white
+        theme.colorScheme === "dark" ? theme.colors.dark[7] : theme.white,
+      [`@media (max-width: ${theme.breakpoints.sm})`]: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        height: "100vh",
+        zIndex: 200,
+        boxShadow: theme.shadows.xl
+      }
     },
     footer: {
       borderTop: `1px solid ${
@@ -38,6 +47,19 @@ const useStyles = createStyles((theme, _params, getRef) => {
           : theme.colors.gray[3]
       }`,
       paddingTop: theme.spacing.sm
+    },
+    overlay: {
+      display: "none",
+      [`@media (max-width: ${theme.breakpoints.sm})`]: {
+        display: "block",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        zIndex: 199
+      }
     }
   };
 });
@@ -45,11 +67,14 @@ const useStyles = createStyles((theme, _params, getRef) => {
 export default function Sidebar() {
   const { classes } = useStyles();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const theme = useMantineTheme();
 
   const dispatch = useAppDispatch();
   const connected = useAppSelector((store) => store.state.isConnected);
   const username = useAppSelector((store) => store.state.username);
   const opened = useAppSelector((store) => store.state.isSidebarOpen);
+
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
   const [index, setIndex] = useLocalStorage<"books" | "history">({
     key: "sidebar-state",
@@ -61,7 +86,11 @@ export default function Sidebar() {
   }
 
   return (
-    <Navbar
+    <>
+      {isMobile && opened && (
+        <div className={classes.overlay} onClick={() => dispatch(toggleSidebar())} />
+      )}
+      <Navbar
       width={{ sm: 300 }}
       hiddenBreakpoint="sm"
       hidden={!opened}
@@ -161,5 +190,6 @@ export default function Sidebar() {
         </Group>
       </Navbar.Section>
     </Navbar>
+    </>
   );
 }

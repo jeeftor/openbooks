@@ -112,12 +112,26 @@ export default function SearchPage() {
     <Stack
       spacing={0}
       align="center"
-      sx={(theme) => ({ width: "100%", margin: theme.spacing.xl })}>
+      sx={(theme) => ({
+        width: "100%",
+        maxWidth: "100%",
+        overflow: "hidden",
+        margin: theme.spacing.xl,
+        [`@media (max-width: ${theme.breakpoints.sm})`]: {
+          margin: theme.spacing.xs,
+          padding: theme.spacing.xs
+        }
+      })}>
       <form className={classes.wFull} onSubmit={(e) => searchHandler(e)}>
         <Group
           noWrap
-          spacing="md"
-          sx={(theme) => ({ marginBottom: theme.spacing.md })}>
+          spacing="xs"
+          sx={(theme) => ({
+            marginBottom: theme.spacing.md,
+            [`@media (max-width: ${theme.breakpoints.sm})`]: {
+              marginBottom: theme.spacing.xs
+            }
+          })}>
           {!opened && (
             <ActionIcon size="lg" onClick={() => dispatch(toggleSidebar())}>
               <Sidebar weight="bold" size={20}></Sidebar>
@@ -130,11 +144,12 @@ export default function SearchPage() {
             value={searchQuery}
             onChange={(e: any) => setSearchQuery(e.target.value)}
             placeholder={
-              errorMode ? "Download a book manually." : "Search for a book."
+              errorMode ? "Download manually" : "Search for a book"
             }
             radius="md"
             type="search"
-            icon={<MagnifyingGlass weight="bold" size={22} />}
+            size="sm"
+            icon={<MagnifyingGlass weight="bold" size={18} />}
             required
           />
 
@@ -143,9 +158,10 @@ export default function SearchPage() {
             color={theme.colorScheme === "dark" ? "brand.2" : "brand"}
             disabled={!validInput}
             radius="md"
+            size="sm"
             variant={validInput ? "gradient" : "default"}
             gradient={{ from: "brand.4", to: "brand.3" }}>
-            {errorMode ? "Download" : "Search"}
+            {errorMode ? "Get" : "Go"}
           </Button>
         </Group>
       </form>

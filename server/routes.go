@@ -60,9 +60,9 @@ func (server *server) serveWs() http.HandlerFunc {
 		userId, err := uuid.Parse(cookie.Value)
 		_, alreadyConnected := server.clients[userId]
 
-		// If invalid UUID or the same browser tries to connect again or multiple browser connections
+		// If invalid UUID or the same browser tries to connect again
 		// Don't connect to IRC or create new client
-		if err != nil || alreadyConnected || len(server.clients) > 0 {
+		if err != nil || alreadyConnected {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -77,12 +77,13 @@ func (server *server) serveWs() http.HandlerFunc {
 			return
 		}
 
+		uniqueUsername := server.generateUniqueUsername()
 		client := &Client{
 			conn: conn,
 			send: make(chan interface{}, 128),
 			uuid: userId,
-			irc:  irc.New(server.config.UserName, server.config.UserAgent),
-			log:  log.New(os.Stdout, fmt.Sprintf("CLIENT (%s): ", server.config.UserName), log.LstdFlags|log.Lmsgprefix),
+			irc:  irc.New(uniqueUsername, server.config.UserAgent),
+			log:  log.New(os.Stdout, fmt.Sprintf("CLIENT (%s): ", uniqueUsername), log.LstdFlags|log.Lmsgprefix),
 			ctx:  context.Background(),
 		}
 
@@ -94,6 +95,18 @@ func (server *server) serveWs() http.HandlerFunc {
 		go server.writePump(client)
 		go server.readPump(client)
 	}
+}
+
+func (server *server) generateUniqueUsername() string {
+	baseUsername := server.config.UserName
+	suffix := fmt.Sprintf("_%s", uuid.New().String()[:4])
+
+	// Truncate base if needed (IRC has username limits)
+	maxBaseLen := 12
+	if len(baseUsername) > maxBaseLen {
+		baseUsername = baseUsername[:maxBaseLen]
+	}
+	return baseUsername + suffix
 }
 
 func (server *server) staticFilesHandler(assetPath string) http.Handler {
