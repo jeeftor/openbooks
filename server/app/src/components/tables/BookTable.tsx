@@ -1,9 +1,13 @@
 import {
   ActionIcon,
   Button,
+  Card,
+  Chip,
+  Group,
   Indicator,
   Loader,
   ScrollArea,
+  Stack,
   Table,
   Text,
   Tooltip,
@@ -57,52 +61,35 @@ export default function BookTable({ books }: BookTableProps) {
   const { data: servers } = useGetServersQuery(null);
 
   const { ref: elementSizeRef, height, width } = useElementSize();
-  const virtualizerRef = useRef();
+  const virtualizerRef = useRef<HTMLDivElement>();
   const mergedRef = useMergedRef(elementSizeRef, virtualizerRef);
 
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
+  // Mobile format filter state
+  const [formatFilter, setFormatFilter] = useState("");
+
+  const formats = useMemo(
+    () => [...new Set(books.map((b) => b.format))].filter(Boolean).sort(),
+    [books]
+  );
+
+  const filteredBooks = useMemo(
+    () =>
+      formatFilter ? books.filter((b) => b.format === formatFilter) : books,
+    [books, formatFilter]
+  );
+
+  // Virtualizer for mobile card list
+  const cardVirtualizer = useVirtualizer({
+    count: filteredBooks.length,
+    getScrollElement: () => virtualizerRef.current ?? null,
+    estimateSize: () => 110,
+    overscan: 5
+  });
+
   const columns = useMemo(() => {
     const cols = (cols: number) => (width / 12) * cols;
-
-    // Mobile: Show Author (4/12), Title (6/12), Download (2/12)
-    if (isMobile) {
-      return [
-        columnHelper.accessor("author", {
-          header: (props) => (
-            <TextFilter
-              icon={<User weight="bold" />}
-              placeholder="Author"
-              column={props.column}
-              table={props.table}
-            />
-          ),
-          size: cols(4),
-          enableColumnFilter: false
-        }),
-        columnHelper.accessor("title", {
-          header: (props) => (
-            <TextFilter
-              icon={<MagnifyingGlass weight="bold" />}
-              placeholder="Title"
-              column={props.column}
-              table={props.table}
-            />
-          ),
-          minSize: 20,
-          size: cols(6),
-          enableColumnFilter: false
-        }),
-        columnHelper.display({
-          header: "Download",
-          size: cols(2),
-          enableColumnFilter: false,
-          cell: ({ row }) => (
-            <DownloadButton book={row.original.full}></DownloadButton>
-          )
-        })
-      ];
-    }
 
     // Desktop: Show all 6 columns
     return [
@@ -194,7 +181,7 @@ export default function BookTable({ books }: BookTableProps) {
         )
       })
     ];
-  }, [width, servers, isMobile]);
+  }, [width, servers]);
 
   const table = useReactTable({
     data: books,
@@ -211,11 +198,94 @@ export default function BookTable({ books }: BookTableProps) {
 
   const rowVirtualizer = useVirtualizer({
     count: tableRows.length,
-    getScrollElement: () => virtualizerRef.current,
+    getScrollElement: () => virtualizerRef.current ?? null,
     estimateSize: () => 50,
     overscan: 10
   });
 
+  // Mobile card view
+  if (isMobile) {
+    const cardVirtualItems = cardVirtualizer.getVirtualItems();
+
+    return (
+      <ScrollArea
+        viewportRef={mergedRef}
+        className={classes.container}
+        type="hover"
+        scrollbarSize={6}
+        styles={{ thumb: { ["&::before"]: { minWidth: 4 } } }}
+        offsetScrollbars={false}>
+        {/* Sticky format filter bar */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+            backgroundColor:
+              theme.colorScheme === "dark"
+                ? theme.colors.dark[7]
+                : theme.white,
+            paddingBottom: theme.spacing.xs,
+            paddingTop: theme.spacing.xs
+          }}>
+          <Chip.Group
+            value={formatFilter}
+            onChange={(v) => setFormatFilter(v as string)}>
+            <Group spacing="xs" px="xs" noWrap style={{ overflowX: "auto" }}>
+              <Chip value="" size="sm" variant="filled">
+                All
+              </Chip>
+              {formats.map((f) => (
+                <Chip key={f} value={f} size="sm" variant="filled">
+                  {f.toUpperCase()}
+                </Chip>
+              ))}
+            </Group>
+          </Chip.Group>
+        </div>
+
+        {/* Virtualized card list */}
+        <div
+          style={{
+            height: cardVirtualizer.getTotalSize(),
+            position: "relative"
+          }}>
+          {cardVirtualItems.map((virtualItem) => {
+            const book = filteredBooks[virtualItem.index];
+            return (
+              <div
+                key={virtualItem.key}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualItem.start}px)`,
+                  padding: `0 ${theme.spacing.xs}px ${theme.spacing.xs}px`
+                }}>
+                <Card withBorder radius="md" p="sm">
+                  <Text weight={600} lineClamp={2} size="sm">
+                    {book.title}
+                  </Text>
+                  <Text color="dimmed" size="xs" mt={2}>
+                    {book.author}
+                  </Text>
+                  <Group position="apart" mt="xs" noWrap>
+                    <Text size="xs" color="dimmed">
+                      {book.format} · {book.size}
+                    </Text>
+                    <DownloadButton book={book.full} large />
+                  </Group>
+                </Card>
+              </div>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    );
+  }
+
+  // Desktop table view
   const virtualItems = rowVirtualizer.getVirtualItems();
 
   const paddingTop =
@@ -299,7 +369,7 @@ export default function BookTable({ books }: BookTableProps) {
   );
 }
 
-function DownloadButton({ book }: { book: string }) {
+function DownloadButton({ book, large }: { book: string; large?: boolean }) {
   const dispatch = useAppDispatch();
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
@@ -309,26 +379,24 @@ function DownloadButton({ book }: { book: string }) {
     state.state.inFlightDownloads.includes(book)
   );
 
-  // Prevent hitting the same button multiple times
   const onClick = () => {
     if (clicked) return;
     dispatch(sendDownload(book));
     setClicked(true);
   };
 
-  // Compact icon button on mobile
   if (isMobile) {
     return (
       <ActionIcon
         color="brand"
         variant="filled"
-        size="sm"
+        size={large ? "lg" : "sm"}
         radius="sm"
         onClick={onClick}>
         {isInFlight ? (
           <Loader size="xs" color="white" />
         ) : (
-          <DownloadSimple size={16} weight="bold" />
+          <DownloadSimple size={large ? 20 : 16} weight="bold" />
         )}
       </ActionIcon>
     );

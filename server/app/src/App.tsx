@@ -1,28 +1,27 @@
 import {
+  ActionIcon,
   AppShell,
   ColorScheme,
   ColorSchemeProvider,
   createEmotionCache,
   createStyles,
-  MantineProvider
+  Drawer,
+  MantineProvider,
+  Text
 } from "@mantine/core";
 import { useLocalStorage, useMediaQuery } from "@mantine/hooks";
 import { NotificationsProvider } from "@mantine/notifications";
 import { useEffect } from "react";
 import NotificationDrawer from "./components/drawer/NotificationDrawer";
-import Sidebar from "./components/sidebar/Sidebar";
+import Sidebar, { SidebarContent } from "./components/sidebar/Sidebar";
 import SearchPage from "./pages/SearchPage";
 import { setSidebarOpen } from "./state/stateSlice";
 import { useAppDispatch, useAppSelector } from "./state/store";
+import { CaretUp } from "phosphor-react";
 
 const emotionCache = createEmotionCache({ key: "openbooks" });
 
 const useStyles = createStyles((theme) => ({
-  burger: {
-    position: "absolute",
-    bottom: 0,
-    left: 0
-  },
   wrapper: {
     boxSizing: "border-box",
     display: "flex",
@@ -31,6 +30,12 @@ const useStyles = createStyles((theme) => ({
     minHeight: "100vh",
     maxWidth: "100vw",
     overflowX: "hidden"
+  },
+  pullTab: {
+    position: "fixed",
+    bottom: 16,
+    right: 16,
+    zIndex: 100
   }
 }));
 
@@ -45,7 +50,6 @@ export default function App() {
   const dispatch = useAppDispatch();
   const open = useAppSelector((state) => state.state.isSidebarOpen);
 
-  // Close sidebar on mobile on initial load
   const isMobile = useMediaQuery("(max-width: 768px)");
   useEffect(() => {
     if (isMobile) {
@@ -93,7 +97,7 @@ export default function App() {
         }}>
         <NotificationsProvider position="top-center">
           <AppShell
-            navbar={<Sidebar />}
+            navbar={isMobile ? undefined : <Sidebar />}
             padding={0}
             styles={(theme) => ({
               main: {
@@ -107,6 +111,35 @@ export default function App() {
               <SearchPage />
               <NotificationDrawer />
             </div>
+
+            {isMobile && (
+              <>
+                <Drawer
+                  opened={open}
+                  onClose={() => dispatch(setSidebarOpen(false))}
+                  position="bottom"
+                  size="60%"
+                  withCloseButton
+                  padding="md"
+                  title={
+                    <Text weight="bold" size="lg">
+                      OpenBooks
+                    </Text>
+                  }>
+                  <SidebarContent />
+                </Drawer>
+
+                {!open && (
+                  <ActionIcon
+                    className={classes.pullTab}
+                    size="lg"
+                    variant="filled"
+                    onClick={() => dispatch(setSidebarOpen(true))}>
+                    <CaretUp weight="bold" size={20} />
+                  </ActionIcon>
+                )}
+              </>
+            )}
           </AppShell>
         </NotificationsProvider>
       </MantineProvider>

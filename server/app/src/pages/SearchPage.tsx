@@ -10,6 +10,7 @@ import {
   TextInput,
   Title
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { MagnifyingGlass, Sidebar, Warning } from "phosphor-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import image from "../assets/reading.svg";
@@ -71,6 +72,7 @@ export default function SearchPage() {
     : searchQuery !== "";
 
   const { classes, theme } = useStyles({ errorMode: !!errorMode });
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
   useEffect(() => {
     setShowErrors(false);
@@ -132,7 +134,7 @@ export default function SearchPage() {
               marginBottom: theme.spacing.xs
             }
           })}>
-          {!opened && (
+          {!opened && !isMobile && (
             <ActionIcon size="lg" onClick={() => dispatch(toggleSidebar())}>
               <Sidebar weight="bold" size={20}></Sidebar>
             </ActionIcon>
@@ -148,7 +150,7 @@ export default function SearchPage() {
             }
             radius="md"
             type="search"
-            size="sm"
+            size={isMobile ? "md" : "sm"}
             icon={<MagnifyingGlass weight="bold" size={18} />}
             required
           />

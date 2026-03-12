@@ -1,9 +1,7 @@
 import {
   ActionIcon,
-  Burger,
   createStyles,
   Group,
-  MediaQuery,
   Navbar,
   SegmentedControl,
   Text,
@@ -26,19 +24,11 @@ import { useAppDispatch, useAppSelector } from "../../state/store";
 import History from "./History";
 import Library from "./Library";
 
-const useStyles = createStyles((theme, _params, getRef) => {
+const useStyles = createStyles((theme) => {
   return {
     navbar: {
       backgroundColor:
-        theme.colorScheme === "dark" ? theme.colors.dark[7] : theme.white,
-      [`@media (max-width: ${theme.breakpoints.sm})`]: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        height: "100vh",
-        zIndex: 200,
-        boxShadow: theme.shadows.xl
-      }
+        theme.colorScheme === "dark" ? theme.colors.dark[7] : theme.white
     },
     footer: {
       borderTop: `1px solid ${
@@ -47,78 +37,39 @@ const useStyles = createStyles((theme, _params, getRef) => {
           : theme.colors.gray[3]
       }`,
       paddingTop: theme.spacing.sm
-    },
-    overlay: {
-      display: "none",
-      [`@media (max-width: ${theme.breakpoints.sm})`]: {
-        display: "block",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        zIndex: 199
-      }
     }
   };
 });
 
-export default function Sidebar() {
+export function SidebarContent() {
   const { classes } = useStyles();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
-  const theme = useMantineTheme();
-
   const dispatch = useAppDispatch();
   const connected = useAppSelector((store) => store.state.isConnected);
   const username = useAppSelector((store) => store.state.username);
-  const opened = useAppSelector((store) => store.state.isSidebarOpen);
-
-  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
   const [index, setIndex] = useLocalStorage<"books" | "history">({
     key: "sidebar-state",
     defaultValue: "history"
   });
 
-  if (!opened) {
-    return <></>;
-  }
-
   return (
     <>
-      {isMobile && opened && (
-        <div className={classes.overlay} onClick={() => dispatch(toggleSidebar())} />
-      )}
-      <Navbar
-      width={{ sm: 300 }}
-      hiddenBreakpoint="sm"
-      hidden={!opened}
-      className={classes.navbar}>
       <Navbar.Section p="sm">
         <Group position="apart">
           <Text weight="bold" size="lg">
             OpenBooks
           </Text>
-          <Group>
-            <Tooltip
-              label={`OpenBooks server ${
-                connected ? "connected" : "disconnected"
-              }.`}>
-              <ActionIcon
-                disabled={!connected}
-                onClick={() => dispatch(toggleDrawer())}>
-                <BellSimple weight="bold" size={18} />
-              </ActionIcon>
-            </Tooltip>
-            <MediaQuery largerThan="sm" styles={{ display: "none" }}>
-              <Burger
-                opened={opened}
-                onClick={() => dispatch(toggleSidebar())}
-                size="sm"
-              />
-            </MediaQuery>
-          </Group>
+          <Tooltip
+            label={`OpenBooks server ${
+              connected ? "connected" : "disconnected"
+            }.`}>
+            <ActionIcon
+              disabled={!connected}
+              onClick={() => dispatch(toggleDrawer())}>
+              <BellSimple weight="bold" size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
 
         <Text size="sm" color="dimmed">
@@ -189,7 +140,26 @@ export default function Sidebar() {
           </Group>
         </Group>
       </Navbar.Section>
-    </Navbar>
     </>
+  );
+}
+
+export default function Sidebar() {
+  const { classes } = useStyles();
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+  const opened = useAppSelector((store) => store.state.isSidebarOpen);
+
+  if (!opened || isMobile) {
+    return <></>;
+  }
+
+  return (
+    <Navbar
+      width={{ sm: 300 }}
+      hiddenBreakpoint="sm"
+      className={classes.navbar}>
+      <SidebarContent />
+    </Navbar>
   );
 }
