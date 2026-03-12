@@ -204,7 +204,14 @@ export default function BookTable({ books }: BookTableProps) {
     overscan: 10
   });
 
-  // ── Mobile: swipeable card view ──────────────────────────────────────────
+  const mobileVirtualizer = useVirtualizer({
+    count: filteredBooks.length,
+    getScrollElement: () => virtualizerRef.current ?? null,
+    estimateSize: () => 82,
+    overscan: 8
+  });
+
+  // ── Mobile: compact vertical card list ──────────────────────────────────
   if (isMobile) {
     const activeFilterCount = [authorFilter, titleFilter, formatFilter].filter(
       Boolean
@@ -217,9 +224,16 @@ export default function BookTable({ books }: BookTableProps) {
         {/* Header: result count + filter button */}
         <Group
           px="sm"
-          py="xs"
+          py={6}
           position="apart"
-          style={{ flexShrink: 0, borderBottom: `1px solid ${theme.colorScheme === "dark" ? theme.colors.dark[4] : theme.colors.gray[2]}` }}>
+          style={{
+            flexShrink: 0,
+            borderBottom: `1px solid ${
+              theme.colorScheme === "dark"
+                ? theme.colors.dark[4]
+                : theme.colors.gray[2]
+            }`
+          }}>
           <Text size="xs" color="dimmed">
             {filteredBooks.length} of {books.length} results
           </Text>
@@ -234,73 +248,62 @@ export default function BookTable({ books }: BookTableProps) {
           </ActionIcon>
         </Group>
 
-        {/* Horizontal swipeable cards */}
-        <div
-          style={{
-            flex: 1,
-            overflowX: "auto",
-            overflowY: "hidden",
-            display: "flex",
-            scrollSnapType: "x mandatory",
-            gap: theme.spacing.sm,
-            paddingLeft: "8%",
-            paddingRight: "8%",
-            paddingTop: theme.spacing.sm,
-            paddingBottom: theme.spacing.md,
-            alignItems: "stretch"
-          }}>
-          {filteredBooks.length === 0 ? (
-            <div
-              style={{
-                flex: "0 0 84%",
-                scrollSnapAlign: "center",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}>
-              <Text color="dimmed" align="center" size="sm">
-                No results match your filters.
-              </Text>
-            </div>
-          ) : (
-            filteredBooks.map((book, i) => (
-              <div
-                key={i}
-                style={{ flex: "0 0 84%", scrollSnapAlign: "center" }}>
-                <Card
-                  withBorder
-                  radius="md"
-                  p="md"
+        {/* Virtualized card list */}
+        <ScrollArea
+          viewportRef={mergedRef}
+          style={{ flex: 1 }}
+          type="hover"
+          scrollbarSize={4}
+          offsetScrollbars={false}>
+          <div
+            style={{
+              height: mobileVirtualizer.getTotalSize(),
+              position: "relative",
+              padding: `${theme.spacing.xs}px`
+            }}>
+            {mobileVirtualizer.getVirtualItems().map((vItem) => {
+              const book = filteredBooks[vItem.index];
+              return (
+                <div
+                  key={vItem.key}
                   style={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column"
+                    position: "absolute",
+                    top: 0,
+                    left: theme.spacing.xs,
+                    right: theme.spacing.xs,
+                    transform: `translateY(${vItem.start}px)`,
+                    paddingBottom: theme.spacing.xs
                   }}>
-                  <Text weight={700} size="md" lineClamp={3}>
-                    {book.title}
-                  </Text>
-                  <Text color="dimmed" size="sm" mt={4}>
-                    {book.author}
-                  </Text>
-                  <Group mt="xs" spacing="xs">
-                    {book.format && (
-                      <Badge size="sm" variant="light" color="brand">
-                        {book.format.toUpperCase()}
-                      </Badge>
-                    )}
-                    {book.size && (
-                      <Text size="xs" color="dimmed">
-                        {book.size}
-                      </Text>
-                    )}
-                  </Group>
-                  <Box style={{ flex: 1 }} />
-                  <CardDownloadButton book={book.full} />
-                </Card>
-              </div>
-            ))
-          )}
-        </div>
+                  <Card withBorder radius="sm" p="xs">
+                    <Group noWrap position="apart" align="flex-start">
+                      <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Text weight={600} size="sm" lineClamp={1}>
+                          {book.title}
+                        </Text>
+                        <Text color="dimmed" size="xs" lineClamp={1}>
+                          {book.author}
+                        </Text>
+                        <Group mt={4} spacing={6}>
+                          {book.format && (
+                            <Badge size="xs" variant="light" color="brand">
+                              {book.format.toUpperCase()}
+                            </Badge>
+                          )}
+                          {book.size && (
+                            <Text size="xs" color="dimmed">
+                              {book.size}
+                            </Text>
+                          )}
+                        </Group>
+                      </Box>
+                      <CardDownloadButton book={book.full} />
+                    </Group>
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
 
         {/* Filter drawer */}
         <Drawer
@@ -447,21 +450,20 @@ function CardDownloadButton({ book }: { book: string }) {
   };
 
   return (
-    <Button
-      mt="md"
-      fullWidth
-      radius="md"
-      leftIcon={
-        isInFlight ? (
-          <Loader size="xs" color="white" />
-        ) : (
-          <DownloadSimple size={16} weight="bold" />
-        )
-      }
+    <ActionIcon
+      color="brand"
+      variant="filled"
+      size="lg"
+      radius="sm"
       onClick={onClick}
-      disabled={clicked && !isInFlight}>
-      {isInFlight ? "Downloading..." : "Download"}
-    </Button>
+      disabled={clicked && !isInFlight}
+      style={{ flexShrink: 0 }}>
+      {isInFlight ? (
+        <Loader size="xs" color="white" />
+      ) : (
+        <DownloadSimple size={20} weight="bold" />
+      )}
+    </ActionIcon>
   );
 }
 
