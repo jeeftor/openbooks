@@ -64,7 +64,7 @@ export default function BookTable({ books }: BookTableProps) {
   const virtualizerRef = useRef<HTMLDivElement>();
   const mergedRef = useMergedRef(elementSizeRef, virtualizerRef);
 
-  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   // Mobile format filter state
   const [formatFilter, setFormatFilter] = useState("");
@@ -231,7 +231,7 @@ export default function BookTable({ books }: BookTableProps) {
           <Chip.Group
             value={formatFilter}
             onChange={(v) => setFormatFilter(v as string)}>
-            <Group spacing="xs" px="xs" noWrap style={{ overflowX: "auto" }}>
+            <Group spacing="xs" px="sm" py={4}>
               <Chip value="" size="sm" variant="filled">
                 All
               </Chip>
@@ -372,7 +372,7 @@ export default function BookTable({ books }: BookTableProps) {
 function DownloadButton({ book, large }: { book: string; large?: boolean }) {
   const dispatch = useAppDispatch();
   const theme = useMantineTheme();
-  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const [clicked, setClicked] = useState(false);
   const isInFlight = useSelector((state: RootState) =>

@@ -30,6 +30,7 @@ func (server *server) registerRoutes() *chi.Mux {
 	router.Get("/ws", server.serveWs())
 	router.Get("/stats", server.statsHandler())
 	router.Get("/servers", server.serverListHandler())
+	router.Get("/version", server.versionHandler())
 
 	router.Group(func(r chi.Router) {
 		r.Use(server.requireUser)
@@ -147,6 +148,13 @@ func (server *server) statsHandler() http.HandlerFunc {
 func (server *server) serverListHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(server.repository.servers)
+	}
+}
+
+func (server *server) versionHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(server.config.Version)
 	}
 }
 

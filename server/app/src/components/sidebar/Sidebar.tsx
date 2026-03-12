@@ -21,6 +21,7 @@ import {
 import { toggleDrawer } from "../../state/notificationSlice";
 import { toggleSidebar } from "../../state/stateSlice";
 import { useAppDispatch, useAppSelector } from "../../state/store";
+import { useGetVersionQuery } from "../../state/api";
 import History from "./History";
 import Library from "./Library";
 
@@ -47,6 +48,7 @@ export function SidebarContent() {
   const dispatch = useAppDispatch();
   const connected = useAppSelector((store) => store.state.isConnected);
   const username = useAppSelector((store) => store.state.username);
+  const { data: version } = useGetVersionQuery(null);
 
   const [index, setIndex] = useLocalStorage<"books" | "history">({
     key: "sidebar-state",
@@ -127,6 +129,11 @@ export function SidebarContent() {
           </Group>
 
           <Group align="end" spacing="xs">
+            {version && (
+              <Text size="xs" color="dimmed">
+                {version}
+              </Text>
+            )}
             <ActionIcon onClick={() => toggleColorScheme()}>
               {colorScheme === "dark" ? (
                 <Sun size={18} weight="bold" />
@@ -147,7 +154,7 @@ export function SidebarContent() {
 export default function Sidebar() {
   const { classes } = useStyles();
   const theme = useMantineTheme();
-  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const opened = useAppSelector((store) => store.state.isSidebarOpen);
 
   if (!opened || isMobile) {

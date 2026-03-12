@@ -36,9 +36,12 @@ export const openbooksApi = createApi({
         method: "DELETE"
       }),
       invalidatesTags: ["books"]
+    }),
+    getVersion: builder.query<string, null>({
+      query: () => `version`
     })
   })
 });
 
-export const { useGetServersQuery, useGetBooksQuery, useDeleteBookMutation } =
+export const { useGetServersQuery, useGetBooksQuery, useDeleteBookMutation, useGetVersionQuery } =
   openbooksApi;

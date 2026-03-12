@@ -13,7 +13,7 @@ import (
 )
 
 // version will always match the GitHub release versions.
-var version = "4.5.0"
+var version = "dev"
 
 // We only increment ircVersion when irc admins require a fix to be made.
 // They can block / permit certain version numbers. ircVersion is the current permitted

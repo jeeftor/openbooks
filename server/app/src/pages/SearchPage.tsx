@@ -72,7 +72,7 @@ export default function SearchPage() {
     : searchQuery !== "";
 
   const { classes, theme } = useStyles({ errorMode: !!errorMode });
-  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   useEffect(() => {
     setShowErrors(false);

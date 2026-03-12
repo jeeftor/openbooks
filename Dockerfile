@@ -10,11 +10,12 @@ WORKDIR /go/src/
 COPY . .
 COPY --from=web /web/ .
 
+ARG VERSION=dev
 ENV CGO_ENABLED=0
 RUN go get -d -v ./...
 RUN go install -v ./...
 WORKDIR /go/src/cmd/openbooks/
-RUN go build
+RUN go build -ldflags "-X main.version=${VERSION}"
 
 FROM gcr.io/distroless/static as app
 WORKDIR /app

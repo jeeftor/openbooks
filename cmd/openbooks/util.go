@@ -15,6 +15,7 @@ func bindGlobalServerFlags(config *server.Config) {
 	config.Server = globalFlags.Server
 	config.SearchBot = globalFlags.SearchBot
 	config.EnableTLS = globalFlags.EnableTLS
+	config.Version = version
 }
 
 // Make sure the server config has a valid rate limit.
