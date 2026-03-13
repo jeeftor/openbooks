@@ -65,13 +65,19 @@ func (c *Client) searchResultHandler(downloadDir string) core.HandlerFunc {
 // bookResultHandler downloads the book file and sends it over the websocket
 func (c *Client) bookResultHandler(downloadDir string, disableBrowserDownloads bool) core.HandlerFunc {
 	return func(text string) {
-		extractedPath, err := core.DownloadExtractDCCString(filepath.Join(downloadDir, "books"), text, nil)
+		subDir := c.downloadSubDir
+		if subDir == "" {
+			subDir = "books"
+		}
+		dir := filepath.Join(downloadDir, subDir)
+		extractedPath, err := core.DownloadExtractDCCString(dir, text, nil)
 		if err != nil {
 			c.log.Println(err)
 			c.send <- newErrorResponse("Error when downloading book.")
 			return
 		}
 
+		c.log.Printf("Downloaded book to: %s\n", extractedPath)
 		c.log.Printf("Sending book entitled '%s'.\n", filepath.Base(extractedPath))
 		c.send <- newDownloadResponse(extractedPath, disableBrowserDownloads)
 	}

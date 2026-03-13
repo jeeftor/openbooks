@@ -179,7 +179,13 @@ export default function BookTable({ books }: BookTableProps) {
         header: "Download",
         size: cols(1),
         enableColumnFilter: false,
-        cell: ({ row }) => <DownloadButton book={row.original.full} />
+        cell: ({ row }) => (
+          <DownloadButton
+            book={row.original.full}
+            author={row.original.author}
+            title={row.original.title}
+          />
+        )
       })
     ];
   }, [width, servers]);
@@ -296,7 +302,11 @@ export default function BookTable({ books }: BookTableProps) {
                           )}
                         </Group>
                       </Box>
-                      <CardDownloadButton book={book.full} />
+                      <CardDownloadButton
+                        book={book.full}
+                        author={book.author}
+                        title={book.title}
+                      />
                     </Group>
                   </Card>
                 </div>
@@ -436,7 +446,7 @@ export default function BookTable({ books }: BookTableProps) {
   );
 }
 
-function CardDownloadButton({ book }: { book: string }) {
+function CardDownloadButton({ book, author, title }: { book: string; author?: string; title?: string }) {
   const dispatch = useAppDispatch();
   const [clicked, setClicked] = useState(false);
   const isInFlight = useSelector((state: RootState) =>
@@ -445,7 +455,7 @@ function CardDownloadButton({ book }: { book: string }) {
 
   const onClick = () => {
     if (clicked) return;
-    dispatch(sendDownload(book));
+    dispatch(sendDownload({ book, author, title }));
     setClicked(true);
   };
 
@@ -467,7 +477,7 @@ function CardDownloadButton({ book }: { book: string }) {
   );
 }
 
-function DownloadButton({ book }: { book: string }) {
+function DownloadButton({ book, author, title }: { book: string; author?: string; title?: string }) {
   const dispatch = useAppDispatch();
   const [clicked, setClicked] = useState(false);
   const isInFlight = useSelector((state: RootState) =>
@@ -476,7 +486,7 @@ function DownloadButton({ book }: { book: string }) {
 
   const onClick = () => {
     if (clicked) return;
-    dispatch(sendDownload(book));
+    dispatch(sendDownload({ book, author, title }));
     setClicked(true);
   };
 

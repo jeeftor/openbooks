@@ -57,6 +57,8 @@ type Config struct {
 	DisableBrowserDownloads bool
 	UserAgent               string
 	Version                 string
+	OrganizeDownloads       bool
+	ReplaceSpace            string
 }
 
 func New(config Config) *server {
