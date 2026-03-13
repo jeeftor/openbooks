@@ -3,8 +3,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -116,19 +114,6 @@ func sanitizePathComponent(s, replaceSpace string) string {
 
 // handle DownloadRequests by sending the request to the book server
 func (c *Client) sendDownloadRequest(d *DownloadRequest, server *server) {
-	subDir := "books"
-	if server.config.OrganizeDownloads && d.Author != "" && d.Title != "" {
-		author := sanitizePathComponent(d.Author, server.config.ReplaceSpace)
-		title := sanitizePathComponent(d.Title, server.config.ReplaceSpace)
-		subDir = filepath.Join("books", author, title)
-		dirPath := filepath.Join(server.config.DownloadDir, subDir)
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
-			c.log.Printf("Error creating download directory %s: %v", dirPath, err)
-			subDir = "books"
-		}
-	}
-	c.downloadSubDir = subDir
-
 	core.DownloadBook(c.irc, d.Book)
 	c.send <- newStatusResponse(NOTIFY, "Download request received.")
 }

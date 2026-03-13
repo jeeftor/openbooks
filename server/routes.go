@@ -35,7 +35,7 @@ func (server *server) registerRoutes() *chi.Mux {
 	router.Group(func(r chi.Router) {
 		r.Use(server.requireUser)
 		r.Get("/library", server.getAllBooksHandler())
-		r.Delete("/library/{fileName}", server.deleteBooksHandler())
+		r.Delete("/library/*", server.deleteBooksHandler())
 		r.Get("/library/*", server.getBookHandler())
 	})
 
@@ -161,6 +161,7 @@ func (server *server) versionHandler() http.HandlerFunc {
 func (server *server) getAllBooksHandler() http.HandlerFunc {
 	type download struct {
 		Name         string    `json:"name"`
+		Path         string    `json:"path"`
 		DownloadLink string    `json:"downloadLink"`
 		Time         time.Time `json:"time"`
 	}
@@ -171,30 +172,34 @@ func (server *server) getAllBooksHandler() http.HandlerFunc {
 			return
 		}
 
-		libraryDir := filepath.Join(server.config.DownloadDir, "books")
-		books, err := os.ReadDir(libraryDir)
-		if err != nil {
-			server.log.Printf("Unable to list books. %s\n", err)
-		}
-
+		libraryDir := server.config.DownloadDir
 		output := make([]download, 0)
-		for _, book := range books {
-			if book.IsDir() || strings.HasPrefix(book.Name(), ".") || filepath.Ext(book.Name()) == ".temp" {
-				continue
-			}
 
-			info, err := book.Info()
+		err := filepath.WalkDir(libraryDir, func(p string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			name := d.Name()
+			if strings.HasPrefix(name, ".") || filepath.Ext(name) == ".temp" {
+				return nil
+			}
+			info, err := d.Info()
 			if err != nil {
 				server.log.Println(err)
+				return nil
 			}
-
-			dl := download{
-				Name:         book.Name(),
-				DownloadLink: path.Join("library", book.Name()),
+			// relPath is relative to DownloadDir, e.g. "Author/Series/Title/file.epub"
+			relPath, _ := filepath.Rel(libraryDir, p)
+			output = append(output, download{
+				Name:         name,
+				Path:         filepath.ToSlash(relPath),
+				DownloadLink: path.Join("library", filepath.ToSlash(relPath)),
 				Time:         info.ModTime(),
-			}
-
-			output = append(output, dl)
+			})
+			return nil
+		})
+		if err != nil {
+			server.log.Printf("Unable to list books. %s\n", err)
 		}
 
 		w.Header().Add("Content-Type", "application/json")
@@ -204,8 +209,8 @@ func (server *server) getAllBooksHandler() http.HandlerFunc {
 
 func (server *server) getBookHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, fileName := path.Split(r.URL.Path)
-		bookPath := filepath.Join(server.config.DownloadDir, "books", fileName)
+		relPath, _ := url.PathUnescape(chi.URLParam(r, "*"))
+		bookPath := filepath.Join(server.config.DownloadDir, filepath.FromSlash(relPath))
 
 		http.ServeFile(w, r, bookPath)
 
@@ -220,13 +225,15 @@ func (server *server) getBookHandler() http.HandlerFunc {
 
 func (server *server) deleteBooksHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		fileName, err := url.PathUnescape(chi.URLParam(r, "fileName"))
+		relPath, err := url.PathUnescape(chi.URLParam(r, "*"))
 		if err != nil {
 			server.log.Printf("Error unescaping path: %s\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 
-		err = os.Remove(filepath.Join(server.config.DownloadDir, "books", fileName))
+		bookPath := filepath.Join(server.config.DownloadDir, filepath.FromSlash(relPath))
+		err = os.Remove(bookPath)
 		if err != nil {
 			server.log.Printf("Error deleting book file: %s\n", err)
 			w.WriteHeader(http.StatusInternalServerError)

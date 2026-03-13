@@ -8,6 +8,7 @@ export interface IrcServer {
 
 export interface Book {
   name: string;
+  path: string;
   downloadLink: string;
   time: string;
 }

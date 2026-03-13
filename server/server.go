@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -147,7 +146,7 @@ func (server *server) registerGracefulShutdown(cancel context.CancelFunc) {
 }
 
 func createBooksDirectory(config Config) {
-	err := os.MkdirAll(filepath.Join(config.DownloadDir, "books"), os.FileMode(0755))
+	err := os.MkdirAll(config.DownloadDir, os.FileMode(0755))
 	if err != nil {
 		panic(err)
 	}

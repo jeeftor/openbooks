@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"path"
+	"strings"
 
 	"github.com/evan-buss/openbooks/core"
 )
@@ -110,26 +111,22 @@ func newSearchResponse(results []core.BookDetail, errors []core.ParseError) Sear
 	}
 }
 
-func newDownloadResponse(filePath string, disableBrowserDownloads bool) DownloadResponse {
-	// If we don't want to autodownload the file, show the user the path to the file
-	// otherwise just show file name.
-	if !disableBrowserDownloads {
-		filePath = path.Base(filePath)
-	}
+func newDownloadResponse(filePath string, downloadDir string, disableBrowserDownloads bool) DownloadResponse {
+	// Show path relative to the download root so the user knows where the file landed.
+	relPath := strings.TrimPrefix(filePath, downloadDir+"/")
 
 	response := DownloadResponse{
 		StatusResponse: StatusResponse{
 			MessageType:      DOWNLOAD,
 			NotificationType: SUCCESS,
-			Title:            "Book file received.",
-			Detail:           filePath,
+			Title:            fmt.Sprintf("Book received: %s", path.Base(filePath)),
+			Detail:           relPath,
 		},
 	}
 
-	// If we want to autodownload the file, add the path to the response
-	// client will not attempt autodownload if the path is empty
+	// If browser downloads are enabled, trigger auto-download using the base filename.
 	if !disableBrowserDownloads {
-		response.DownloadPath = path.Join("library", filePath)
+		response.DownloadPath = path.Join("library", path.Base(filePath))
 	}
 
 	return response

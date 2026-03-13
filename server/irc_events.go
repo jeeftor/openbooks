@@ -8,10 +8,52 @@ import (
 	"github.com/evan-buss/openbooks/core"
 )
 
+// organizeByMetadata moves an EPUB to a metadata-derived subdirectory under downloadDir/books/.
+// Returns the final path (original path if unchanged or on error).
+func (c *Client) organizeByMetadata(extractedPath string, config Config) string {
+	if !config.OrganizeDownloads {
+		return extractedPath
+	}
+	if filepath.Ext(extractedPath) != ".epub" {
+		return extractedPath
+	}
+
+	meta, err := core.ReadEPUBMetadata(extractedPath)
+	if err != nil || meta == nil || meta.Author == "" || meta.Title == "" {
+		c.log.Printf("organizeByMetadata: skipping metadata organization for %s (err=%v)", filepath.Base(extractedPath), err)
+		return extractedPath
+	}
+
+	rs := config.ReplaceSpace
+	author := sanitizePathComponent(meta.Author, rs)
+	title := sanitizePathComponent(meta.Title, rs)
+
+	var targetDir string
+	if meta.Series != "" {
+		series := sanitizePathComponent(meta.Series, rs)
+		targetDir = filepath.Join(config.DownloadDir, author, series, title)
+	} else {
+		targetDir = filepath.Join(config.DownloadDir, author, title)
+	}
+
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		c.log.Printf("organizeByMetadata: failed to create dir %s: %v", targetDir, err)
+		return extractedPath
+	}
+
+	newPath := filepath.Join(targetDir, filepath.Base(extractedPath))
+	if err := os.Rename(extractedPath, newPath); err != nil {
+		c.log.Printf("organizeByMetadata: failed to move file: %v", err)
+		return extractedPath
+	}
+
+	return newPath
+}
+
 func (server *server) NewIrcEventHandler(client *Client) core.EventHandler {
 	handler := core.EventHandler{}
 	handler[core.SearchResult] = client.searchResultHandler(server.config.DownloadDir)
-	handler[core.BookResult] = client.bookResultHandler(server.config.DownloadDir, server.config.DisableBrowserDownloads)
+	handler[core.BookResult] = client.bookResultHandler(*server.config)
 	handler[core.NoResults] = client.noResultsHandler
 	handler[core.BadServer] = client.badServerHandler
 	handler[core.SearchAccepted] = client.searchAcceptedHandler
@@ -25,7 +67,7 @@ func (server *server) NewIrcEventHandler(client *Client) core.EventHandler {
 // searchResultHandler downloads from DCC server, parses data, and sends data to client
 func (c *Client) searchResultHandler(downloadDir string) core.HandlerFunc {
 	return func(text string) {
-		extractedPath, err := core.DownloadExtractDCCString(filepath.Join(downloadDir, "books"), text, nil)
+		extractedPath, err := core.DownloadExtractDCCString(downloadDir, text, nil)
 		if err != nil {
 			c.log.Println(err)
 			c.send <- newErrorResponse("Error when downloading search results.")
@@ -63,13 +105,9 @@ func (c *Client) searchResultHandler(downloadDir string) core.HandlerFunc {
 }
 
 // bookResultHandler downloads the book file and sends it over the websocket
-func (c *Client) bookResultHandler(downloadDir string, disableBrowserDownloads bool) core.HandlerFunc {
+func (c *Client) bookResultHandler(config Config) core.HandlerFunc {
 	return func(text string) {
-		subDir := c.downloadSubDir
-		if subDir == "" {
-			subDir = "books"
-		}
-		dir := filepath.Join(downloadDir, subDir)
+		dir := config.DownloadDir
 		extractedPath, err := core.DownloadExtractDCCString(dir, text, nil)
 		if err != nil {
 			c.log.Println(err)
@@ -77,9 +115,10 @@ func (c *Client) bookResultHandler(downloadDir string, disableBrowserDownloads b
 			return
 		}
 
-		c.log.Printf("Downloaded book to: %s\n", extractedPath)
-		c.log.Printf("Sending book entitled '%s'.\n", filepath.Base(extractedPath))
-		c.send <- newDownloadResponse(extractedPath, disableBrowserDownloads)
+		finalPath := c.organizeByMetadata(extractedPath, config)
+		c.log.Printf("Downloaded book to: %s\n", finalPath)
+		c.log.Printf("Sending book entitled '%s'.\n", filepath.Base(finalPath))
+		c.send <- newDownloadResponse(finalPath, config.DownloadDir, config.DisableBrowserDownloads)
 	}
 }
 
