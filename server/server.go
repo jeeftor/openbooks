@@ -34,6 +34,9 @@ type server struct {
 
 	log *log.Logger
 
+	// In-memory activity log (ring buffer)
+	logBuf *logBuffer
+
 	// Mutex to guard the lastSearch timestamp
 	lastSearchMutex sync.Mutex
 
@@ -64,6 +67,7 @@ func New(config Config) *server {
 	return &server{
 		repository: NewRepository(),
 		config:     &config,
+		logBuf:     newLogBuffer(500),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[uuid.UUID]*Client),

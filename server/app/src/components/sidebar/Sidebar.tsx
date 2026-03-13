@@ -22,6 +22,7 @@ import { toggleDrawer } from "../../state/notificationSlice";
 import { toggleSidebar } from "../../state/stateSlice";
 import { useAppDispatch, useAppSelector } from "../../state/store";
 import { useGetVersionQuery } from "../../state/api";
+import ActivityLog from "./ActivityLog";
 import History from "./History";
 import Library from "./Library";
 
@@ -50,7 +51,7 @@ export function SidebarContent() {
   const username = useAppSelector((store) => store.state.username);
   const { data: version } = useGetVersionQuery(null);
 
-  const [index, setIndex] = useLocalStorage<"books" | "history">({
+  const [index, setIndex] = useLocalStorage<"books" | "history" | "logs">({
     key: "sidebar-state",
     defaultValue: "history"
   });
@@ -89,17 +90,24 @@ export function SidebarContent() {
             }
           })}
           value={index}
-          onChange={(value: "books" | "history") => setIndex(value)}
+          onChange={(value: "books" | "history" | "logs") => setIndex(value)}
           data={[
-            { label: "Search History", value: "history" },
-            { label: "Previous Downloads", value: "books" }
+            { label: "History", value: "history" },
+            { label: "Downloads", value: "books" },
+            { label: "Logs", value: "logs" }
           ]}
           fullWidth
         />
       </Navbar.Section>
 
       <Navbar.Section grow p="xs" style={{ overflow: "auto" }}>
-        {index === "history" ? <History /> : <Library />}
+        {index === "history" ? (
+          <History />
+        ) : index === "books" ? (
+          <Library />
+        ) : (
+          <ActivityLog />
+        )}
       </Navbar.Section>
 
       <Navbar.Section className={classes.footer} p="sm">

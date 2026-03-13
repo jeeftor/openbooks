@@ -8,19 +8,23 @@ import (
 	"github.com/evan-buss/openbooks/core"
 )
 
-// organizeByMetadata moves an EPUB to a metadata-derived subdirectory under downloadDir/books/.
+// organizeByMetadata moves an EPUB to a metadata-derived subdirectory.
 // Returns the final path (original path if unchanged or on error).
-func (c *Client) organizeByMetadata(extractedPath string, config Config) string {
+func (c *Client) organizeByMetadata(extractedPath string, config Config, lb *logBuffer) string {
+	name := filepath.Base(extractedPath)
+
 	if !config.OrganizeDownloads {
 		return extractedPath
 	}
 	if filepath.Ext(extractedPath) != ".epub" {
+		lb.info(fmt.Sprintf("Saved (flat, non-EPUB): %s", name))
 		return extractedPath
 	}
 
 	meta, err := core.ReadEPUBMetadata(extractedPath)
 	if err != nil || meta == nil || meta.Author == "" || meta.Title == "" {
-		c.log.Printf("organizeByMetadata: skipping metadata organization for %s (err=%v)", filepath.Base(extractedPath), err)
+		c.log.Printf("organizeByMetadata: skipping metadata organization for %s (err=%v)", name, err)
+		lb.warn(fmt.Sprintf("Saved (flat, metadata unavailable): %s", name))
 		return extractedPath
 	}
 
@@ -38,22 +42,26 @@ func (c *Client) organizeByMetadata(extractedPath string, config Config) string 
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		c.log.Printf("organizeByMetadata: failed to create dir %s: %v", targetDir, err)
+		lb.error(fmt.Sprintf("Failed to create directory for %s: %v", name, err))
 		return extractedPath
 	}
 
-	newPath := filepath.Join(targetDir, filepath.Base(extractedPath))
+	newPath := filepath.Join(targetDir, name)
 	if err := os.Rename(extractedPath, newPath); err != nil {
 		c.log.Printf("organizeByMetadata: failed to move file: %v", err)
+		lb.error(fmt.Sprintf("Failed to move %s: %v", name, err))
 		return extractedPath
 	}
 
+	rel, _ := filepath.Rel(config.DownloadDir, newPath)
+	lb.info(fmt.Sprintf("Saved: %s", rel))
 	return newPath
 }
 
 func (server *server) NewIrcEventHandler(client *Client) core.EventHandler {
 	handler := core.EventHandler{}
 	handler[core.SearchResult] = client.searchResultHandler(server.config.DownloadDir)
-	handler[core.BookResult] = client.bookResultHandler(*server.config)
+	handler[core.BookResult] = client.bookResultHandler(*server.config, server.logBuf)
 	handler[core.NoResults] = client.noResultsHandler
 	handler[core.BadServer] = client.badServerHandler
 	handler[core.SearchAccepted] = client.searchAcceptedHandler
@@ -105,17 +113,18 @@ func (c *Client) searchResultHandler(downloadDir string) core.HandlerFunc {
 }
 
 // bookResultHandler downloads the book file and sends it over the websocket
-func (c *Client) bookResultHandler(config Config) core.HandlerFunc {
+func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFunc {
 	return func(text string) {
 		dir := config.DownloadDir
 		extractedPath, err := core.DownloadExtractDCCString(dir, text, nil)
 		if err != nil {
 			c.log.Println(err)
+			lb.error(fmt.Sprintf("Download failed: %v", err))
 			c.send <- newErrorResponse("Error when downloading book.")
 			return
 		}
 
-		finalPath := c.organizeByMetadata(extractedPath, config)
+		finalPath := c.organizeByMetadata(extractedPath, config, lb)
 		c.log.Printf("Downloaded book to: %s\n", finalPath)
 		c.log.Printf("Sending book entitled '%s'.\n", filepath.Base(finalPath))
 		c.send <- newDownloadResponse(finalPath, config.DownloadDir, config.DisableBrowserDownloads)

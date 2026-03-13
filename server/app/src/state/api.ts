@@ -13,6 +13,12 @@ export interface Book {
   time: string;
 }
 
+export interface LogEntry {
+  time: string;
+  level: "info" | "warn" | "error";
+  message: string;
+}
+
 export const openbooksApi = createApi({
   baseQuery: fetchBaseQuery({
     baseUrl: getApiURL().href,
@@ -38,11 +44,19 @@ export const openbooksApi = createApi({
       }),
       invalidatesTags: ["books"]
     }),
+    getLogs: builder.query<LogEntry[], null>({
+      query: () => `logs`
+    }),
     getVersion: builder.query<string, null>({
       query: () => `version`
     })
   })
 });
 
-export const { useGetServersQuery, useGetBooksQuery, useDeleteBookMutation, useGetVersionQuery } =
-  openbooksApi;
+export const {
+  useGetServersQuery,
+  useGetBooksQuery,
+  useDeleteBookMutation,
+  useGetLogsQuery,
+  useGetVersionQuery
+} = openbooksApi;

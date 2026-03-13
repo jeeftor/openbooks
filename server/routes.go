@@ -32,6 +32,8 @@ func (server *server) registerRoutes() *chi.Mux {
 	router.Get("/servers", server.serverListHandler())
 	router.Get("/version", server.versionHandler())
 
+	router.Get("/logs", server.logsHandler())
+
 	router.Group(func(r chi.Router) {
 		r.Use(server.requireUser)
 		r.Get("/library", server.getAllBooksHandler())
@@ -220,6 +222,13 @@ func (server *server) getBookHandler() http.HandlerFunc {
 				server.log.Printf("Error when deleting book file. %s", err)
 			}
 		}
+	}
+}
+
+func (server *server) logsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(server.logBuf.all())
 	}
 }
 
