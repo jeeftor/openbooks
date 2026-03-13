@@ -79,13 +79,22 @@ export default function BookTable({ books }: BookTableProps) {
   const [formatFilter, setFormatFilter] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
 
+  const sortedBooks = useMemo(() => {
+    if (!servers?.length) return books;
+    return [...books].sort((a, b) => {
+      const aOnline = servers.includes(a.server) ? 0 : 1;
+      const bOnline = servers.includes(b.server) ? 0 : 1;
+      return aOnline - bOnline;
+    });
+  }, [books, servers]);
+
   const formats = useMemo(
-    () => [...new Set(books.map((b) => b.format))].filter(Boolean).sort(),
-    [books]
+    () => [...new Set(sortedBooks.map((b) => b.format))].filter(Boolean).sort(),
+    [sortedBooks]
   );
 
   const filteredBooks = useMemo(() => {
-    let result = books;
+    let result = sortedBooks;
     if (authorFilter)
       result = result.filter((b) =>
         b.author.toLowerCase().includes(authorFilter.toLowerCase())
@@ -191,7 +200,7 @@ export default function BookTable({ books }: BookTableProps) {
   }, [width, servers]);
 
   const table = useReactTable({
-    data: books,
+    data: sortedBooks,
     columns,
     enableFilters: true,
     columnResizeMode: "onChange",
