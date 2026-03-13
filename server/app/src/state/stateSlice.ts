@@ -18,7 +18,10 @@ interface AppState {
 
 const loadActive = (): HistoryItem | null => {
   try {
-    return JSON.parse(localStorage.getItem("active")!) ?? null;
+    const item: HistoryItem | null = JSON.parse(localStorage.getItem("active")!) ?? null;
+    // Discard items that were saved mid-search (no results yet) to prevent
+    // the search input from loading in a permanently disabled state.
+    return item?.results ? item : null;
   } catch (err) {
     return null;
   }
@@ -67,12 +70,12 @@ const sendMessage = createAction("socket/send_message", (message: any) => ({
 
 const sendDownload = createAsyncThunk(
   "state/send_download",
-  (book: string, { dispatch }) => {
-    dispatch(addInFlightDownload(book));
+  (payload: { book: string; author?: string; title?: string }, { dispatch }) => {
+    dispatch(addInFlightDownload(payload.book));
     dispatch(
       sendMessage({
         type: MessageType.DOWNLOAD,
-        payload: { book }
+        payload: { book: payload.book, author: payload.author, title: payload.title }
       })
     );
   }

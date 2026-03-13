@@ -13,6 +13,7 @@ import (
 
 var openBrowser = false
 var serverConfig server.Config
+var replaceSpace string
 
 func init() {
 	desktopCmd.AddCommand(serverCmd)
@@ -24,6 +25,8 @@ func init() {
 	serverCmd.Flags().BoolVarP(&openBrowser, "browser", "b", false, "Open the browser on server start.")
 	serverCmd.Flags().BoolVar(&serverConfig.Persist, "persist", false, "Persist eBooks in 'dir'. Default is to delete after sending.")
 	serverCmd.Flags().StringVarP(&serverConfig.DownloadDir, "dir", "d", filepath.Join(os.TempDir(), "openbooks"), "The directory where eBooks are saved when persist enabled.")
+	serverCmd.Flags().BoolVar(&serverConfig.OrganizeDownloads, "organize-downloads", false, "Organize downloads into author/title/FILE subdirectories.")
+	serverCmd.Flags().StringVar(&replaceSpace, "replace-space", "", "Replace spaces in author/title directory names with this character (e.g. '.', '-', '_').")
 }
 
 var serverCmd = &cobra.Command{
@@ -44,6 +47,7 @@ var serverCmd = &cobra.Command{
 		serverConfig.Basepath = sanitizePath(serverConfig.Basepath)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		serverConfig.ReplaceSpace = replaceSpace
 		if openBrowser {
 			browserUrl := "http://127.0.0.1:" + path.Join(serverConfig.Port+serverConfig.Basepath)
 			util.OpenBrowser(browserUrl)

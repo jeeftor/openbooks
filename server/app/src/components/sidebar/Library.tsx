@@ -70,7 +70,7 @@ function LibraryCard({ book }: LibraryCardProps) {
   return (
     <Menu shadow="md">
       <Menu.Target>
-        <Tooltip label={book.name} openDelay={1_000}>
+        <Tooltip label={book.path ?? book.name} openDelay={500}>
           <Button
             key={book.name}
             classNames={classes}
@@ -98,7 +98,7 @@ function LibraryCard({ book }: LibraryCardProps) {
         <Menu.Item
           color="red"
           icon={<Trash size={18} weight="bold" />}
-          onClick={() => deleteBook(book.name)}>
+          onClick={() => deleteBook(book.path ?? book.name)}>
           Delete
         </Menu.Item>
       </Menu.Dropdown>
