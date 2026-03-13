@@ -18,7 +18,10 @@ interface AppState {
 
 const loadActive = (): HistoryItem | null => {
   try {
-    return JSON.parse(localStorage.getItem("active")!) ?? null;
+    const item: HistoryItem | null = JSON.parse(localStorage.getItem("active")!) ?? null;
+    // Discard items that were saved mid-search (no results yet) to prevent
+    // the search input from loading in a permanently disabled state.
+    return item?.results ? item : null;
   } catch (err) {
     return null;
   }
