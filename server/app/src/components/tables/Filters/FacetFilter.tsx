@@ -266,7 +266,7 @@ export function ServerFacetEntry({
   style
 }: FacetEntryProps) {
   const { classes, cx } = useFacetStyles();
-  const { data: servers } = useGetServersQuery(null);
+  const { data: servers } = useGetServersQuery(null, { pollingInterval: 30000 });
   const serverOnline = servers?.includes(entry) ?? false;
 
   return (

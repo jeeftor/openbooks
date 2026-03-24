@@ -65,7 +65,7 @@ interface BookTableProps {
 
 export default function BookTable({ books }: BookTableProps) {
   const { classes, cx, theme } = useTableStyles();
-  const { data: servers } = useGetServersQuery(null);
+  const { data: servers } = useGetServersQuery(null, { pollingInterval: 30000 });
 
   const { ref: elementSizeRef, width } = useElementSize();
   const virtualizerRef = useRef<HTMLDivElement>();
