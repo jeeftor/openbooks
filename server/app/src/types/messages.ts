@@ -1,0 +1,75 @@
+export enum NotificationType {
+  NOTIFY,
+  SUCCESS,
+  WARNING,
+  DANGER
+}
+
+export enum MessageType {
+  STATUS,
+  CONNECT,
+  SEARCH,
+  DOWNLOAD,
+  RATELIMIT
+}
+
+export interface AppNotification {
+  appearance: NotificationType;
+  title: string;
+  detail?: string;
+  timestamp: number;
+}
+
+export interface WsResponse {
+  type: MessageType;
+  appearance: NotificationType;
+  title: string;
+  detail?: string;
+}
+
+export interface ConnectionResponse extends WsResponse {
+  name: string;
+}
+
+export interface SearchResponse extends WsResponse {
+  books: BookDetail[];
+  errors: ParseError[];
+}
+
+export interface DownloadResponse extends WsResponse {
+  downloadPath?: string;
+}
+
+export interface BookDetail {
+  server: string;
+  author: string;
+  title: string;
+  format: string;
+  size: string;
+  full: string;
+}
+
+export interface ParseError {
+  error: string;
+  line: string;
+}
+
+export interface Book {
+  name: string;
+  path: string;
+  downloadLink: string;
+  time: string;
+}
+
+export interface LogEntry {
+  time: string;
+  level: "info" | "warn" | "error";
+  message: string;
+}
+
+export interface HistoryItem {
+  query: string;
+  timestamp: number;
+  results?: BookDetail[];
+  errors?: ParseError[];
+}

@@ -88,7 +88,9 @@ export const websocketConn =
         MAX_RETRY_DELAY
       );
 
-      console.log(`Reconnecting in ${delay / 1000}s (attempt ${retryCount}/${MAX_RETRIES})...`);
+      console.log(
+        `Reconnecting in ${delay / 1000}s (attempt ${retryCount}/${MAX_RETRIES})...`
+      );
 
       displayNotification({
         appearance: NotificationType.WARNING,
@@ -114,7 +116,8 @@ export const websocketConn =
           pendingMessages.push(action.payload.message);
           displayNotification({
             appearance: NotificationType.WARNING,
-            title: "Not connected. Message queued - will send when reconnected.",
+            title:
+              "Not connected. Message queued - will send when reconnected.",
             timestamp: new Date().getTime()
           });
         }

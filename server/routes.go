@@ -61,11 +61,7 @@ func (server *server) serveWs() http.HandlerFunc {
 		}
 
 		userId, err := uuid.Parse(cookie.Value)
-		_, alreadyConnected := server.clients[userId]
-
-		// If invalid UUID or the same browser tries to connect again
-		// Don't connect to IRC or create new client
-		if err != nil || alreadyConnected {
+		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}

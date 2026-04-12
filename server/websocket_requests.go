@@ -94,6 +94,7 @@ func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 		return
 	}
 
+	c.log.Printf("Searching for: %q\n", s.Query)
 	core.SearchBook(c.irc, server.config.SearchBot, s.Query)
 	server.lastSearch = time.Now()
 

@@ -22,9 +22,9 @@ type containerXML struct {
 
 type opfPackage struct {
 	Metadata struct {
-		Titles   []string    `xml:"title"`
+		Titles   []string     `xml:"title"`
 		Creators []opfCreator `xml:"creator"`
-		Metas    []opfMeta   `xml:"meta"`
+		Metas    []opfMeta    `xml:"meta"`
 	} `xml:"metadata"`
 }
 

@@ -23,7 +23,7 @@ export const store = configureStore({
     getDefaultMiddleware().concat(
       websocketConn(getWebsocketURL().href),
       openbooksApi.middleware
-    ),
+    )
 });
 
 setupListeners(store.dispatch);

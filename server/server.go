@@ -107,6 +107,12 @@ func Start(config Config) {
 	server.log.Printf("OpenBooks is listening on port %v", config.Port)
 	server.log.Printf("Download Directory: %s\n", config.DownloadDir)
 	server.log.Printf("Open http://localhost:%v%s in your browser.", config.Port, config.Basepath)
+	server.log.Printf("Persist downloads:      %v", config.Persist)
+	server.log.Printf("Organize downloads:     %v", config.OrganizeDownloads)
+	server.log.Printf("IRC server:             %s (TLS: %v)", config.Server, config.EnableTLS)
+	server.log.Printf("Username:               %s", config.UserName)
+	server.log.Printf("Search bot:             %s", config.SearchBot)
+	server.log.Printf("Browser downloads:      %v", !config.DisableBrowserDownloads)
 	server.log.Fatal(http.ListenAndServe(":"+config.Port, router))
 }
 
@@ -116,9 +122,18 @@ func (server *server) startClientHub(ctx context.Context) {
 	for {
 		select {
 		case client := <-server.register:
+			// Handle reconnect: if the same UUID is already registered (e.g. after
+			// a network drop), close the old connection so its goroutines exit.
+			if old, exists := server.clients[client.uuid]; exists {
+				old.conn.Close() // causes readPump ReadJSON to fail → defer fires
+				close(old.send)  // causes writePump to exit cleanly
+				server.log.Printf("Replaced stale connection for %s\n", old.irc.Username)
+			}
 			server.clients[client.uuid] = client
 		case client := <-server.unregister:
-			if _, ok := server.clients[client.uuid]; ok {
+			// Use pointer equality: if a new client replaced this one, skip the delete
+			// so we don't evict the replacement from the map.
+			if existing, ok := server.clients[client.uuid]; ok && existing == client {
 				_, cancel := context.WithCancel(client.ctx)
 				close(client.send)
 				cancel()

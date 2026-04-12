@@ -1,42 +1,58 @@
-.PHONY: help install build build-frontend build-backend test dev dev-mobile dev1 dev2 dev-mock dev-mock1 dev-mock2 dev-cli clean lint fmt docker
+.PHONY: help install install-go install-npm \
+        dev dev-mobile dev-mock dev-mock-mobile \
+        dev1 dev2 dev-mock1 dev-mock2 dev-cli \
+        build build-frontend build-backend build-release \
+        test test-go test-frontend type-check \
+        lint lint-go lint-frontend \
+        fmt fmt-go fmt-frontend \
+        docker docker-run clean
 
-# Default target
+# ─── Default target ──────────────────────────────────────────────────────────
 help:
-	@echo "OpenBooks Development Commands"
 	@echo ""
-	@echo "Setup:"
-	@echo "  make install          Install all dependencies (Go + npm)"
+	@echo "  OpenBooks — Development Commands"
+	@echo "  Vue 3 frontend + Go backend"
 	@echo ""
-	@echo "Development (real IRC server - recommended):"
-	@echo "  make dev              Run backend + frontend (connects to irc.irchighway.net)"
-	@echo "  make dev-mobile       Same as dev, but frontend accessible from LAN (for phone testing)"
-	@echo "  make dev1             Backend only  (Terminal 1)"
-	@echo "  make dev2             Frontend only (Terminal 2)"
+	@echo "  ── Setup ──────────────────────────────────────────────"
+	@echo "  make install           Install all dependencies (Go + npm)"
 	@echo ""
-	@echo "Development (mock IRC - for offline testing):"
-	@echo "  make dev-mock         Run mock + backend + frontend"
-	@echo "  make dev-mock1        Mock server   (Terminal 1)"
-	@echo "  make dev-mock2        Backend       (Terminal 2)"
-	@echo "  make dev2             Frontend      (Terminal 3)"
+	@echo "  ── Dev: Real IRC (irc.irchighway.net) ─────────────────"
+	@echo "  make dev               Backend + frontend in one terminal"
+	@echo "  make dev-mobile        Same, but LAN-accessible (for phone testing)"
+	@echo "  make dev1              Backend only   (Terminal 1)"
+	@echo "  make dev2              Frontend only  (Terminal 2)"
 	@echo ""
-	@echo "Build:"
-	@echo "  make build            Build everything (frontend + backend)"
-	@echo "  make build-frontend   Build React frontend only"
-	@echo "  make build-backend    Build Go backend only"
+	@echo "  ── Dev: Mock IRC (offline, no IRC account needed) ──────"
+	@echo "  make dev-mock          Mock + backend + frontend in one terminal"
+	@echo "  make dev-mock-mobile   Same, but LAN-accessible (for phone testing)"
+	@echo "  make dev-mock1         Mock IRC server  (Terminal 1)"
+	@echo "  make dev-mock2         Backend          (Terminal 2)"
+	@echo "  make dev2              Frontend         (Terminal 3)"
 	@echo ""
-	@echo "Quality:"
-	@echo "  make test             Run all tests"
-	@echo "  make test-go          Run Go tests"
-	@echo "  make test-frontend    Run frontend tests"
-	@echo "  make lint             Run linters"
-	@echo "  make fmt              Format code"
+	@echo "  ── Build ───────────────────────────────────────────────"
+	@echo "  make build             Build everything (frontend + backend)"
+	@echo "  make build-frontend    Vue frontend only  → server/app/dist/"
+	@echo "  make build-backend     Go backend only    → cmd/openbooks/openbooks"
+	@echo "  make build-release     Stripped release binary"
 	@echo ""
-	@echo "Other:"
-	@echo "  make dev-cli          Run OpenBooks in CLI mode"
-	@echo "  make docker           Build Docker image"
-	@echo "  make clean            Clean build artifacts"
+	@echo "  ── Quality ─────────────────────────────────────────────"
+	@echo "  make type-check        Run vue-tsc type checking"
+	@echo "  make test              Run all tests (Go + frontend)"
+	@echo "  make test-go           Go tests only"
+	@echo "  make test-frontend     Frontend tests only (if configured)"
+	@echo "  make lint              Run all linters"
+	@echo "  make fmt               Format all code"
+	@echo ""
+	@echo "  ── Other ───────────────────────────────────────────────"
+	@echo "  make dev-cli           OpenBooks CLI mode (mock IRC)"
+	@echo "  make docker            Build Docker image"
+	@echo "  make docker-run        Run Docker image on :8080"
+	@echo "  make clean             Remove build artifacts"
+	@echo ""
+	@echo "  Override username: make dev NAME=myuser  (default: openbooks_dev)"
+	@echo ""
 
-# Setup
+# ─── Setup ───────────────────────────────────────────────────────────────────
 install: install-go install-npm
 
 install-go:
@@ -48,111 +64,121 @@ install-npm:
 # =============================================================================
 # DEVELOPMENT
 # =============================================================================
-# Real IRC server (recommended):
-#   make dev          - Backend + frontend, connects to irc.irchighway.net
-#   make dev1 + dev2  - Same but in separate terminals (for debugging)
+# Real IRC server:
+#   make dev            - All-in-one (recommended)
+#   make dev-mobile     - All-in-one, exposed on LAN for phone/tablet testing
+#   make dev1 + dev2    - Separate terminals (easier log reading)
 #
-# Mock IRC server (offline testing):
-#   make dev-mock           - Mock + backend + frontend, all in one terminal
+# Mock IRC server (offline, no IRC credentials needed):
+#   make dev-mock            - All-in-one
+#   make dev-mock-mobile     - All-in-one, LAN-exposed for phone/tablet testing
 #   make dev-mock1 + dev-mock2 + dev2  - Separate terminals
 #
-# Note: Frontend must be built before backend (backend embeds the frontend).
-#       The targets handle this automatically via build-frontend dependency.
+# Note: Go backend embeds server/app/dist at compile time. The all-in-one
+#       targets build the frontend first, then run both services concurrently.
+#       The frontend Vite dev server proxies WS to :5228 automatically.
 # =============================================================================
 
-# Default dev username (override with: make dev NAME=myname)
+# Default username (override with: make dev NAME=myname)
 NAME ?= openbooks_dev
 
-# Option A: All-in-one with REAL IRC server (recommended)
+# ── All-in-one: Real IRC ──────────────────────────────────────────────────────
 dev: build-frontend install-npm
-	@echo "Starting backend + frontend (connecting to real IRC server)..."
-	@echo "Press Ctrl+C to stop all services"
 	@echo ""
-	@echo "Services:"
-	@echo "  IRC:       irc.irchighway.net:6697 (real server)"
-	@echo "  Backend:   localhost:5228"
-	@echo "  Frontend:  localhost:5173"
-	@echo "  Username:  $(NAME)"
+	@echo "  IRC:      irc.irchighway.net:6697"
+	@echo "  Backend:  http://localhost:5228"
+	@echo "  Frontend: http://localhost:5173  ← open in browser"
+	@echo "  Username: $(NAME)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	(cd cmd/openbooks && echo "[backend] Building..." && go build && echo "[backend] Starting..." && ./openbooks server --name $(NAME) 2>&1 | sed 's/^/[backend] /') & \
-	sleep 2 && (cd server/app && echo "[frontend] Starting..." && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
+	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --persist --organize-downloads 2>&1 | sed 's/^/[backend] /') & \
+	sleep 2 && (cd server/app && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
-# Option A2: Same as dev but accessible from LAN (for mobile testing)
+# ── All-in-one: Real IRC, LAN-exposed (mobile/tablet) ────────────────────────
 dev-mobile: build-frontend install-npm
-	@echo "Starting backend + frontend (accessible from LAN)..."
-	@echo "Press Ctrl+C to stop all services"
 	@echo ""
-	@LOCAL_IP=$$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $$1}'); \
-	echo "Services:"; \
-	echo "  IRC:       irc.irchighway.net:6697 (real server)"; \
-	echo "  Backend:   $$LOCAL_IP:5228"; \
-	echo "  Frontend:  $$LOCAL_IP:5173  <-- Open this on your phone"; \
-	echo "  Username:  $(NAME)"; \
+	@LOCAL_IP=$$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $$1}' || echo "YOUR_IP"); \
+	echo "  IRC:      irc.irchighway.net:6697"; \
+	echo "  Backend:  http://$$LOCAL_IP:5228"; \
+	echo "  Frontend: http://$$LOCAL_IP:5173  ← open on your phone/tablet"; \
+	echo "  Username: $(NAME)"; \
 	echo ""; \
 	trap 'kill 0' EXIT; \
-	(cd cmd/openbooks && echo "[backend] Building..." && go build && echo "[backend] Starting..." && ./openbooks server --name $(NAME) 2>&1 | sed 's/^/[backend] /') & \
-	sleep 2 && (cd server/app && echo "[frontend] Starting..." && npm run dev -- --host 2>&1 | sed 's/^/[frontend] /') & \
+	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --persist --organize-downloads 2>&1 | sed 's/^/[backend] /') & \
+	sleep 2 && (cd server/app && npm run dev -- --host 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
-# Option B: All-in-one with MOCK IRC server (for offline testing)
+# ── All-in-one: Mock IRC ──────────────────────────────────────────────────────
 dev-mock: build-frontend install-npm
-	@echo "Starting mock + backend + frontend..."
-	@echo "Press Ctrl+C to stop all services"
 	@echo ""
-	@echo "Services:"
-	@echo "  Mock IRC:  localhost:6667"
-	@echo "  Backend:   localhost:5228"
-	@echo "  Frontend:  localhost:5173"
-	@echo "  Username:  $(NAME)"
+	@echo "  Mock IRC: localhost:6667  (offline, no IRC account needed)"
+	@echo "  Backend:  http://localhost:5228"
+	@echo "  Frontend: http://localhost:5173  ← open in browser"
+	@echo "  Username: $(NAME)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	(cd cmd/mock_server && echo "[mock] Starting..." && go run . 2>&1 | sed 's/^/[mock] /') & \
-	sleep 2 && (cd cmd/openbooks && echo "[backend] Building..." && go build && echo "[backend] Starting..." && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 2>&1 | sed 's/^/[backend] /') & \
-	sleep 3 && (cd server/app && echo "[frontend] Starting..." && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
+	(cd cmd/mock_server && go run . 2>&1 | sed 's/^/[mock]     /') & \
+	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 2>&1 | sed 's/^/[backend]  /') & \
+	sleep 3 && (cd server/app && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
-# Option C: Separate terminals (for debugging - run in order: dev1 -> dev2)
+# ── All-in-one: Mock IRC, LAN-exposed (mobile/tablet) ────────────────────────
+dev-mock-mobile: build-frontend install-npm
+	@echo ""
+	@LOCAL_IP=$$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $$1}' || echo "YOUR_IP"); \
+	echo "  Mock IRC: localhost:6667  (offline, no IRC account needed)"; \
+	echo "  Backend:  http://$$LOCAL_IP:5228"; \
+	echo "  Frontend: http://$$LOCAL_IP:5173  ← open on your phone/tablet"; \
+	echo "  Username: $(NAME)"; \
+	echo ""; \
+	trap 'kill 0' EXIT; \
+	(cd cmd/mock_server && go run . 2>&1 | sed 's/^/[mock]     /') & \
+	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 2>&1 | sed 's/^/[backend]  /') & \
+	sleep 3 && (cd server/app && npm run dev -- --host 2>&1 | sed 's/^/[frontend] /') & \
+	wait
+
+# ── Separate terminals: Real IRC ──────────────────────────────────────────────
 dev1: build-frontend
-	@echo "Starting Backend on :5228 (real IRC server)..."
-	@echo "Username: $(NAME) (override with: make dev1 NAME=myname)"
-	@echo "Once ready, run 'make dev2' in another terminal"
-	cd cmd/openbooks && go build && ./openbooks server --name $(NAME)
+	@echo "Backend → :5228  (username: $(NAME))"
+	@echo "Run 'make dev2' in another terminal once backend is ready."
+	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --persist --organize-downloads
 
 dev2: install-npm
-	@echo "Starting Frontend on :5173..."
-	@echo "Open http://localhost:5173 in your browser"
+	@echo "Frontend → :5173  (http://localhost:5173)"
 	cd server/app && npm run dev
 
-# For mock server testing (run: dev-mock1 -> dev-mock2 -> dev2)
+# ── Separate terminals: Mock IRC ──────────────────────────────────────────────
 dev-mock1:
-	@echo "Starting Mock IRC server on :6667..."
-	@echo "Wait for 'waiting' message, then run 'make dev-mock2' in another terminal"
+	@echo "Mock IRC → :6667"
+	@echo "Run 'make dev-mock2' in another terminal once mock is ready."
 	cd cmd/mock_server && go run .
 
 dev-mock2: build-frontend
-	@echo "Starting Backend on :5228 (mock IRC)..."
-	@echo "Username: $(NAME)"
-	@echo "Once ready, run 'make dev2' in another terminal"
+	@echo "Backend → :5228  (mock IRC, username: $(NAME))"
+	@echo "Run 'make dev2' in another terminal once backend is ready."
 	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667
 
+# ── CLI mode ──────────────────────────────────────────────────────────────────
 dev-cli:
 	cd cmd/openbooks && go build && ./openbooks cli --tls=false --server localhost:6667
 
-# Build
+# ─── Build ───────────────────────────────────────────────────────────────────
 build: build-frontend build-backend
 
 build-frontend:
+	@echo "Building Vue frontend → server/app/dist/"
 	cd server/app && npm run build
 
 build-backend:
+	@echo "Building Go backend → cmd/openbooks/openbooks"
 	cd cmd/openbooks && go build -o openbooks
 
 build-release:
+	@echo "Building stripped release binary → ./openbooks"
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o openbooks ./cmd/openbooks
 
-# Test
+# ─── Test & Quality ──────────────────────────────────────────────────────────
 test: test-go test-frontend
 
 test-go:
@@ -161,12 +187,15 @@ test-go:
 test-frontend:
 	cd server/app && npm test --if-present
 
-# Quality
+type-check:
+	@echo "Running vue-tsc type check..."
+	cd server/app && npx vue-tsc --noEmit
+
 lint: lint-go lint-frontend
 
 lint-go:
 	go vet ./...
-	@which golangci-lint > /dev/null && golangci-lint run || echo "golangci-lint not installed, skipping"
+	@which golangci-lint > /dev/null && golangci-lint run || echo "  golangci-lint not found, skipping (install via https://golangci-lint.run)"
 
 lint-frontend:
 	cd server/app && npm run lint --if-present
@@ -177,17 +206,18 @@ fmt-go:
 	go fmt ./...
 
 fmt-frontend:
-	cd server/app && npm run format --if-present || npx prettier --write "src/**/*.{ts,tsx}" 2>/dev/null || true
+	cd server/app && npx prettier --write "src/**/*.{ts,vue}" 2>/dev/null || true
 
-# Docker
+# ─── Docker ──────────────────────────────────────────────────────────────────
 docker:
 	docker build -t openbooks .
 
 docker-run:
 	docker run -p 8080:80 -v $(PWD)/books:/books openbooks
 
-# Clean
+# ─── Clean ───────────────────────────────────────────────────────────────────
 clean:
 	rm -f cmd/openbooks/openbooks
+	rm -f openbooks
 	rm -rf server/app/dist
 	rm -rf server/app/node_modules/.cache
