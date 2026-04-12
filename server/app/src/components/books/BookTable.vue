@@ -533,12 +533,24 @@ function toggleFormat(fmt: string) {
                 <div class="flex items-center gap-1.5">
                   <!-- Group indicator -->
                   <button
-                    v-if="groupBooks && (() => { const g = getGroupForBook(displayBooks[vItem.index]); return g && g.books.length > 1; })()"
+                    v-if="groupBooks && displayBooks[vItem.index]?._groupKey && (() => {
+                      const g = groupedBooks?.find(gr => gr.key === displayBooks[vItem.index]._groupKey);
+                      return g && g.books.length > 1;
+                    })()"
                     class="flex-shrink-0 text-slate-400 hover:text-brand-400 transition-colors"
-                    :title="`${getGroupForBook(displayBooks[vItem.index])?.books.length || 0} sources`"
-                    @click="() => { const g = getGroupForBook(displayBooks[vItem.index]); if (g) toggleGroup(g.key); }">
+                    :title="(() => {
+                      const g = groupedBooks?.find(gr => gr.key === displayBooks[vItem.index]._groupKey);
+                      return `${g?.books.length || 0} sources`;
+                    })()"
+                    @click="() => {
+                      const key = displayBooks[vItem.index]._groupKey;
+                      if (key) toggleGroup(key);
+                    }">
                     <Layers :size="12" />
-                    <span class="text-[10px] ml-0.5">{{ getGroupForBook(displayBooks[vItem.index])?.books.length }}</span>
+                    <span class="text-[10px] ml-0.5">{{ (() => {
+                      const g = groupedBooks?.find(gr => gr.key === displayBooks[vItem.index]._groupKey);
+                      return g?.books.length || 0;
+                    })() }}</span>
                   </button>
                   <span
                     class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
