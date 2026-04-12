@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import { User, Search, Circle, Eye, EyeOff, Star, Wifi, ChevronDown, ChevronUp, Layers } from "lucide-vue-next";
+import { User, Search, Circle, Eye, EyeOff, Star, Wifi, ChevronDown, ChevronUp, Layers, Download } from "lucide-vue-next";
 import type { BookDetail } from "../../types/messages";
 import { useServers } from "../../composables/useApi";
 import { usePreferencesStore } from "../../stores/preferences";
@@ -249,6 +249,32 @@ function toggleGroup(groupKey: string) {
   expandedGroups.value = new Set(expandedGroups.value);
 }
 
+function exportResults() {
+  const data = {
+    timestamp: new Date().toISOString(),
+    totalBooks: props.books.length,
+    matchedBooks: matchedBooks.value.length,
+    filters: {
+      servers: serverFilter.value,
+      onlineOnly: onlineOnly.value,
+      author: authorFilter.value,
+      title: titleFilter.value,
+      formats: formatFilter.value
+    },
+    books: props.books
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `openbooks-results-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 const isMatched = (idx: number) =>
   !prefStore.showUnmatched || idx < matchedBooks.value.length;
 
@@ -397,6 +423,14 @@ function toggleFormat(fmt: string) {
           @click="groupBooks = !groupBooks; expandedGroups.clear()">
           <Layers :size="10" />
           Group Books
+        </button>
+        <!-- Export button -->
+        <button
+          class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300 transition-colors whitespace-nowrap"
+          title="Export all results as JSON"
+          @click="exportResults">
+          <Download :size="10" />
+          Export
         </button>
         <!-- Save / clear preference -->
         <div class="ml-auto flex items-center gap-1.5">
