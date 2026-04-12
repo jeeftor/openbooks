@@ -214,25 +214,42 @@ const groupedBooks = computed(() => {
   return groups;
 });
 
-const displayBooks = computed(() => {
+// Track which books are in expanded groups for styling
+interface DisplayBook extends BookDetail {
+  _isGroupMember?: boolean;
+  _isGroupRepresentative?: boolean;
+  _groupKey?: string;
+}
+
+const displayBooks = computed<DisplayBook[]>(() => {
   if (groupBooks.value && groupedBooks.value) {
     // Flatten groups, showing only representative or all if expanded
-    const result: BookDetail[] = [];
+    const result: DisplayBook[] = [];
     groupedBooks.value.forEach(group => {
       if (group.books.length === 1) {
         result.push(group.books[0]);
       } else if (expandedGroups.value.has(group.key)) {
-        result.push(...group.books);
+        // Mark all books in expanded group
+        group.books.forEach((book, idx) => {
+          result.push({
+            ...book,
+            _isGroupMember: true,
+            _isGroupRepresentative: idx === 0,
+            _groupKey: group.key
+          });
+        });
       } else {
-        result.push(group.representative);
+        result.push({
+          ...group.representative,
+          _isGroupRepresentative: true,
+          _groupKey: group.key
+        });
       }
     });
     return result;
   }
   
-  return prefStore.showUnmatched && hiddenCount.value > 0
-    ? [...matchedBooks.value, ...hiddenBooks.value]
-    : matchedBooks.value;
+  return matchedBooks.value;
 });
 
 function getGroupForBook(book: BookDetail): BookGroup | null {
@@ -502,12 +519,17 @@ function toggleFormat(fmt: string) {
           <tr
             v-for="vItem in virtualItems"
             :key="String(vItem.key)"
-            class="border-b border-slate-100 dark:border-slate-800/60 h-12 transition-opacity"
-            :class="isMatched(vItem.index)
-              ? 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
-              : 'opacity-30'">
+            class="border-b border-slate-100 dark:border-slate-800/60 h-12 transition-all"
+            :class="[
+              isMatched(vItem.index)
+                ? 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                : 'opacity-30',
+              displayBooks[vItem.index]?._isGroupMember
+                ? 'bg-brand-50/30 dark:bg-brand-900/10 border-l-2 border-l-brand-400'
+                : ''
+            ]">
             <template v-if="displayBooks[vItem.index]">
-              <td class="px-3 py-1.5">
+              <td class="py-1.5" :class="displayBooks[vItem.index]?._isGroupMember ? 'pl-6 pr-3' : 'px-3'">
                 <div class="flex items-center gap-1.5">
                   <!-- Group indicator -->
                   <button
