@@ -50,10 +50,17 @@ func (server *server) routeMessage(message Request, c *Client) {
 
 // handle ConnectionRequests and either connect to the server or do nothing
 func (c *Client) startIrcConnection(server *server) {
+	// Protect against send on closed channel if this client is being replaced
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Printf("Recovered from panic in startIrcConnection: %v", r)
+		}
+	}()
+
 	err := core.Join(c.irc, server.config.Server, server.config.EnableTLS)
 	if err != nil {
 		c.log.Println(err)
-		c.send <- newErrorResponse("Unable to connect to IRC server.")
+		safeSend(c, newErrorResponse("Unable to connect to IRC server."))
 		return
 	}
 
@@ -69,7 +76,7 @@ func (c *Client) startIrcConnection(server *server) {
 
 	go core.StartReader(c.ctx, c.irc, handler)
 
-	c.send <- ConnectionResponse{
+	safeSend(c, ConnectionResponse{
 		StatusResponse: StatusResponse{
 			MessageType:      CONNECT,
 			NotificationType: SUCCESS,
@@ -77,6 +84,21 @@ func (c *Client) startIrcConnection(server *server) {
 			Detail:           fmt.Sprintf("IRC username %s", c.irc.Username),
 		},
 		Name: c.irc.Username,
+	})
+}
+
+// safeSend attempts to send on the client channel, recovering from panic if channel is closed
+func safeSend(c *Client, msg interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Printf("Channel closed, message not sent: %v", r)
+		}
+	}()
+	select {
+	case c.send <- msg:
+		// sent successfully
+	case <-c.ctx.Done():
+		// context cancelled, client is being shut down
 	}
 }
 
