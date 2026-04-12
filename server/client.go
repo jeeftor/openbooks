@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
@@ -80,7 +81,9 @@ func (server *server) readPump(c *Client) {
 				return
 			}
 
-			c.log.Printf("%s Message Received\n", request.MessageType)
+			// Log message type and payload for debugging
+			payloadJSON, _ := json.Marshal(request.Payload)
+			c.log.Printf("%s Message Received: %s\n", request.MessageType, string(payloadJSON))
 
 			server.routeMessage(request, c)
 		}
