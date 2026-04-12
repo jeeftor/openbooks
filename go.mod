@@ -30,6 +30,7 @@ require (
 
 require (
 	git.wow.st/gmp/jni v0.0.0-20260127013417-d142949d346a // indirect
+	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/inkeliz/w32 v1.0.2 // indirect

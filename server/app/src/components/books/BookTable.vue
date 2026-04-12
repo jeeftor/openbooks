@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import { User, Search, Circle, Eye, EyeOff, Star, Wifi, ChevronDown, ChevronUp } from "lucide-vue-next";
+import { User, Search, Circle, Eye, EyeOff, Star, Wifi, ChevronDown, ChevronUp, Layers } from "lucide-vue-next";
 import type { BookDetail } from "../../types/messages";
 import { useServers } from "../../composables/useApi";
 import { usePreferencesStore } from "../../stores/preferences";
@@ -70,6 +70,8 @@ const serverDropdownOpen = ref(false);
 const authorFilter = ref("");
 const titleFilter = ref("");
 const formatFilter = ref<string[]>([...prefStore.preferredFormats]);
+const groupBooks = ref(false);
+const expandedGroups = ref<Set<string>>(new Set());
 
 const allServers = computed(() =>
   [...new Set(sortedBooks.value.map((b) => b.server))].filter(Boolean).sort()
@@ -97,11 +99,155 @@ const matchedBooks = computed(() => sortedBooks.value.filter(matchesBook));
 const hiddenBooks = computed(() => sortedBooks.value.filter((b) => !matchesBook(b)));
 const hiddenCount = computed(() => hiddenBooks.value.length);
 
-const displayBooks = computed(() =>
-  prefStore.showUnmatched && hiddenCount.value > 0
+// Grouping logic for EPUBs only
+interface BookGroup {
+  key: string;
+  books: BookDetail[];
+  representative: BookDetail;
+}
+
+function normalizeString(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function similarity(a: string, b: string): number {
+  const distance = levenshteinDistance(a, b);
+  const maxLen = Math.max(a.length, b.length);
+  return maxLen === 0 ? 1 : 1 - distance / maxLen;
+}
+
+function areSimilar(a: BookDetail, b: BookDetail): boolean {
+  // Only group EPUBs
+  if (a.format !== 'EPUB' || b.format !== 'EPUB') return false;
+  
+  // Author must be very similar (>85%)
+  const authorSim = similarity(normalizeString(a.author), normalizeString(b.author));
+  if (authorSim < 0.85) return false;
+  
+  // Title must be very similar (>85%)
+  const titleSim = similarity(normalizeString(a.title), normalizeString(b.title));
+  if (titleSim < 0.85) return false;
+  
+  // Size should be within 10%
+  const aSize = parseFloat(a.size) || 0;
+  const bSize = parseFloat(b.size) || 0;
+  if (aSize > 0 && bSize > 0) {
+    const sizeDiff = Math.abs(aSize - bSize) / Math.max(aSize, bSize);
+    if (sizeDiff > 0.1) return false;
+  }
+  
+  return true;
+}
+
+const groupedBooks = computed(() => {
+  if (!groupBooks.value) return null;
+  
+  const groups: BookGroup[] = [];
+  const processed = new Set<number>();
+  
+  matchedBooks.value.forEach((book, idx) => {
+    if (processed.has(idx)) return;
+    
+    const group: BookDetail[] = [book];
+    processed.add(idx);
+    
+    // Find similar books
+    for (let i = idx + 1; i < matchedBooks.value.length; i++) {
+      if (processed.has(i)) continue;
+      if (areSimilar(book, matchedBooks.value[i])) {
+        group.push(matchedBooks.value[i]);
+        processed.add(i);
+      }
+    }
+    
+    // Only create a group if there are duplicates
+    if (group.length > 1) {
+      // Pick representative: online first, then largest
+      const representative = group.sort((a, b) => {
+        const aOnline = servers.value.includes(a.server) ? 0 : 1;
+        const bOnline = servers.value.includes(b.server) ? 0 : 1;
+        if (aOnline !== bOnline) return aOnline - bOnline;
+        const aSize = parseFloat(a.size) || 0;
+        const bSize = parseFloat(b.size) || 0;
+        return bSize - aSize;
+      })[0];
+      
+      groups.push({
+        key: `${normalizeString(book.author)}-${normalizeString(book.title)}`,
+        books: group,
+        representative
+      });
+    } else {
+      // Single book, not grouped
+      groups.push({
+        key: `single-${idx}`,
+        books: [book],
+        representative: book
+      });
+    }
+  });
+  
+  return groups;
+});
+
+const displayBooks = computed(() => {
+  if (groupBooks.value && groupedBooks.value) {
+    // Flatten groups, showing only representative or all if expanded
+    const result: BookDetail[] = [];
+    groupedBooks.value.forEach(group => {
+      if (group.books.length === 1) {
+        result.push(group.books[0]);
+      } else if (expandedGroups.value.has(group.key)) {
+        result.push(...group.books);
+      } else {
+        result.push(group.representative);
+      }
+    });
+    return result;
+  }
+  
+  return prefStore.showUnmatched && hiddenCount.value > 0
     ? [...matchedBooks.value, ...hiddenBooks.value]
-    : matchedBooks.value
-);
+    : matchedBooks.value;
+});
+
+function getGroupForBook(book: BookDetail): BookGroup | null {
+  if (!groupBooks.value || !groupedBooks.value) return null;
+  return groupedBooks.value.find(g => g.books.includes(book)) || null;
+}
+
+function toggleGroup(groupKey: string) {
+  if (expandedGroups.value.has(groupKey)) {
+    expandedGroups.value.delete(groupKey);
+  } else {
+    expandedGroups.value.add(groupKey);
+  }
+  expandedGroups.value = new Set(expandedGroups.value);
+}
 
 const isMatched = (idx: number) =>
   !prefStore.showUnmatched || idx < matchedBooks.value.length;
@@ -241,6 +387,17 @@ function toggleFormat(fmt: string) {
           @click="toggleFormat(fmt)">
           {{ fmt.toUpperCase() }}
         </button>
+        <!-- Group Books toggle -->
+        <button
+          class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap"
+          :class="groupBooks
+            ? 'bg-brand-400 border-brand-400 text-white'
+            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300'"
+          title="Group duplicate EPUBs together"
+          @click="groupBooks = !groupBooks; expandedGroups.clear()">
+          <Layers :size="10" />
+          Group Books
+        </button>
         <!-- Save / clear preference -->
         <div class="ml-auto flex items-center gap-1.5">
           <button
@@ -315,39 +472,50 @@ function toggleFormat(fmt: string) {
             :class="isMatched(vItem.index)
               ? 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
               : 'opacity-30'">
-            <td class="px-3 py-1.5">
-              <div class="flex items-center gap-1.5">
+            <template v-if="displayBooks[vItem.index]">
+              <td class="px-3 py-1.5">
+                <div class="flex items-center gap-1.5">
+                  <!-- Group indicator -->
+                  <button
+                    v-if="groupBooks && (() => { const g = getGroupForBook(displayBooks[vItem.index]); return g && g.books.length > 1; })()"
+                    class="flex-shrink-0 text-slate-400 hover:text-brand-400 transition-colors"
+                    :title="`${getGroupForBook(displayBooks[vItem.index])?.books.length || 0} sources`"
+                    @click="() => { const g = getGroupForBook(displayBooks[vItem.index]); if (g) toggleGroup(g.key); }">
+                    <Layers :size="12" />
+                    <span class="text-[10px] ml-0.5">{{ getGroupForBook(displayBooks[vItem.index])?.books.length }}</span>
+                  </button>
+                  <span
+                    class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    :class="servers.includes(displayBooks[vItem.index].server) ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'" />
+                  <span class="truncate text-slate-600 dark:text-slate-300 max-w-[90px]">
+                    {{ displayBooks[vItem.index].server }}
+                  </span>
+                </div>
+              </td>
+              <td class="px-3 py-1.5 text-slate-700 dark:text-slate-300 max-w-[160px]">
+                <span class="truncate block">{{ displayBooks[vItem.index].author }}</span>
+              </td>
+              <td class="px-3 py-1.5 text-slate-900 dark:text-slate-100 max-w-0">
+                <span class="truncate block">{{ displayBooks[vItem.index].title }}</span>
+              </td>
+              <td class="px-3 py-1.5">
                 <span
-                  class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  :class="servers.includes(displayBooks[vItem.index]?.server) ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'" />
-                <span class="truncate text-slate-600 dark:text-slate-300 max-w-[90px]">
-                  {{ displayBooks[vItem.index]?.server }}
+                  v-if="displayBooks[vItem.index].format"
+                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-300">
+                  {{ displayBooks[vItem.index].format.toUpperCase() }}
                 </span>
-              </div>
-            </td>
-            <td class="px-3 py-1.5 text-slate-700 dark:text-slate-300 max-w-[160px]">
-              <span class="truncate block">{{ displayBooks[vItem.index]?.author }}</span>
-            </td>
-            <td class="px-3 py-1.5 text-slate-900 dark:text-slate-100 max-w-0">
-              <span class="truncate block">{{ displayBooks[vItem.index]?.title }}</span>
-            </td>
-            <td class="px-3 py-1.5">
-              <span
-                v-if="displayBooks[vItem.index]?.format"
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-300">
-                {{ displayBooks[vItem.index]?.format.toUpperCase() }}
-              </span>
-            </td>
-            <td class="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-              {{ displayBooks[vItem.index]?.size }}
-            </td>
-            <td class="px-3 py-1.5">
-              <DownloadButton
-                v-if="displayBooks[vItem.index] && isMatched(vItem.index)"
-                :book="displayBooks[vItem.index].full"
-                :author="displayBooks[vItem.index].author"
-                :title="displayBooks[vItem.index].title" />
-            </td>
+              </td>
+              <td class="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                {{ displayBooks[vItem.index].size }}
+              </td>
+              <td class="px-3 py-1.5">
+                <DownloadButton
+                  v-if="isMatched(vItem.index)"
+                  :book="displayBooks[vItem.index].full"
+                  :author="displayBooks[vItem.index].author"
+                  :title="displayBooks[vItem.index].title" />
+              </td>
+            </template>
           </tr>
 
           <tr v-if="paddingBottom > 0"><td :style="{ height: paddingBottom + 'px' }" colspan="6" /></tr>
