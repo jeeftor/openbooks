@@ -11,7 +11,7 @@ import FilterDrawer from "./FilterDrawer.vue";
 const props = defineProps<{ books: BookDetail[] }>();
 
 const prefStore = usePreferencesStore();
-const servers = useServers();
+const { servers } = useServers();
 const scrollContainer = ref<HTMLElement | null>(null);
 const filterOpen = ref(false);
 

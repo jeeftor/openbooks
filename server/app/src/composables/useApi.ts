@@ -32,7 +32,7 @@ export function useServers() {
   const interval = setInterval(fetchServers, 30_000);
   onUnmounted(() => clearInterval(interval));
 
-  return servers;
+  return { servers, refresh: fetchServers };
 }
 
 export function useBooks(libraryVersion: { readonly value: number }) {

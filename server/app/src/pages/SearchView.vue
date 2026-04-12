@@ -14,7 +14,7 @@ import EmptyState from "../components/search/EmptyState.vue";
 
 const appStore = useAppStore();
 const historyStore = useHistoryStore();
-const servers = useServers();
+const { servers, refresh: refreshServers } = useServers();
 const isMobile = useMediaQuery("(max-width: 767px)");
 
 const query = ref("");
@@ -43,6 +43,8 @@ watch(
   () => appStore.activeItem?.timestamp,
   () => {
     showErrors.value = false;
+    // Refresh server list when switching searches (e.g., from history)
+    refreshServers();
   }
 );
 
