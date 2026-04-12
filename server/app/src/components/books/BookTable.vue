@@ -142,7 +142,7 @@ function similarity(a: string, b: string): number {
 
 function areSimilar(a: BookDetail, b: BookDetail): boolean {
   // Only group EPUBs
-  if (a.format !== 'EPUB' || b.format !== 'EPUB') return false;
+  if (a.format?.toLowerCase() !== 'epub' || b.format?.toLowerCase() !== 'epub') return false;
   
   // Author must be very similar (>85%)
   const authorSim = similarity(normalizeString(a.author), normalizeString(b.author));
