@@ -103,6 +103,7 @@ func Start(config Config) {
 	server.registerGracefulShutdown(cancel)
 	router.Mount(config.Basepath, routes)
 
+	server.log.Printf("Version: %s\n", config.Version)
 	server.log.Printf("Base Path: %s\n", config.Basepath)
 	server.log.Printf("OpenBooks is listening on port %v", config.Port)
 	server.log.Printf("Download Directory: %s\n", config.DownloadDir)
