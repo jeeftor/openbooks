@@ -1,4 +1,4 @@
-FROM node:16 as web
+FROM node:22 as web
 WORKDIR /web
 COPY . .
 WORKDIR /web/server/app/
