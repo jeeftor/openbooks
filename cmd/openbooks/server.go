@@ -49,6 +49,8 @@ var serverCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		serverConfig.ReplaceSpace = replaceSpace
 		serverConfig.Version = version
+		serverConfig.CommitSHA = commitSHA
+		serverConfig.BuildDate = buildDate
 		if openBrowser {
 			browserUrl := "http://127.0.0.1:" + path.Join(serverConfig.Port+serverConfig.Basepath)
 			util.OpenBrowser(browserUrl)

@@ -15,6 +15,12 @@ import (
 // version will always match the GitHub release versions.
 var version = "dev"
 
+// commitSHA is the git commit hash, injected at build time
+var commitSHA = "unknown"
+
+// buildDate is the build timestamp, injected at build time
+var buildDate = "unknown"
+
 // We only increment ircVersion when irc admins require a fix to be made.
 // They can block / permit certain version numbers. ircVersion is the current permitted
 // version number.

@@ -11,11 +11,13 @@ COPY . .
 COPY --from=web /web/ .
 
 ARG VERSION=dev
+ARG COMMIT_SHA=unknown
+ARG BUILD_DATE=unknown
 ENV CGO_ENABLED=0
 RUN go get -d -v ./...
 RUN go install -v ./...
 WORKDIR /go/src/cmd/openbooks/
-RUN go build -ldflags "-X main.version=${VERSION}"
+RUN go build -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}"
 
 FROM gcr.io/distroless/static as app
 WORKDIR /app

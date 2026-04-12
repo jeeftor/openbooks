@@ -59,6 +59,8 @@ type Config struct {
 	DisableBrowserDownloads bool
 	UserAgent               string
 	Version                 string
+	CommitSHA               string
+	BuildDate               string
 	OrganizeDownloads       bool
 	ReplaceSpace            string
 }
@@ -103,7 +105,7 @@ func Start(config Config) {
 	server.registerGracefulShutdown(cancel)
 	router.Mount(config.Basepath, routes)
 
-	server.log.Printf("Version: %s\n", config.Version)
+	server.log.Printf("Version: %s (commit: %s, built: %s)\n", config.Version, config.CommitSHA, config.BuildDate)
 	server.log.Printf("Base Path: %s\n", config.Basepath)
 	server.log.Printf("OpenBooks is listening on port %v", config.Port)
 	server.log.Printf("Download Directory: %s\n", config.DownloadDir)
