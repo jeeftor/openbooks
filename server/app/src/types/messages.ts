@@ -72,4 +72,5 @@ export interface HistoryItem {
   timestamp: number;
   results?: BookDetail[];
   errors?: ParseError[];
+  timedOut?: boolean;
 }

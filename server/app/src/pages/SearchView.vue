@@ -27,6 +27,7 @@ const searchProgress = ref(0); // 0-100
 const hasErrors = computed(
   () => (appStore.activeItem?.errors?.length ?? 0) > 0
 );
+const isTimedOut = computed(() => appStore.activeItem?.timedOut === true);
 const resultCount = computed(() => appStore.activeItem?.results?.length ?? 0);
 const onlineCount = computed(() => {
   const results = appStore.activeItem?.results;
@@ -102,10 +103,8 @@ function handleSearch(e: Event) {
         const timedOut = {
           ...active,
           results: [],
-          errors: [{
-            error: "Search timeout",
-            line: "No response from IRC server after 60 seconds. The bot may be offline or overloaded. Try again later."
-          }]
+          errors: [],
+          timedOut: true
         };
         appStore.setActiveItem(timedOut);
         historyStore.updateItem(timedOut);
@@ -271,6 +270,21 @@ function handleSearch(e: Event) {
               {{ Math.ceil((60000 - (searchProgress / 100 * 60000)) / 1000) }}s remaining
             </p>
           </div>
+        </div>
+      </div>
+
+      <!-- Timeout state -->
+      <div
+        v-else-if="isTimedOut"
+        class="h-full flex items-center justify-center">
+        <div class="flex flex-col items-center gap-3 text-center max-w-sm px-4">
+          <div class="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <WifiOff :size="22" class="text-red-400" />
+          </div>
+          <p class="text-sm font-medium text-slate-600 dark:text-slate-300">Search timed out</p>
+          <p class="text-xs text-slate-400 dark:text-slate-500">
+            No response from the IRC server after 60 seconds. The bot may be offline or overloaded. Try again later.
+          </p>
         </div>
       </div>
 
