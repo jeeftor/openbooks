@@ -215,6 +215,12 @@ docker:
 docker-run:
 	docker run -p 8080:80 -v $(PWD)/books:/books openbooks
 
+docker-calibre:
+	docker build -f Dockerfile.calibre -t openbooks-calibre .
+
+docker-run-calibre:
+	docker run -p 8080:80 -v $(PWD)/books:/books openbooks-calibre
+
 # ─── Clean ───────────────────────────────────────────────────────────────────
 clean:
 	rm -f cmd/openbooks/openbooks

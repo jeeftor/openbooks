@@ -117,6 +117,7 @@ func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 	}
 
 	c.log.Printf("Searching for: %q\n", s.Query)
+	server.logBuf.info(fmt.Sprintf("Search: %q", s.Query))
 	core.SearchBook(c.irc, server.config.SearchBot, s.Query)
 	server.lastSearch = time.Now()
 
@@ -137,6 +138,11 @@ func sanitizePathComponent(s, replaceSpace string) string {
 
 // handle DownloadRequests by sending the request to the book server
 func (c *Client) sendDownloadRequest(d *DownloadRequest, server *server) {
+	if d.Title != "" && d.Author != "" {
+		server.logBuf.info(fmt.Sprintf("Download: %s by %s", d.Title, d.Author))
+	} else {
+		server.logBuf.info(fmt.Sprintf("Download: %s", d.Book))
+	}
 	core.DownloadBook(c.irc, d.Book)
 	c.send <- newStatusResponse(NOTIFY, "Download request received.")
 }

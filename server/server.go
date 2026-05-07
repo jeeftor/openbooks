@@ -63,6 +63,7 @@ type Config struct {
 	BuildDate               string
 	OrganizeDownloads       bool
 	ReplaceSpace            string
+	PostProcessCmd          []string // command + args; file path appended automatically
 }
 
 func New(config Config) *server {

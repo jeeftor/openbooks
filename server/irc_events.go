@@ -125,6 +125,7 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 		}
 
 		finalPath := c.organizeByMetadata(extractedPath, config, lb)
+		runPostProcess(config.PostProcessCmd, finalPath)
 		c.log.Printf("Downloaded book to: %s\n", finalPath)
 		c.log.Printf("Sending book entitled '%s'.\n", filepath.Base(finalPath))
 		c.send <- newDownloadResponse(finalPath, config.DownloadDir, config.DisableBrowserDownloads)

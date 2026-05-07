@@ -24,10 +24,23 @@ Openbooks allows you to download ebooks from irc.irchighway.net quickly and easi
 
 ### Docker
 
+Two image variants are published to the GitHub Container Registry:
+
+| Tag | Description |
+|-----|-------------|
+| `ghcr.io/evan-buss/openbooks:latest` | Minimal distroless image (~2MB). No post-processing. |
+| `ghcr.io/evan-buss/openbooks:latest-calibre` | Includes [Calibre](https://calibre-ebook.com/) CLI tools. Runs `calibre-polish` on every downloaded EPUB by default. |
+
+Semver releases follow the same pattern: `v1.2.3` and `v1.2.3-calibre`.
+
 - Basic config
-  - `docker run -p 8080:80 evanbuss/openbooks`
-- Config to persist all eBook files to disk
-  - `docker run -p 8080:80 -v /home/evan/Downloads/openbooks:/books evanbuss/openbooks --persist`
+  - `docker run -p 8080:80 ghcr.io/evan-buss/openbooks:latest`
+- Persist all eBook files to disk
+  - `docker run -p 8080:80 -v /home/evan/Downloads/openbooks:/books ghcr.io/evan-buss/openbooks:latest --persist`
+- Use the Calibre variant (auto-polishes downloaded EPUBs)
+  - `docker run -p 8080:80 -v /home/evan/Downloads/openbooks:/books ghcr.io/evan-buss/openbooks:latest-calibre --persist`
+- Run a custom post-process command on every download
+  - `docker run -p 8080:80 -v /home/evan/Downloads/openbooks:/books ghcr.io/evan-buss/openbooks:latest server --name openbooks --dir /books --port 80 --post-process-cmd "my-script,--arg1"`
 
 ### Setting the Base Path
 
