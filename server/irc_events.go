@@ -60,7 +60,7 @@ func (c *Client) organizeByMetadata(extractedPath string, config Config, lb *log
 
 func (server *server) NewIrcEventHandler(client *Client) core.EventHandler {
 	handler := core.EventHandler{}
-	handler[core.SearchResult] = client.searchResultHandler(server.config.DownloadDir)
+	handler[core.SearchResult] = client.searchResultHandler(server.config.DownloadDir, server.logBuf)
 	handler[core.BookResult] = client.bookResultHandler(*server.config, server.logBuf)
 	handler[core.NoResults] = client.noResultsHandler
 	handler[core.BadServer] = client.badServerHandler
@@ -73,7 +73,7 @@ func (server *server) NewIrcEventHandler(client *Client) core.EventHandler {
 }
 
 // searchResultHandler downloads from DCC server, parses data, and sends data to client
-func (c *Client) searchResultHandler(downloadDir string) core.HandlerFunc {
+func (c *Client) searchResultHandler(downloadDir string, lb *logBuffer) core.HandlerFunc {
 	return func(text string) {
 		extractedPath, err := core.DownloadExtractDCCString(downloadDir, text, nil)
 		if err != nil {
@@ -103,6 +103,7 @@ func (c *Client) searchResultHandler(downloadDir string) core.HandlerFunc {
 		}
 
 		c.log.Printf("Sending %d search results.\n", len(bookResults))
+		lb.info(fmt.Sprintf("Search results: %d found, %d unparseable", len(bookResults), len(parseErrors)))
 		c.send <- newSearchResponse(bookResults, parseErrors)
 
 		err = os.Remove(extractedPath)
