@@ -37,7 +37,7 @@ docker run -p 8080:80 \
   -v ./books:/books \
   ghcr.io/jeeftor/openbooks:latest-calibre \
   server --name my_irc_name --dir /books --port 80 \
-  --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images"
+  --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"
 ```
 
 ## Docker Compose
@@ -61,7 +61,7 @@ services:
       --port 80
       --organize-downloads
       --replace-space .
-      --post-process-cmd "ebook-polish,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images"
+      --post-process-cmd "ebook-polish,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"
 
 volumes:
   books:
