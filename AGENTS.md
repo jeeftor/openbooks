@@ -16,6 +16,7 @@
   - docs updated, or a note that docs were not needed
   - any follow-up issues created
 - Issues should close through the PR merge, not through direct commits to `master`.
+- After a PR is merged, delete the remote feature branch and remove the local branch or worktree.
 - Do not push directly to `master` for normal feature or fix work.
 - If work is paused or deferred, leave the issue open and comment with the current state and next step.
 
