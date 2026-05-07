@@ -175,3 +175,36 @@ func moveFile(src, dst string) error {
 	in.Close()
 	return os.Remove(src)
 }
+
+// copyFile copies src to dst, creating parent directories as needed.
+func copyFile(src, dst string) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return fmt.Errorf("create target dir: %w", err)
+	}
+
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open source: %w", err)
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("create target: %w", err)
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		os.Remove(dst)
+		return fmt.Errorf("copy: %w", err)
+	}
+	return out.Close()
+}
+
+func originalCopyPath(path string) string {
+	ext := filepath.Ext(path)
+	if ext == "" {
+		return path + ".orig"
+	}
+	return strings.TrimSuffix(path, ext) + ".orig" + ext
+}

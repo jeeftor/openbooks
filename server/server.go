@@ -62,6 +62,7 @@ type Config struct {
 	OrganizeDownloads bool
 	ReplaceSpace      string
 	PostProcessCmd    []string // command + args; file path appended automatically
+	DevMode           bool
 }
 
 func New(config Config) *server {
@@ -109,6 +110,7 @@ func Start(config Config) {
 	server.log.Printf("Base path:              %s", config.Basepath)
 	server.log.Printf("Download directory:     %s", config.DownloadDir)
 	server.log.Printf("Organize downloads:     %v", config.OrganizeDownloads)
+	server.log.Printf("Dev mode:               %v", config.DevMode)
 	server.log.Printf("IRC server:             %s (TLS: %v)", config.Server, config.EnableTLS)
 	server.log.Printf("Username:               %s", config.UserName)
 	server.log.Printf("Search bot:             %s", config.SearchBot)

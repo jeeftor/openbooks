@@ -135,6 +135,16 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 			fmt.Sprintf("File: %s\nSize: %s\nStaged at: %s", ircFilename, size, extractedPath),
 		)
 
+		var stagedOriginalPath string
+		if config.DevMode {
+			stagedOriginalPath = originalCopyPath(extractedPath)
+			if err := copyFile(extractedPath, stagedOriginalPath); err != nil {
+				sess.warn(fmt.Sprintf("Could not preserve original download: %v", err))
+				c.log.Printf("Failed to preserve original download: %v", err)
+				stagedOriginalPath = ""
+			}
+		}
+
 		// 2. Run post-processor on the staged file first so metadata is clean.
 		runPostProcess(config.PostProcessCmd, extractedPath, sess)
 
@@ -179,6 +189,9 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 		case <-c.ctx.Done():
 			// Client disconnected — clean up the staged file and exit.
 			os.Remove(extractedPath)
+			if stagedOriginalPath != "" {
+				os.Remove(stagedOriginalPath)
+			}
 			return
 		}
 
@@ -197,6 +210,19 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 			c.log.Printf("Move failed: %v", err)
 			sess.error(fmt.Sprintf("Failed to move file: %v", err))
 			finalPath = extractedPath
+		}
+		if stagedOriginalPath != "" {
+			originalFinalPath := originalCopyPath(finalPath)
+			if err := moveFile(stagedOriginalPath, originalFinalPath); err != nil {
+				c.log.Printf("Move original copy failed: %v", err)
+				sess.warn(fmt.Sprintf("Failed to save original copy: %v", err))
+			} else {
+				relOrig, _ := filepath.Rel(dir, originalFinalPath)
+				sess.infoDetail(
+					fmt.Sprintf("🧪 Original preserved: %s", filepath.ToSlash(relOrig)),
+					fmt.Sprintf("Path: %s", originalFinalPath),
+				)
+			}
 		}
 
 		// 7. Optionally rewrite the EPUB's internal OPF metadata.
