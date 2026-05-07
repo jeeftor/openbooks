@@ -135,6 +135,10 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 			c.log.Println(err)
 			lb.error(fmt.Sprintf("Download failed: %v", err))
 			c.send <- newErrorResponse("Error when downloading book.")
+			select {
+			case c.downloadDone <- struct{}{}:
+			default:
+			}
 			return
 		}
 
@@ -145,6 +149,11 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 		runPostProcess(config.PostProcessCmd, finalPath, lb)
 		c.log.Printf("Book saved to: %s\n", finalPath)
 		c.send <- newDownloadResponse(finalPath, config.DownloadDir)
+		// Signal the download queue to proceed to the next item.
+		select {
+		case c.downloadDone <- struct{}{}:
+		default:
+		}
 	}
 }
 

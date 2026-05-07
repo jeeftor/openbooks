@@ -78,12 +78,14 @@ func (server *server) serveWs() http.HandlerFunc {
 
 		uniqueUsername := server.generateUniqueUsername()
 		client := &Client{
-			conn: conn,
-			send: make(chan interface{}, 128),
-			uuid: userId,
-			irc:  irc.New(uniqueUsername, server.config.UserAgent),
-			log:  log.New(os.Stdout, fmt.Sprintf("CLIENT (%s): ", uniqueUsername), log.LstdFlags|log.Lmsgprefix),
-			ctx:  context.Background(),
+			conn:          conn,
+			send:          make(chan interface{}, 128),
+			uuid:          userId,
+			irc:           irc.New(uniqueUsername, server.config.UserAgent),
+			log:           log.New(os.Stdout, fmt.Sprintf("CLIENT (%s): ", uniqueUsername), log.LstdFlags|log.Lmsgprefix),
+			ctx:           context.Background(),
+			downloadQueue: make(chan downloadJob, 50),
+			downloadDone:  make(chan struct{}, 1),
 		}
 
 		server.log.Printf("Client connected from %s\n", conn.RemoteAddr().String())

@@ -77,6 +77,7 @@ func (c *Client) startIrcConnection(server *server) {
 	}
 
 	go core.StartReader(c.ctx, c.irc, handler)
+	go c.processDownloadQueue(server)
 
 	safeSend(c, ConnectionResponse{
 		StatusResponse: StatusResponse{
@@ -140,11 +141,21 @@ func sanitizePathComponent(s, replaceSpace string) string {
 
 // handle DownloadRequests by sending the request to the book server
 func (c *Client) sendDownloadRequest(d *DownloadRequest, server *server) {
-	if d.Title != "" && d.Author != "" {
-		server.logBuf.info(fmt.Sprintf("Download: %s by %s", d.Title, d.Author))
-	} else {
-		server.logBuf.info(fmt.Sprintf("Download: %s", d.Book))
+	title := d.Title
+	if title == "" {
+		title = d.Book
 	}
-	core.DownloadBook(c.irc, d.Book)
-	c.send <- newStatusResponse(NOTIFY, "Download request received.")
+	pending := len(c.downloadQueue)
+	if pending > 0 {
+		server.logBuf.info(fmt.Sprintf("Queued: %s (position %d)", title, pending+1))
+		c.send <- newStatusResponse(NOTIFY, fmt.Sprintf("Download queued (position %d).", pending+1))
+	} else {
+		if d.Title != "" && d.Author != "" {
+			server.logBuf.info(fmt.Sprintf("Download: %s by %s", d.Title, d.Author))
+		} else {
+			server.logBuf.info(fmt.Sprintf("Download: %s", d.Book))
+		}
+		c.send <- newStatusResponse(NOTIFY, "Download request received.")
+	}
+	c.downloadQueue <- downloadJob{book: d.Book, title: title, author: d.Author}
 }

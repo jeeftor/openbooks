@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/evan-buss/openbooks/core"
 	"github.com/evan-buss/openbooks/irc"
 	"github.com/google/uuid"
 
@@ -32,6 +33,13 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+// downloadJob holds a queued download request.
+type downloadJob struct {
+	book   string
+	title  string
+	author string
+}
+
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
 	// Unique ID for the client
@@ -39,9 +47,6 @@ type Client struct {
 
 	// The websocket connection.
 	conn *websocket.Conn
-
-	// Signal to indicate the connection should be terminated.
-	// disconnect chan struct{}
 
 	// Message to send to the client ws connection
 	send chan interface{}
@@ -53,6 +58,41 @@ type Client struct {
 
 	// Context is used to signal when this client should close.
 	ctx context.Context
+
+	// downloadQueue serializes downloads so only one DCC transfer is active at a time.
+	downloadQueue chan downloadJob
+
+	// downloadDone is signaled by bookResultHandler when a download finishes.
+	downloadDone chan struct{}
+}
+
+// processDownloadQueue drains downloadQueue one job at a time, sending each
+// request to IRC and waiting for bookResultHandler to signal completion before
+// proceeding to the next. This prevents flooding IRC with concurrent DCC requests.
+func (c *Client) processDownloadQueue(server *server) {
+	for {
+		select {
+		case job, ok := <-c.downloadQueue:
+			if !ok {
+				return
+			}
+			pending := len(c.downloadQueue)
+			if pending > 0 {
+				server.logBuf.info(fmt.Sprintf("Download queued: %s (%d more in queue)", job.title, pending))
+			}
+			core.DownloadBook(c.irc, job.book)
+			// Wait for bookResultHandler to signal completion or give up after 5 min.
+			select {
+			case <-c.downloadDone:
+			case <-time.After(5 * time.Minute):
+				server.logBuf.warn("Download timed out waiting for IRC response, proceeding to next")
+			case <-c.ctx.Done():
+				return
+			}
+		case <-c.ctx.Done():
+			return
+		}
+	}
 }
 
 // readPump pumps messages from the websocket connection to the hub.
