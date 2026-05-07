@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="./server/app/src/assets/icon.svg" alt="Audiobookshelf logo" width="84" height="84">
-</p>
-
 <h1 align="center">openbooks-abs</h1>
 
 <p align="center">
