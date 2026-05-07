@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/evan-buss/openbooks/core"
@@ -81,15 +82,25 @@ func (c *Client) processDownloadQueue(server *server) {
 			}
 			pending := len(c.downloadQueue)
 			if pending > 0 {
-				server.logBuf.info(fmt.Sprintf("Download queued: %s (%d more in queue)", job.title, pending))
+				server.logBuf.info(fmt.Sprintf("📋 Queued: %s (%d pending)", job.title, pending))
 			}
+			// Extract bot name from the book string (first word after "!")
+			botName := job.book
+			if idx := strings.Index(job.book, " "); idx > 1 {
+				botName = job.book[1:idx] // strip leading "!"
+			}
+			server.logBuf.info(fmt.Sprintf("📡 Requesting from %s — waiting for IRC bot to send file…", botName))
+			c.send <- newDownloadWaitingResponse(botName, job.title)
 			core.DownloadBook(c.irc, job.book)
 			// Wait for bookResultHandler to signal completion or give up after 5 min.
 			select {
 			case <-c.downloadDone:
+				// bookResultHandler already sent the clear after download finished.
 			case <-time.After(5 * time.Minute):
-				server.logBuf.warn("Download timed out waiting for IRC response, proceeding to next")
+				c.send <- newDownloadWaitingClear()
+				server.logBuf.warn(fmt.Sprintf("⏱️  Timed out waiting for %s — bot may be offline or throttling. Skipping.", botName))
 			case <-c.ctx.Done():
+				c.send <- newDownloadWaitingClear()
 				return
 			}
 		case <-c.ctx.Done():

@@ -8,6 +8,7 @@ import {
   type SearchResponse,
   type DownloadResponse,
   type RenamePromptResponse,
+  type DownloadWaitingResponse,
   type AppNotification
 } from "../types/messages";
 import { useAppStore } from "../stores/app";
@@ -110,8 +111,13 @@ export function useWebSocket() {
         break;
       case MessageType.RENAME_PROMPT:
         appStore.pendingRename = response as RenamePromptResponse;
-        // Don't show a toast — the modal handles UX entirely.
+        appStore.waitingDownload = null; // clear waiting state when modal appears
         return;
+      case MessageType.DOWNLOAD_WAITING: {
+        const dw = response as DownloadWaitingResponse;
+        appStore.waitingDownload = dw.active ? dw : null;
+        return;
+      }
       case MessageType.RATELIMIT:
         historyStore.deleteItem(undefined);
         break;

@@ -20,8 +20,9 @@ const (
 	SEARCH
 	DOWNLOAD
 	RATELIMIT
-	RENAME_PROMPT  // server → client: book staged, awaiting rename decision
-	RENAME_CONFIRM // client → server: user's rename decision
+	RENAME_PROMPT   // server → client: book staged, awaiting rename decision
+	RENAME_CONFIRM  // client → server: user's rename decision
+	DOWNLOAD_WAITING // server → client: IRC request sent, waiting for DCC response
 )
 
 type NotificationType int
@@ -174,6 +175,33 @@ func newStatusResponse(notificationType NotificationType, title string) StatusRe
 		MessageType:      STATUS,
 		NotificationType: notificationType,
 		Title:            title,
+	}
+}
+
+// DownloadWaitingResponse is sent when an IRC download request has been dispatched
+// and we are waiting for the bot to send the DCC offer. Active=false clears the UI state.
+type DownloadWaitingResponse struct {
+	StatusResponse
+	Active      bool   `json:"active"`
+	Bot         string `json:"bot,omitempty"`
+	BookTitle   string `json:"bookTitle,omitempty"`
+	TimeoutSecs int    `json:"timeoutSecs,omitempty"`
+}
+
+func newDownloadWaitingResponse(bot, title string) DownloadWaitingResponse {
+	return DownloadWaitingResponse{
+		StatusResponse: StatusResponse{MessageType: DOWNLOAD_WAITING},
+		Active:         true,
+		Bot:            bot,
+		BookTitle:      title,
+		TimeoutSecs:    300,
+	}
+}
+
+func newDownloadWaitingClear() DownloadWaitingResponse {
+	return DownloadWaitingResponse{
+		StatusResponse: StatusResponse{MessageType: DOWNLOAD_WAITING},
+		Active:         false,
 	}
 }
 

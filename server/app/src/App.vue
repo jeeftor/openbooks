@@ -8,6 +8,7 @@ import MobileNav from "./components/layout/MobileNav.vue";
 import SearchView from "./pages/SearchView.vue";
 import NotificationDrawer from "./components/notifications/NotificationDrawer.vue";
 import RenameModal from "./components/RenameModal.vue";
+import DownloadWaitingBanner from "./components/DownloadWaitingBanner.vue";
 
 useDark({ storageKey: 'ob-dark-mode', initialValue: 'dark' });
 useWebSocket();
@@ -27,6 +28,7 @@ const isMobile = useMediaQuery("(max-width: 767px)");
     <MobileNav v-if="isMobile" />
     <NotificationDrawer />
     <RenameModal />
+    <DownloadWaitingBanner />
     <Toaster rich-colors position="top-center" />
   </div>
 </template>

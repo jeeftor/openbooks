@@ -100,6 +100,9 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 		}
 		stage := stagingDir(dir)
 
+		// DCC offer received — clear the "waiting for bot" UI state immediately.
+		safeSend(c, newDownloadWaitingClear())
+
 		// Determine the filename for the initial log entry and session group.
 		var ircFilenamePreview string
 		if d, err := dcc.ParseString(text); err == nil {

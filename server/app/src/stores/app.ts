@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import type { HistoryItem, RenamePromptResponse } from "../types/messages";
+import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse } from "../types/messages";
 
 export const useAppStore = defineStore("app", () => {
   const isConnected = ref(false);
@@ -23,6 +23,9 @@ export const useAppStore = defineStore("app", () => {
   // Set when the server sends a RENAME_PROMPT. RenameModal watches this
   // and clears it after the user confirms or cancels.
   const pendingRename = ref<RenamePromptResponse | null>(null);
+
+  // Set while waiting for an IRC bot to send its DCC offer.
+  const waitingDownload = ref<DownloadWaitingResponse | null>(null);
 
   function setConnected(connected: boolean) {
     isConnected.value = connected;
@@ -66,6 +69,7 @@ export const useAppStore = defineStore("app", () => {
     activeItem,
     pendingQuery,
     pendingRename,
+    waitingDownload,
     libraryVersion,
     setConnected,
     setConnecting,

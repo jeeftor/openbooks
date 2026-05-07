@@ -12,7 +12,8 @@ export enum MessageType {
   DOWNLOAD,
   RATELIMIT,
   RENAME_PROMPT,
-  RENAME_CONFIRM
+  RENAME_CONFIRM,
+  DOWNLOAD_WAITING
 }
 
 export interface AppNotification {
@@ -100,6 +101,13 @@ export interface RenamePromptResponse extends WsResponse {
   replaceSpace: string;
   coverBase64?: string;
   coverMime?: string;
+}
+
+export interface DownloadWaitingResponse extends WsResponse {
+  active: boolean;
+  bot?: string;
+  bookTitle?: string;
+  timeoutSecs?: number;
 }
 
 export interface RenameConfirmRequest {
