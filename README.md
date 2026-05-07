@@ -28,28 +28,30 @@ Two image variants are published to the GitHub Container Registry:
 
 | Tag | Description |
 |-----|-------------|
-| `ghcr.io/evan-buss/openbooks:latest` | Minimal distroless image (~2MB). No post-processing. |
-| `ghcr.io/evan-buss/openbooks:latest-calibre` | Includes [Calibre](https://calibre-ebook.com/) CLI tools. Runs `calibre-polish` on every downloaded EPUB by default. |
+| `ghcr.io/jeeftor/openbooks:latest` | Minimal distroless image (~2MB). No post-processing. |
+| `ghcr.io/jeeftor/openbooks:latest-calibre` | Includes [Calibre](https://calibre-ebook.com/) CLI tools. Runs `calibre-polish` on every downloaded EPUB by default. |
 
 Semver releases follow the same pattern: `v1.2.3` and `v1.2.3-calibre`.
 
-- Basic config
-  - `docker run -p 8080:80 ghcr.io/evan-buss/openbooks:latest`
-- Persist all eBook files to disk
-  - `docker run -p 8080:80 -v /home/evan/Downloads/openbooks:/books ghcr.io/evan-buss/openbooks:latest --persist`
-- Use the Calibre variant (auto-polishes downloaded EPUBs)
-  - `docker run -p 8080:80 -v /home/evan/Downloads/openbooks:/books ghcr.io/evan-buss/openbooks:latest-calibre --persist`
+All downloads are automatically saved to the mounted volume — there is no temporary/delete mode.
+
+- Basic usage (files saved to `./books`)
+  - `docker run -p 8080:80 -v ./books:/books ghcr.io/jeeftor/openbooks:latest server --name my_irc_name --dir /books --port 80`
+- Use the Calibre variant (auto-polishes downloaded EPUBs with `calibre-polish`)
+  - `docker run -p 8080:80 -v ./books:/books ghcr.io/jeeftor/openbooks:latest-calibre`
 - Run a custom post-process command on every download
-  - `docker run -p 8080:80 -v /home/evan/Downloads/openbooks:/books ghcr.io/evan-buss/openbooks:latest server --name openbooks --dir /books --port 80 --post-process-cmd "my-script,--arg1"`
+  - `docker run -p 8080:80 -v ./books:/books ghcr.io/jeeftor/openbooks:latest server --name openbooks --dir /books --port 80 --post-process-cmd "my-script,--arg1"`
+- Organize downloads into `Author/Series/Title/` subdirectories
+  - Add `--organize-downloads` (optionally `--replace-space .` to use dots instead of spaces)
 
 ### Setting the Base Path
 
-OpenBooks server doesn't have to be hosted at the root of your webserver. The basepath value allows you to host it behind a reverse proxy. The base path value must have opening and closing forward slashes (default "/").
+OpenBooks can run behind a reverse proxy at a subpath. The base path must have opening and closing forward slashes (default `/`).
 
-- Docker
-  - `docker run -p 8080:80 -e BASE_PATH=/openbooks/ evanbuss/openbooks`
+- Docker (via environment variable)
+  - `docker run -p 8080:80 -e BASE_PATH=/openbooks/ ghcr.io/jeeftor/openbooks:latest server --name openbooks --dir /books --port 80`
 - Binary
-  - `./openbooks server --basepath /openbooks/`
+  - `./openbooks server --basepath /openbooks/ --name myname`
 
 ## Usage
 
@@ -108,13 +110,12 @@ go build -tags webview
 ## Technology
 
 - Backend
-  - Golang
-  - Chi
+  - Go
+  - Chi (HTTP router)
   - gorilla/websocket
-  - Archiver (extract files from various archive formats)
+  - Archiver (ZIP/RAR extraction)
 - Frontend
-  - React.js
+  - Vue 3
   - TypeScript
-  - Redux / Redux Toolkit
-  - Mantine UI / @emotion/react
-  - Framer Motion
+  - Vite
+  - Tailwind CSS
