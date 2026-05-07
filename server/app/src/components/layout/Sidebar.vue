@@ -31,6 +31,14 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "books", label: "Downloads" },
   { id: "logs", label: "Logs" }
 ];
+
+function selectTab(tab: Tab) {
+  if (tab === "books" && activeTab.value === "books") {
+    appStore.toggleLibrarySortMode();
+    return;
+  }
+  activeTab.value = tab;
+}
 </script>
 
 <template>
@@ -61,7 +69,7 @@ const TABS: { id: Tab; label: string }[] = [
           :class="activeTab === tab.id
             ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-50 shadow-sm'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
-          @click="activeTab = tab.id"
+          @click="selectTab(tab.id)"
         >
           {{ tab.label }}
         </button>

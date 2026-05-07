@@ -36,6 +36,10 @@ const TABS = [
 ];
 
 function selectTab(tab: Tab) {
+  if (tab === "books" && activeTab.value === "books") {
+    appStore.toggleLibrarySortMode();
+    return;
+  }
   activeTab.value = activeTab.value === tab ? null : tab;
 }
 </script>

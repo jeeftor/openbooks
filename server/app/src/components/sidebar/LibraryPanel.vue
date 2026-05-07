@@ -20,10 +20,22 @@ interface FileGroup {
 
 // Group files by their parent directory. Root-level files (no subdir) are each
 // their own group so they render flat without a folder header.
+const sortedBooks = computed((): Book[] => {
+  const ordered = [...books.value];
+  if (appStore.librarySortMode === "alpha") {
+    return ordered.sort((a, b) => a.path.localeCompare(b.path));
+  }
+  return ordered.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+});
+
+const sortLabel = computed(() =>
+  appStore.librarySortMode === "newest" ? "Newest first" : "A-Z"
+);
+
 const groups = computed((): FileGroup[] => {
   const map = new Map<string, FileGroup>();
 
-  for (const book of books.value) {
+  for (const book of sortedBooks.value) {
     const parts = book.path.split("/");
     const isNested = parts.length > 1;
     const dir = isNested ? parts.slice(0, -1).join("/") : `__root__:${book.path}`;
@@ -95,13 +107,18 @@ function formatDate(dateStr: string) {
       <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
         {{ totalLabel || `${books.length} files` }}
       </span>
-      <button
-        class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
-        :class="{ 'animate-spin': loading }"
-        title="Refresh"
-        @click="refresh()">
-        <RefreshCw :size="13" />
-      </button>
+      <div class="flex items-center gap-1">
+        <span class="text-[10px] text-slate-400 dark:text-slate-500">
+          {{ sortLabel }}
+        </span>
+        <button
+          class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+          :class="{ 'animate-spin': loading }"
+          title="Refresh"
+          @click="refresh()">
+          <RefreshCw :size="13" />
+        </button>
+      </div>
     </div>
 
     <!-- Loading -->
