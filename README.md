@@ -19,6 +19,7 @@ OpenBooks ABS is not affiliated with Audiobookshelf.
 
 ## Table of Contents
 
+- [Screenshots](#screenshots)
 - [How This Fork Differs](#how-this-fork-differs)
 - [Docker](#docker)
   - [Recommended: Calibre Image](#recommended-calibre-image)
@@ -31,10 +32,15 @@ OpenBooks ABS is not affiliated with Audiobookshelf.
 - [Local Development](#local-development)
 - [Technology](#technology)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./.github/home_v3_dark.png">
-  <img alt="openbooks-abs screenshot" src="./.github/home_v3.png">
-</picture>
+## Screenshots
+
+<p align="center">
+  <img alt="OpenBooks ABS search results" src="./.github/search.png">
+</p>
+
+<p align="center">
+  <img alt="OpenBooks ABS save dialog" src="./.github/metadata.png">
+</p>
 
 ## How This Fork Differs
 
