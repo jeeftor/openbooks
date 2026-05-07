@@ -68,9 +68,7 @@ var desktopCmd = &cobra.Command{
 		bindGlobalServerFlags(&desktopConfig)
 		rateLimit, _ := cmd.Flags().GetInt("rate-limit")
 		ensureValidRate(rateLimit, &desktopConfig)
-		desktopConfig.DisableBrowserDownloads = true
 		desktopConfig.Basepath = "/"
-		desktopConfig.Persist = true
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		if debug {

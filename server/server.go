@@ -46,24 +46,22 @@ type server struct {
 
 // Config contains settings for server
 type Config struct {
-	Log                     bool
-	Port                    string
-	UserName                string
-	Persist                 bool
-	DownloadDir             string
-	Basepath                string
-	Server                  string
-	EnableTLS               bool
-	SearchTimeout           time.Duration
-	SearchBot               string
-	DisableBrowserDownloads bool
-	UserAgent               string
-	Version                 string
-	CommitSHA               string
-	BuildDate               string
-	OrganizeDownloads       bool
-	ReplaceSpace            string
-	PostProcessCmd          []string // command + args; file path appended automatically
+	Log               bool
+	Port              string
+	UserName          string
+	DownloadDir       string
+	Basepath          string
+	Server            string
+	EnableTLS         bool
+	SearchTimeout     time.Duration
+	SearchBot         string
+	UserAgent         string
+	Version           string
+	CommitSHA         string
+	BuildDate         string
+	OrganizeDownloads bool
+	ReplaceSpace      string
+	PostProcessCmd    []string // command + args; file path appended automatically
 }
 
 func New(config Config) *server {
@@ -107,16 +105,16 @@ func Start(config Config) {
 	router.Mount(config.Basepath, routes)
 
 	server.log.Printf("Version: %s (commit: %s, built: %s)\n", config.Version, config.CommitSHA, config.BuildDate)
-	server.log.Printf("Base Path: %s\n", config.Basepath)
-	server.log.Printf("OpenBooks is listening on port %v", config.Port)
-	server.log.Printf("Download Directory: %s\n", config.DownloadDir)
-	server.log.Printf("Open http://localhost:%v%s in your browser.", config.Port, config.Basepath)
-	server.log.Printf("Persist downloads:      %v", config.Persist)
+	server.log.Printf("Listening on port:      %v", config.Port)
+	server.log.Printf("Base path:              %s", config.Basepath)
+	server.log.Printf("Download directory:     %s", config.DownloadDir)
 	server.log.Printf("Organize downloads:     %v", config.OrganizeDownloads)
 	server.log.Printf("IRC server:             %s (TLS: %v)", config.Server, config.EnableTLS)
 	server.log.Printf("Username:               %s", config.UserName)
 	server.log.Printf("Search bot:             %s", config.SearchBot)
-	server.log.Printf("Browser downloads:      %v", !config.DisableBrowserDownloads)
+	if len(config.PostProcessCmd) > 0 {
+		server.log.Printf("Post-process command:   %v", config.PostProcessCmd)
+	}
 	server.log.Fatal(http.ListenAndServe(":"+config.Port, router))
 }
 

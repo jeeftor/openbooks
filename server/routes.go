@@ -165,11 +165,6 @@ func (server *server) getAllBooksHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !server.config.Persist {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-
 		libraryDir := server.config.DownloadDir
 		output := make([]download, 0)
 
@@ -211,13 +206,6 @@ func (server *server) getBookHandler() http.HandlerFunc {
 		bookPath := filepath.Join(server.config.DownloadDir, filepath.FromSlash(relPath))
 
 		http.ServeFile(w, r, bookPath)
-
-		if !server.config.Persist {
-			err := os.Remove(bookPath)
-			if err != nil {
-				server.log.Printf("Error when deleting book file. %s", err)
-			}
-		}
 	}
 }
 

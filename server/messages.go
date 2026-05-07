@@ -111,11 +111,11 @@ func newSearchResponse(results []core.BookDetail, errors []core.ParseError) Sear
 	}
 }
 
-func newDownloadResponse(filePath string, downloadDir string, disableBrowserDownloads bool) DownloadResponse {
+func newDownloadResponse(filePath string, downloadDir string) DownloadResponse {
 	// Show path relative to the download root so the user knows where the file landed.
 	relPath := strings.TrimPrefix(filePath, downloadDir+"/")
 
-	response := DownloadResponse{
+	return DownloadResponse{
 		StatusResponse: StatusResponse{
 			MessageType:      DOWNLOAD,
 			NotificationType: SUCCESS,
@@ -123,13 +123,6 @@ func newDownloadResponse(filePath string, downloadDir string, disableBrowserDown
 			Detail:           relPath,
 		},
 	}
-
-	// If browser downloads are enabled, trigger auto-download using the base filename.
-	if !disableBrowserDownloads {
-		response.DownloadPath = path.Join("library", path.Base(filePath))
-	}
-
-	return response
 }
 
 func newStatusResponse(notificationType NotificationType, title string) StatusResponse {

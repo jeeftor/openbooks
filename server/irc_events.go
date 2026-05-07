@@ -6,7 +6,17 @@ import (
 	"path/filepath"
 
 	"github.com/evan-buss/openbooks/core"
+	"github.com/evan-buss/openbooks/dcc"
 )
+
+func fileSizeMB(path string) string {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "? MB"
+	}
+	mb := float64(info.Size()) / 1024 / 1024
+	return fmt.Sprintf("%.1f MB", mb)
+}
 
 // organizeByMetadata moves an EPUB to a metadata-derived subdirectory.
 // Returns the final path (original path if unchanged or on error).
@@ -117,6 +127,9 @@ func (c *Client) searchResultHandler(downloadDir string, lb *logBuffer) core.Han
 func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFunc {
 	return func(text string) {
 		dir := config.DownloadDir
+		if d, err := dcc.ParseString(text); err == nil {
+			lb.info(fmt.Sprintf("Downloading: %s", d.Filename))
+		}
 		extractedPath, err := core.DownloadExtractDCCString(dir, text, nil)
 		if err != nil {
 			c.log.Println(err)
@@ -125,11 +138,13 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 			return
 		}
 
+		size := fileSizeMB(extractedPath)
+		lb.info(fmt.Sprintf("Downloaded: %s (%s)", filepath.Base(extractedPath), size))
+
 		finalPath := c.organizeByMetadata(extractedPath, config, lb)
-		runPostProcess(config.PostProcessCmd, finalPath)
-		c.log.Printf("Downloaded book to: %s\n", finalPath)
-		c.log.Printf("Sending book entitled '%s'.\n", filepath.Base(finalPath))
-		c.send <- newDownloadResponse(finalPath, config.DownloadDir, config.DisableBrowserDownloads)
+		runPostProcess(config.PostProcessCmd, finalPath, lb)
+		c.log.Printf("Book saved to: %s\n", finalPath)
+		c.send <- newDownloadResponse(finalPath, config.DownloadDir)
 	}
 }
 
