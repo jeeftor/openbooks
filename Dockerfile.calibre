@@ -20,17 +20,10 @@ WORKDIR /go/src/cmd/openbooks/
 RUN go build -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}"
 
 FROM debian:bookworm-slim AS app
-# Install Calibre headless (command-line tools, no Qt GUI)
+# Install Calibre from Debian repos (includes calibre-polish and all CLI tools)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    wget \
-    xz-utils \
-    && wget -nv -O /tmp/calibre-install.sh https://download.calibre-ebook.com/linux-installer.sh \
-    && sh /tmp/calibre-install.sh install_dir=/opt/calibre \
-    && rm /tmp/calibre-install.sh \
-    && apt-get purge -y --auto-remove wget xz-utils \
+    calibre \
     && rm -rf /var/lib/apt/lists/*
-ENV PATH="/opt/calibre/bin:${PATH}"
 
 WORKDIR /app
 COPY --from=build /go/src/cmd/openbooks/openbooks .
