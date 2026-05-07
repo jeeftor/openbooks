@@ -101,37 +101,38 @@ func resolveFinalPath(
 	if series == "" && meta != nil {
 		series = sanitizePathComponent(meta.Series, rs)
 	}
+	fileName := resolveChoiceFileName(choice, title, ext, rs)
 
 	switch choice.OptionID {
 	case "keep":
 		return filepath.Join(downloadDir, ircFilename)
 
 	case "title":
-		if title == "" {
+		if fileName == "" {
 			return filepath.Join(downloadDir, ircFilename)
 		}
-		return filepath.Join(downloadDir, title+ext)
+		return filepath.Join(downloadDir, fileName)
 
 	case "author-title-flat":
-		if author == "" || title == "" {
+		if author == "" || fileName == "" {
 			return filepath.Join(downloadDir, ircFilename)
 		}
-		return filepath.Join(downloadDir, fmt.Sprintf("%s - %s%s", author, title, ext))
+		return filepath.Join(downloadDir, fmt.Sprintf("%s - %s", author, fileName))
 
 	case "organized":
-		if author == "" || title == "" {
+		if author == "" || title == "" || fileName == "" {
 			return filepath.Join(downloadDir, ircFilename)
 		}
-		return filepath.Join(downloadDir, author, title, title+ext)
+		return filepath.Join(downloadDir, author, title, fileName)
 
 	case "series":
-		if author == "" || title == "" {
+		if author == "" || title == "" || fileName == "" {
 			return filepath.Join(downloadDir, ircFilename)
 		}
 		if series == "" {
-			return filepath.Join(downloadDir, author, title, title+ext)
+			return filepath.Join(downloadDir, author, title, fileName)
 		}
-		return filepath.Join(downloadDir, author, series, title, title+ext)
+		return filepath.Join(downloadDir, author, series, title, fileName)
 
 	case "custom":
 		name := strings.TrimSpace(choice.CustomName)
@@ -143,6 +144,17 @@ func resolveFinalPath(
 	default:
 		return filepath.Join(downloadDir, ircFilename)
 	}
+}
+
+func resolveChoiceFileName(choice RenameChoice, title, ext, replaceSpace string) string {
+	fileName := sanitizePathComponent(choice.FileName, replaceSpace)
+	if fileName == "" && title != "" {
+		fileName = title + ext
+	}
+	if fileName == "" || filepath.Ext(fileName) != "" {
+		return fileName
+	}
+	return fileName + ext
 }
 
 // moveFile moves src to dst, creating parent directories as needed.

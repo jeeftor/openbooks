@@ -148,6 +148,7 @@ func (c *Client) handleRenameConfirm(req *RenameConfirmRequest) {
 	choice := RenameChoice{
 		OptionID:        req.OptionID,
 		CustomName:      req.CustomName,
+		FileName:        req.FileName,
 		RewriteMetadata: req.RewriteMetadata,
 		Author:          req.Author,
 		Title:           req.Title,

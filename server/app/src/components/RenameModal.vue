@@ -11,6 +11,8 @@ const editAuthor = ref("");
 const editTitle = ref("");
 const editSeries = ref("");
 const editSeriesIndex = ref("");
+const editFileName = ref("");
+const fileNameEdited = ref(false);
 const selectedId = ref("keep");
 const customName = ref("");
 const rewriteMetadata = ref(false);
@@ -24,6 +26,8 @@ watch(
     editTitle.value = prompt.metadata?.Title ?? "";
     editSeries.value = prompt.metadata?.Series ?? "";
     editSeriesIndex.value = prompt.metadata?.SeriesIndex ?? "";
+    fileNameEdited.value = false;
+    editFileName.value = defaultFileName(prompt.ircFilename, editTitle.value, prompt.replaceSpace);
     // Default to the best organized option available.
     const ids = prompt.options.map((o) => o.id);
     if (ids.includes("series")) selectedId.value = "series";
@@ -43,6 +47,23 @@ function sanitize(s: string, replaceSpace: string): string {
   return s;
 }
 
+function extension(filename: string): string {
+  const idx = filename.lastIndexOf(".");
+  return idx === -1 ? "" : filename.slice(idx).toLowerCase();
+}
+
+function defaultFileName(ircFilename: string, title: string, replaceSpace: string): string {
+  const ext = extension(ircFilename);
+  const safeTitle = sanitize(title, replaceSpace);
+  return safeTitle ? `${safeTitle}${ext}` : ircFilename;
+}
+
+function fileNameWithExtension(filename: string, ext: string): string {
+  const trimmed = filename.trim();
+  if (!trimmed) return "";
+  return extension(trimmed) ? trimmed : `${trimmed}${ext}`;
+}
+
 // Recompute option previews from the (possibly edited) metadata fields.
 // Mirrors buildRenameOptions() in server/staging.go.
 const liveOptions = computed((): RenameOption[] => {
@@ -52,11 +73,12 @@ const liveOptions = computed((): RenameOption[] => {
   const rs = p.replaceSpace;
   const irc = p.ircFilename;
   const isEPUB = irc.toLowerCase().endsWith(".epub");
-  const ext = irc.slice(irc.lastIndexOf(".")).toLowerCase();
+  const ext = extension(irc);
 
   const author = sanitize(editAuthor.value, rs);
   const title = sanitize(editTitle.value, rs);
   const series = sanitize(editSeries.value, rs);
+  const fileName = sanitize(fileNameWithExtension(editFileName.value, ext), rs);
 
   const opts: RenameOption[] = [
     { id: "keep", label: "Keep IRC filename", preview: irc, isOrganized: false },
@@ -64,26 +86,26 @@ const liveOptions = computed((): RenameOption[] => {
 
   if (!isEPUB || !title) return opts;
 
-  opts.push({ id: "title", label: "Title only", preview: `${title}${ext}`, isOrganized: false });
+  opts.push({ id: "title", label: "Title only", preview: fileName || `${title}${ext}`, isOrganized: false });
 
   if (author) {
     opts.push({
       id: "author-title-flat",
       label: "Author — Title (flat)",
-      preview: `${author} - ${title}${ext}`,
+      preview: `${author} - ${fileName || `${title}${ext}`}`,
       isOrganized: false,
     });
     opts.push({
       id: "organized",
       label: "Author / Title /",
-      preview: `${author}/${title}/${title}${ext}`,
+      preview: `${author}/${title}/${fileName || `${title}${ext}`}`,
       isOrganized: true,
     });
     if (series) {
       opts.push({
         id: "series",
         label: "Author / Series / Title /",
-        preview: `${author}/${series}/${title}/${title}${ext}`,
+        preview: `${author}/${series}/${title}/${fileName || `${title}${ext}`}`,
         isOrganized: true,
       });
     }
@@ -96,6 +118,22 @@ const liveOptions = computed((): RenameOption[] => {
 watch(liveOptions, (opts) => {
   if (!opts.find((o) => o.id === selectedId.value)) {
     selectedId.value = opts[opts.length - 1]?.id ?? "keep";
+  }
+});
+
+watch(editSeries, () => {
+  if (liveOptions.value.find((o) => o.id === "series")) {
+    selectedId.value = "series";
+  }
+  if (editSeries.value.trim() && !editSeriesIndex.value.trim()) {
+    editSeriesIndex.value = "0";
+  }
+});
+
+watch(editTitle, () => {
+  const p = prompt.value;
+  if (p && !fileNameEdited.value) {
+    editFileName.value = defaultFileName(p.ircFilename, editTitle.value, p.replaceSpace);
   }
 });
 
@@ -127,6 +165,7 @@ function confirm() {
     payload: {
       optionId: selectedId.value,
       customName: customName.value,
+      fileName: editFileName.value,
       rewriteMetadata: rewriteMetadata.value,
       author: editAuthor.value,
       title: editTitle.value,
@@ -143,6 +182,7 @@ function cancel() {
     payload: {
       optionId: "keep",
       customName: "",
+      fileName: "",
       rewriteMetadata: false,
       author: "",
       title: "",
@@ -226,6 +266,14 @@ function cancel() {
                 placeholder="Unknown title"
                 class="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <label class="text-xs text-slate-500 dark:text-slate-400 text-right">File</label>
+              <input
+                v-model="editFileName"
+                type="text"
+                placeholder="book.epub"
+                class="w-full px-3 py-1.5 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                @input="fileNameEdited = true"
+              />
               <label class="text-xs text-slate-500 dark:text-slate-400 text-right self-start pt-2">Series</label>
               <div class="space-y-2">
                 <input
@@ -235,12 +283,12 @@ function cancel() {
                   class="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <div class="flex items-center gap-2">
-                  <label class="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap"># in series</label>
+                  <label class="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">Sequence</label>
                   <input
                     v-model="editSeriesIndex"
                     type="text"
                     inputmode="decimal"
-                    placeholder="1"
+                    placeholder="0"
                     class="w-16 px-2 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
                   />
                 </div>

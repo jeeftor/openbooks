@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/evan-buss/openbooks/core"
 	"os"
 	"path/filepath"
 	"testing"
@@ -64,5 +65,64 @@ func TestCopyFileCreatesParentAndCopiesBytes(t *testing.T) {
 	}
 	if string(got) != string(want) {
 		t.Fatalf("copied bytes = %q, want %q", got, want)
+	}
+}
+
+func TestResolveFinalPathUsesEditedFileName(t *testing.T) {
+	t.Parallel()
+
+	meta := &core.EPUBMetadata{
+		Author: "F Scott Fitzgerald",
+		Title:  "The Great Gatsby",
+		Series: "Classics",
+	}
+
+	tests := []struct {
+		name   string
+		choice RenameChoice
+		want   string
+	}{
+		{
+			name: "series organization uses custom file name",
+			choice: RenameChoice{
+				OptionID: "series",
+				Author:   "F Scott Fitzgerald",
+				Title:    "The Great Gatsby",
+				Series:   "Classics",
+				FileName: "Gatsby - cleaned.epub",
+			},
+			want: filepath.Join("books", "F Scott Fitzgerald", "Classics", "The Great Gatsby", "Gatsby - cleaned.epub"),
+		},
+		{
+			name: "series organization appends extension",
+			choice: RenameChoice{
+				OptionID: "series",
+				Author:   "F Scott Fitzgerald",
+				Title:    "The Great Gatsby",
+				Series:   "Classics",
+				FileName: "Gatsby - cleaned",
+			},
+			want: filepath.Join("books", "F Scott Fitzgerald", "Classics", "The Great Gatsby", "Gatsby - cleaned.epub"),
+		},
+		{
+			name: "organized falls back to title file name",
+			choice: RenameChoice{
+				OptionID: "organized",
+				Author:   "F Scott Fitzgerald",
+				Title:    "The Great Gatsby",
+			},
+			want: filepath.Join("books", "F Scott Fitzgerald", "The Great Gatsby", "The Great Gatsby.epub"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := resolveFinalPath("books", tt.choice, "irc-file.epub", meta, "")
+			if got != tt.want {
+				t.Fatalf("resolveFinalPath() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
