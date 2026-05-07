@@ -24,6 +24,7 @@ OpenBooks ABS is not affiliated with Audiobookshelf.
 - [Docker](#docker)
   - [Recommended: Calibre Image](#recommended-calibre-image)
   - [Custom Server Command](#custom-server-command)
+  - [Custom Cleanup Image](#custom-cleanup-image)
 - [Docker Compose](#docker-compose)
   - [Running Beside Audiobookshelf](#running-beside-audiobookshelf)
 - [Important Flags](#important-flags)
@@ -102,7 +103,7 @@ That means the cleaned EPUB is saved normally, and the original pre-polish EPUB 
 
 ### Custom Server Command
 
-Use the minimal image when you want full control over post-processing:
+Use the minimal image when you want no default post-processing and full control over the OpenBooks ABS server flags:
 
 ```bash
 docker run -p 8080:80 \
@@ -115,17 +116,44 @@ docker run -p 8080:80 \
   --replace-space .
 ```
 
-To add your own cleanup command:
+The command override only changes OpenBooks ABS server flags. It does not install new tools into the container.
+
+### Custom Cleanup Image
+
+If your post-processor is not already in the image, build a small image on top of OpenBooks ABS and copy your cleanup command into it. Use the Calibre image as the base if your cleanup uses shell scripts, Calibre tools, or other Debian packages. The minimal image is distroless and is better suited to self-contained binaries.
+
+Example `Dockerfile.openbooks-abs` with a local script:
+
+```Dockerfile
+FROM ghcr.io/jeeftor/openbooks-abs:latest-calibre
+
+COPY --chmod=755 cleanup-epub.sh /usr/local/bin/cleanup-epub
+
+CMD ["server", "--name", "openbooks_abs", "--dir", "/books", "--port", "80", "--dev", \
+     "--post-process-cmd", "cleanup-epub,--strict"]
+```
+
+Example using `COPY --from` to bring in a tool from another image:
+
+```Dockerfile
+FROM ghcr.io/my-org/epub-tools:latest AS epub-tools
+
+FROM ghcr.io/jeeftor/openbooks-abs:latest-calibre
+
+COPY --from=epub-tools /usr/local/bin/my-epub-cleaner /usr/local/bin/my-epub-cleaner
+
+CMD ["server", "--name", "openbooks_abs", "--dir", "/books", "--port", "80", "--dev", \
+     "--post-process-cmd", "my-epub-cleaner,--strict"]
+```
+
+Build and run the derived image:
 
 ```bash
+docker build -f Dockerfile.openbooks-abs -t openbooks-abs-custom .
+
 docker run -p 8080:80 \
   -v ./books:/books \
-  ghcr.io/jeeftor/openbooks-abs:latest \
-  server \
-  --name my_irc_name \
-  --dir /books \
-  --port 80 \
-  --post-process-cmd "my-script,--arg1"
+  openbooks-abs-custom
 ```
 
 ## Docker Compose
@@ -211,7 +239,7 @@ The Calibre image uses `ebook-polish`, for example:
 --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"
 ```
 
-You can replace that with your own script if you want to run validation, conversion, metadata checks, or other cleanup.
+You can replace that with your own command if you want to run validation, conversion, metadata checks, or other cleanup. That command must exist inside the container. For repeatable use, prefer a derived Docker image that copies your script or binary into the OpenBooks ABS image, as shown in [Custom Cleanup Image](#custom-cleanup-image).
 
 Annotated compose example:
 
@@ -226,8 +254,6 @@ services:
       # Completed books land here. Mount the same path into Audiobookshelf.
       - ./books:/books
 
-      # Optional: mount helper scripts if you want a custom post-processor.
-      - ./scripts:/scripts:ro
     ports:
       - "8080:80"
     restart: unless-stopped
@@ -250,8 +276,9 @@ services:
     # More aggressive EPUB cleanup:
     # --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"
     #
-    # Custom script. OpenBooks ABS appends the downloaded file path:
-    # --post-process-cmd "/scripts/cleanup-epub.sh,--strict"
+    # Custom tools should be baked into a derived image, then referenced here.
+    # OpenBooks ABS appends the downloaded file path:
+    # --post-process-cmd "cleanup-epub,--strict"
 ```
 
 ## Reverse Proxy Base Path
