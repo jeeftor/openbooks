@@ -147,6 +147,10 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 
 		finalPath := c.organizeByMetadata(extractedPath, config, lb)
 		runPostProcess(config.PostProcessCmd, finalPath, lb)
+		// organizeByMetadata logs the path when organize is enabled; log it here for flat mode.
+		if !config.OrganizeDownloads {
+			lb.info(fmt.Sprintf("Saved: %s", filepath.Base(finalPath)))
+		}
 		c.log.Printf("Book saved to: %s\n", finalPath)
 		c.send <- newDownloadResponse(finalPath, config.DownloadDir)
 		// Signal the download queue to proceed to the next item.
