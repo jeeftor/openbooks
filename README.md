@@ -11,6 +11,20 @@ Author/Title/Title.epub
 
 The goal is simple: search from the browser, download from IRC, clean the EPUB, choose the final name, and leave the finished file in a library folder that Audiobookshelf can scan.
 
+## Table of Contents
+
+- [How This Fork Differs](#how-this-fork-differs)
+- [Docker](#docker)
+  - [Recommended: Calibre Image](#recommended-calibre-image)
+  - [Custom Server Command](#custom-server-command)
+- [Docker Compose](#docker-compose)
+  - [Running Beside Audiobookshelf](#running-beside-audiobookshelf)
+- [Important Flags](#important-flags)
+- [Post-Processing](#post-processing)
+- [Reverse Proxy Base Path](#reverse-proxy-base-path)
+- [Local Development](#local-development)
+- [Technology](#technology)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./.github/home_v3_dark.png">
   <img alt="openbooks-abs screenshot" src="./.github/home_v3.png">
