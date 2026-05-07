@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useMediaQuery } from "@vueuse/core";
-import { Search, PanelLeftOpen, Loader, Wifi, WifiOff } from "lucide-vue-next";
+import { Search, PanelLeftOpen, Loader, Wifi, WifiOff, Download } from "lucide-vue-next";
 import { useAppStore } from "../stores/app";
 import { useHistoryStore } from "../stores/history";
 import { sendMessage } from "../composables/useWebSocket";
@@ -33,6 +33,10 @@ const onlineCount = computed(() => {
   const results = appStore.activeItem?.results;
   if (!results || !servers.value.length) return 0;
   return new Set(results.filter(b => servers.value.includes(b.server)).map(b => b.server)).size;
+});
+const rawResults = computed(() => {
+  const timestamp = appStore.activeItem?.timestamp;
+  return timestamp ? appStore.rawSearchResults[timestamp] : undefined;
 });
 const errorMode = computed(() => showErrors.value && !!appStore.activeItem);
 const validInput = computed(() => {
@@ -122,6 +126,27 @@ function retrySearch() {
   if (appStore.activeItem?.query) {
     issueSearch(appStore.activeItem.query);
   }
+}
+
+function downloadRawResults() {
+  const active = appStore.activeItem;
+  if (!active || !rawResults.value) return;
+
+  const safeQuery = active.query
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "search";
+  const blob = new Blob([rawResults.value], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `openbooks-abs-${safeQuery}-raw-results.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function handleSearch(e: Event) {
@@ -215,6 +240,14 @@ function handleSearch(e: Event) {
           <span v-if="hasErrors" class="text-amber-500">
             · {{ appStore.activeItem.errors?.length }} parse errors
           </span>
+          <button
+            v-if="rawResults"
+            class="ml-1 flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500 transition hover:border-brand-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            title="Download the raw IRC search results text file"
+            @click="downloadRawResults">
+            <Download :size="11" />
+            Raw results
+          </button>
         </template>
         <!-- Connected indicator (always visible when connected, right-aligned) -->
         <span

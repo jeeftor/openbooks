@@ -10,6 +10,7 @@ export const useAppStore = defineStore("app", () => {
   const username = ref<string | undefined>(undefined);
   const inFlightDownloads = ref<string[]>([]);
   const libraryVersion = ref(0);
+  const rawSearchResults = ref<Record<number, string>>({});
 
   // Session-only — not persisted. Results arrive async via WebSocket;
   // using localStorage + computed caused the getter to return null while
@@ -46,6 +47,19 @@ export const useAppStore = defineStore("app", () => {
     activeItem.value = item;
   }
 
+  function setRawSearchResult(timestamp: number, raw: string | undefined) {
+    if (!raw) return;
+
+    const next = { ...rawSearchResults.value, [timestamp]: raw };
+    const timestamps = Object.keys(next)
+      .map(Number)
+      .sort((a, b) => b - a);
+    for (const oldTimestamp of timestamps.slice(5)) {
+      delete next[oldTimestamp];
+    }
+    rawSearchResults.value = next;
+  }
+
   function toggleSidebar() {
     isSidebarOpen.value = !isSidebarOpen.value;
   }
@@ -75,6 +89,7 @@ export const useAppStore = defineStore("app", () => {
     username,
     inFlightDownloads,
     activeItem,
+    rawSearchResults,
     pendingQuery,
     pendingRename,
     waitingDownload,
@@ -84,6 +99,7 @@ export const useAppStore = defineStore("app", () => {
     setConnecting,
     setUsername,
     setActiveItem,
+    setRawSearchResult,
     toggleSidebar,
     addInFlightDownload,
     removeInFlightDownload,

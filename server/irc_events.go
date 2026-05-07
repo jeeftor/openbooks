@@ -51,6 +51,10 @@ func (c *Client) searchResultHandler(downloadDir string, lb *logBuffer) core.Han
 			c.send <- newErrorResponse("Error when parsing search results.")
 			return
 		}
+		rawResults, err := os.ReadFile(extractedPath)
+		if err != nil {
+			c.log.Printf("Error reading raw search results file: %v", err)
+		}
 
 		if len(bookResults) == 0 && len(parseErrors) == 0 {
 			c.noResultsHandler(text)
@@ -67,7 +71,7 @@ func (c *Client) searchResultHandler(downloadDir string, lb *logBuffer) core.Han
 
 		c.log.Printf("Sending %d search results.\n", len(bookResults))
 		lb.info(fmt.Sprintf("🔍 Search results: %d found, %d unparseable", len(bookResults), len(parseErrors)))
-		c.send <- newSearchResponse(bookResults, parseErrors)
+		c.send <- newSearchResponse(bookResults, parseErrors, string(rawResults))
 
 		err = os.Remove(extractedPath)
 		if err != nil {

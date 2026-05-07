@@ -75,6 +75,7 @@ type SearchResponse struct {
 	StatusResponse
 	Books  []core.BookDetail `json:"books"`
 	Errors []core.ParseError `json:"errors"`
+	Raw    string            `json:"raw,omitempty"`
 }
 
 // DownloadResponse is a response that sends the requested book to the client
@@ -143,7 +144,7 @@ func newRateLimitResponse(remainingSeconds float64) StatusResponse {
 	}
 }
 
-func newSearchResponse(results []core.BookDetail, errors []core.ParseError) SearchResponse {
+func newSearchResponse(results []core.BookDetail, errors []core.ParseError, raw string) SearchResponse {
 	detail := fmt.Sprintf("There were %v parsing errors.", len(errors))
 	if len(errors) == 1 {
 		detail = "There was 1 parsing error."
@@ -157,6 +158,7 @@ func newSearchResponse(results []core.BookDetail, errors []core.ParseError) Sear
 		},
 		Books:  results,
 		Errors: errors,
+		Raw:    raw,
 	}
 }
 
