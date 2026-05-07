@@ -2,11 +2,21 @@
 
 ## GitHub Workflow
 
-- Start new work from a GitHub issue in this repository before making code or documentation changes.
-- Use a dedicated feature or fix branch for each issue. Branch names should describe the issue scope.
-- Keep the issue updated as the work changes: add comments for scope changes, important decisions, blockers, or follow-up work discovered during implementation.
-- Keep commits focused on the issue. Do not mix unrelated cleanup or separate features into the same branch.
-- When the work is complete, close the issue from the commit message or pull request with GitHub closing keywords such as `Closes #123`.
+- Track all code and documentation changes with a GitHub issue before editing files.
+- If an issue already exists, use it. If not, create one with the goal, motivation, and acceptance criteria.
+- Create a dedicated branch from `master` for each issue. Use a descriptive branch name such as `feature/download-search-results` or `fix/series-metadata`.
+- Keep the issue updated while working. Add comments for scope changes, important implementation decisions, blockers, test results, and follow-up work discovered during implementation.
+- Keep commits focused on the issue. Do not mix unrelated cleanup, refactors, or separate features into the same branch.
+- As part of each feature or fix, decide whether tests and docs need updates. If they do, include them in the same branch. If they do not, note why in the PR.
+- Before opening a PR, run the relevant repo-native checks. If a check cannot be run or has known unrelated failures, document that in the PR.
+- Open a pull request into `master` when the branch is ready. The PR body must include:
+  - the issue it resolves, using `Closes #123`
+  - a short summary of user-visible changes
+  - tests run
+  - docs updated, or a note that docs were not needed
+  - any follow-up issues created
+- Issues should close through the PR merge, not through direct commits to `master`.
+- Do not push directly to `master` for normal feature or fix work.
 - If work is paused or deferred, leave the issue open and comment with the current state and next step.
 
 ## Existing Project Rules
