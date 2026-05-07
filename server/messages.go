@@ -107,6 +107,7 @@ type RenamePromptResponse struct {
 type RenameConfirmRequest struct {
 	OptionID        string `json:"optionId"`
 	CustomName      string `json:"customName"`
+	FileName        string `json:"fileName,omitempty"`
 	RewriteMetadata bool   `json:"rewriteMetadata"`
 	// Metadata fields to write (may differ from extracted if user edited them)
 	Author      string `json:"author,omitempty"`
@@ -119,6 +120,7 @@ type RenameConfirmRequest struct {
 type RenameChoice struct {
 	OptionID        string
 	CustomName      string
+	FileName        string
 	RewriteMetadata bool
 	Author          string
 	Title           string

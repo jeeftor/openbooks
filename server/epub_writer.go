@@ -103,6 +103,9 @@ var (
 
 	// Matches any <meta> tag that has name="calibre:series_index"
 	reCalSeriesIndex = regexp.MustCompile(`(?i)<meta\b[^>]*\bname="calibre:series_index"[^>]*/?>`)
+
+	// Matches closing OPF metadata tags, including namespaced forms like </opf:metadata>.
+	reMetadataClose = regexp.MustCompile(`(?i)</(?:[a-z_][\w.-]*:)?metadata\s*>`)
 )
 
 // patchOPF applies targeted substitutions to OPF XML bytes.
@@ -122,7 +125,7 @@ func patchOPF(data []byte, title, author, series, seriesIndex string) []byte {
 		if reCalSeries.MatchString(s) {
 			s = reCalSeries.ReplaceAllString(s, repl)
 		} else {
-			s = strings.Replace(s, "</metadata>", repl+"\n    </metadata>", 1)
+			s = insertBeforeMetadataClose(s, repl)
 		}
 	}
 	if seriesIndex != "" {
@@ -130,11 +133,19 @@ func patchOPF(data []byte, title, author, series, seriesIndex string) []byte {
 		if reCalSeriesIndex.MatchString(s) {
 			s = reCalSeriesIndex.ReplaceAllString(s, repl)
 		} else {
-			s = strings.Replace(s, "</metadata>", repl+"\n    </metadata>", 1)
+			s = insertBeforeMetadataClose(s, repl)
 		}
 	}
 
 	return []byte(s)
+}
+
+func insertBeforeMetadataClose(s, repl string) string {
+	loc := reMetadataClose.FindStringIndex(s)
+	if loc == nil {
+		return s
+	}
+	return s[:loc[0]] + repl + "\n    " + s[loc[0]:]
 }
 
 // replaceFirstMatch replaces only the first occurrence found by re.

@@ -117,6 +117,7 @@ export interface RenameConfirmRequest {
   payload: {
     optionId: string;
     customName: string;
+    fileName: string;
     rewriteMetadata: boolean;
     author: string;
     title: string;
