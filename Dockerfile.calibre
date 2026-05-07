@@ -1,11 +1,11 @@
-FROM node:22 as web
+FROM node:22 AS web
 WORKDIR /web
 COPY . .
 WORKDIR /web/server/app/
 RUN npm install
 RUN npm run build
 
-FROM golang as build
+FROM golang AS build
 WORKDIR /go/src/
 COPY . .
 COPY --from=web /web/ .
@@ -19,9 +19,10 @@ RUN go install -v ./...
 WORKDIR /go/src/cmd/openbooks/
 RUN go build -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}"
 
-FROM debian:bookworm-slim as app
+FROM debian:bookworm-slim AS app
 # Install Calibre headless (command-line tools, no Qt GUI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     wget \
     xz-utils \
     && wget -nv -O /tmp/calibre-install.sh https://download.calibre-ebook.com/linux-installer.sh \
