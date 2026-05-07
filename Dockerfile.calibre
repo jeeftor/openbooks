@@ -34,5 +34,6 @@ ENV BASE_PATH=/
 
 # Default: run calibre-polish after every download.
 # Override by passing a different --post-process-cmd or omitting it entirely.
-ENTRYPOINT ["./openbooks", "server", "--name", "openbooks", "--dir", "/books", "--port", "80", \
-            "--post-process-cmd", "calibre-polish,--embed-fonts,--subset-fonts,--smarten-punctuation"]
+ENTRYPOINT ["./openbooks"]
+CMD ["server", "--name", "openbooks", "--dir", "/books", "--port", "80", \
+     "--post-process-cmd", "calibre-polish,--embed-fonts,--subset-fonts,--smarten-punctuation"]
