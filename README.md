@@ -139,51 +139,28 @@ Mount the same `./books` directory into Audiobookshelf as an ebook library, then
 
 In a homelab compose stack, the useful part is the shared volume. openbooks-abs writes completed EPUBs into the same host directory that Audiobookshelf sees as an ebook library.
 
-Example `.env`:
-
-```dotenv
-PUID=1000
-PGID=1000
-TZ=Etc/UTC
-
-CONFIG_DIR=/srv/appdata
-BOOKS_DIR=/srv/media/books
-
-OPENBOOKS_ABS_PORT=8080
-AUDIOBOOKSHELF_PORT=13378
-```
-
-Example `docker-compose.yml`:
-
 ```yaml
 services:
   openbooks-abs:
     image: ghcr.io/jeeftor/openbooks-abs:latest-calibre
     container_name: openbooks-abs
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
       - BASE_PATH=/
     volumes:
-      - ${BOOKS_DIR}:/books
+      - ./books:/books
     ports:
-      - "${OPENBOOKS_ABS_PORT}:80"
+      - "8080:80"
     restart: unless-stopped
 
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:latest
     container_name: audiobookshelf
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
     volumes:
-      - ${CONFIG_DIR}/audiobookshelf/config:/config
-      - ${CONFIG_DIR}/audiobookshelf/metadata:/metadata
-      - ${BOOKS_DIR}:/books
+      - ./audiobookshelf/config:/config
+      - ./audiobookshelf/metadata:/metadata
+      - ./books:/books
     ports:
-      - "${AUDIOBOOKSHELF_PORT}:80"
+      - "13378:80"
     restart: unless-stopped
 ```
 
@@ -195,7 +172,7 @@ Then in Audiobookshelf:
 4. Choose an organized rename option, such as `Author / Series / Title / Title.epub` or `Author / Title / Title.epub`.
 5. Scan the Audiobookshelf library.
 
-Because both containers mount the same host path, a book saved by openbooks-abs to `${BOOKS_DIR}/Author/Title/Title.epub` is immediately present inside Audiobookshelf at `/books/Author/Title/Title.epub`. Audiobookshelf will pick it up on the next manual or scheduled library scan.
+Because both containers mount `./books`, a book saved by openbooks-abs to `./books/Author/Title/Title.epub` is immediately present inside Audiobookshelf at `/books/Author/Title/Title.epub`. Audiobookshelf will pick it up on the next manual or scheduled library scan.
 
 ## Important Flags
 
