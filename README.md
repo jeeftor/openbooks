@@ -1,10 +1,10 @@
-<h1 align="center">openbooks-abs</h1>
+<h1 align="center">OpenBooks ABS</h1>
 
 <p align="center">
   A focused OpenBooks fork for preparing EPUB libraries for Audiobookshelf.
 </p>
 
-openbooks-abs is a focused fork of [OpenBooks](https://github.com/evan-buss/openbooks). The original project is a general-purpose IRC ebook search and download tool. This fork keeps that core workflow, but reshapes the server mode around building a clean ebook library that can be mounted directly into [Audiobookshelf](https://www.audiobookshelf.org/).
+OpenBooks ABS is a focused fork of [OpenBooks](https://github.com/evan-buss/openbooks). The original project is a general-purpose IRC ebook search and download tool. This fork keeps that core workflow, but reshapes the server mode around building a clean ebook library that can be mounted directly into [Audiobookshelf](https://www.audiobookshelf.org/).
 
 [Audiobookshelf](https://www.audiobookshelf.org/) works best when books are stored in predictable author/title folders. For EPUB libraries, this fork is designed to turn IRC downloads into layouts like:
 
@@ -15,7 +15,7 @@ Author/Title/Title.epub
 
 The goal is simple: search from the browser, download from IRC, clean the EPUB, choose the final name, and leave the finished file in a library folder that Audiobookshelf can scan.
 
-openbooks-abs is not affiliated with Audiobookshelf.
+OpenBooks ABS is not affiliated with Audiobookshelf.
 
 ## Table of Contents
 
@@ -38,11 +38,12 @@ openbooks-abs is not affiliated with Audiobookshelf.
 
 ## How This Fork Differs
 
-openbooks-abs is disk-first. Upstream OpenBooks historically focused on delivering downloaded files back to the browser, with persistence as an option. This fork removes that browser-download-centered workflow: downloads are saved to the configured directory, and the browser UI is used to search, monitor, rename, and organize.
+OpenBooks ABS is disk-first. Upstream OpenBooks historically focused on delivering downloaded files back to the browser, with persistence as an option. This fork removes that browser-download-centered workflow: downloads are saved to the configured directory, and the browser UI is used to search, monitor, rename, and organize.
 
 Important differences from upstream:
 
 - Better mobile support in the browser UI.
+- Multiple browser sessions can use the app at the same time, each with its own IRC connection and download flow.
 - A rename workflow after download, including metadata-based naming suggestions.
 - EPUB metadata and cover extraction before saving.
 - Optional EPUB internal metadata rewrite when you confirm a renamed book.
@@ -75,7 +76,7 @@ ghcr.io/jeeftor/openbooks:v1.2.3-calibre
 
 ### Recommended: Calibre Image
 
-The Calibre image is the easiest way to use this fork as an Audiobookshelf intake tool:
+The Calibre image is the easiest way to use OpenBooks ABS as an Audiobookshelf intake tool:
 
 ```bash
 docker run -p 8080:80 \
@@ -143,7 +144,7 @@ Mount the same `./books` directory into Audiobookshelf as an ebook library, then
 
 ### Running Beside Audiobookshelf
 
-In a homelab compose stack, the useful part is the shared volume. openbooks-abs writes completed EPUBs into the same host directory that Audiobookshelf sees as an ebook library.
+In a homelab compose stack, the useful part is the shared volume. OpenBooks ABS writes completed EPUBs into the same host directory that Audiobookshelf sees as an ebook library.
 
 ```yaml
 services:
@@ -174,11 +175,11 @@ Then in Audiobookshelf:
 
 1. Open Audiobookshelf and create an ebook library.
 2. Point that library at `/books`.
-3. Use openbooks-abs to search and download a book.
+3. Use OpenBooks ABS to search and download a book.
 4. Choose an organized rename option, such as `Author / Series / Title / Title.epub` or `Author / Title / Title.epub`.
 5. Scan the Audiobookshelf library.
 
-Because both containers mount `./books`, a book saved by openbooks-abs to `./books/Author/Title/Title.epub` is immediately present inside Audiobookshelf at `/books/Author/Title/Title.epub`. Audiobookshelf will pick it up on the next manual or scheduled library scan.
+Because both containers mount `./books`, a book saved by OpenBooks ABS to `./books/Author/Title/Title.epub` is immediately present inside Audiobookshelf at `/books/Author/Title/Title.epub`. Audiobookshelf will pick it up on the next manual or scheduled library scan.
 
 ## Important Flags
 
@@ -243,13 +244,13 @@ services:
     # More aggressive EPUB cleanup:
     # --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"
     #
-    # Custom script. openbooks-abs appends the downloaded file path:
+    # Custom script. OpenBooks ABS appends the downloaded file path:
     # --post-process-cmd "/scripts/cleanup-epub.sh,--strict"
 ```
 
 ## Reverse Proxy Base Path
 
-openbooks-abs can run behind a reverse proxy at a subpath. The base path must include leading and trailing slashes.
+OpenBooks ABS can run behind a reverse proxy at a subpath. The base path must include leading and trailing slashes.
 
 ```bash
 docker run -p 8080:80 \

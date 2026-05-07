@@ -156,7 +156,9 @@ function handleSearch(e: Event) {
     </div>
 
     <!-- Search bar row -->
-    <div class="flex-shrink-0 px-4 pt-4 pb-3">
+    <div
+      class="flex-shrink-0 px-4 pb-3 bg-slate-100 dark:bg-slate-950 z-10"
+      :style="{ paddingTop: isMobile ? 'calc(env(safe-area-inset-top) + 1rem)' : '1rem' }">
       <div class="flex items-center gap-2">
         <!-- Sidebar toggle (desktop only, when sidebar is closed) -->
         <button
