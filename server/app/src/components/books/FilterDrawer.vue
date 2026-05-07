@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { X } from "lucide-vue-next";
+import { computed } from "vue";
+import { X, Star } from "lucide-vue-next";
+import { usePreferencesStore } from "../../stores/preferences";
 
 const props = defineProps<{
   open: boolean;
@@ -7,6 +9,7 @@ const props = defineProps<{
   authorFilter: string;
   titleFilter: string;
   formatFilter: string;
+  excludeNoSize: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -14,12 +17,30 @@ const emit = defineEmits<{
   "update:authorFilter": [value: string];
   "update:titleFilter": [value: string];
   "update:formatFilter": [value: string];
+  "update:excludeNoSize": [value: boolean];
 }>();
+
+const prefStore = usePreferencesStore();
+
+const prefMatchesCurrent = computed(() => {
+  const saved = prefStore.preferredFormats;
+  if (!props.formatFilter) return saved.length === 0;
+  return saved.length === 1 && saved[0] === props.formatFilter;
+});
+
+function saveDefault() {
+  if (props.formatFilter) {
+    prefStore.setPreferredFormats([props.formatFilter]);
+  } else {
+    prefStore.clearPreferredFormats();
+  }
+}
 
 function clearAll() {
   emit("update:authorFilter", "");
   emit("update:titleFilter", "");
   emit("update:formatFilter", "");
+  emit("update:excludeNoSize", false);
 }
 </script>
 
@@ -100,7 +121,7 @@ function clearAll() {
       </div>
 
       <!-- Format chips -->
-      <div class="mb-5">
+      <div class="mb-3">
         <label
           class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2"
           >Format</label
@@ -129,6 +150,35 @@ function clearAll() {
             {{ fmt.toUpperCase() }}
           </button>
         </div>
+        <!-- Save / clear default -->
+        <div class="mt-2">
+          <button
+            v-if="!prefMatchesCurrent"
+            class="flex items-center gap-1 text-xs px-2 py-1 rounded border border-brand-300 dark:border-brand-700 text-brand-500 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+            @click="saveDefault">
+            <Star :size="11" />
+            Save as default
+          </button>
+          <button
+            v-else-if="prefStore.preferredFormats.length > 0"
+            class="text-xs px-2 py-1 rounded border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-red-400 hover:border-red-300 transition-colors"
+            @click="prefStore.clearPreferredFormats(); emit('update:formatFilter', '')">
+            ✕ Clear default
+          </button>
+        </div>
+      </div>
+
+      <!-- Size filter -->
+      <div class="mb-5">
+        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Size</label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            :checked="excludeNoSize"
+            class="rounded text-brand-400 focus:ring-brand-400"
+            @change="emit('update:excludeNoSize', ($event.target as HTMLInputElement).checked)" />
+          <span class="text-sm text-slate-700 dark:text-slate-300">Exclude unknown size (N/A)</span>
+        </label>
       </div>
 
       <!-- Actions -->

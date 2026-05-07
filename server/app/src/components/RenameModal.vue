@@ -226,22 +226,22 @@ function cancel() {
                 placeholder="Unknown title"
                 class="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <label class="text-xs text-slate-500 dark:text-slate-400 text-right">Series</label>
-              <div class="flex gap-2">
+              <label class="text-xs text-slate-500 dark:text-slate-400 text-right self-start pt-2">Series</label>
+              <div class="space-y-2">
                 <input
                   v-model="editSeries"
                   type="text"
                   placeholder="(none)"
-                  class="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <div class="flex items-center gap-1.5 flex-shrink-0">
+                <div class="flex items-center gap-2">
                   <label class="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap"># in series</label>
                   <input
                     v-model="editSeriesIndex"
                     type="text"
                     inputmode="decimal"
                     placeholder="1"
-                    class="w-14 px-2 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                    class="w-16 px-2 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
                   />
                 </div>
               </div>

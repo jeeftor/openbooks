@@ -95,7 +95,7 @@ dev: build-frontend install-npm
 	@echo "  Username: $(NAME)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads 2>&1 | sed 's/^/[backend] /') & \
+	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads --dev 2>&1 | sed 's/^/[backend] /') & \
 	sleep 2 && (cd server/app && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -109,7 +109,7 @@ dev-mobile: build-frontend install-npm
 	echo "  Username: $(NAME)"; \
 	echo ""; \
 	trap 'kill 0' EXIT; \
-	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads 2>&1 | sed 's/^/[backend] /') & \
+	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads --dev 2>&1 | sed 's/^/[backend] /') & \
 	sleep 2 && (cd server/app && npm run dev -- --host 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -123,7 +123,7 @@ dev-mock: build-frontend install-npm
 	@echo ""
 	@trap 'kill 0' EXIT; \
 	(cd cmd/mock_server && go run . 2>&1 | sed 's/^/[mock]     /') & \
-	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 2>&1 | sed 's/^/[backend]  /') & \
+	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 --dev 2>&1 | sed 's/^/[backend]  /') & \
 	sleep 3 && (cd server/app && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -138,7 +138,7 @@ dev-mock-mobile: build-frontend install-npm
 	echo ""; \
 	trap 'kill 0' EXIT; \
 	(cd cmd/mock_server && go run . 2>&1 | sed 's/^/[mock]     /') & \
-	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 2>&1 | sed 's/^/[backend]  /') & \
+	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 --dev 2>&1 | sed 's/^/[backend]  /') & \
 	sleep 3 && (cd server/app && npm run dev -- --host 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -146,7 +146,7 @@ dev-mock-mobile: build-frontend install-npm
 dev1: build-frontend
 	@echo "Backend → :5228  (username: $(NAME))"
 	@echo "Run 'make dev2' in another terminal once backend is ready."
-	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads
+	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads --dev
 
 dev2: install-npm
 	@echo "Frontend → :5173  (http://localhost:5173)"
@@ -161,7 +161,7 @@ dev-mock1:
 dev-mock2: build-frontend
 	@echo "Backend → :5228  (mock IRC, username: $(NAME))"
 	@echo "Run 'make dev2' in another terminal once backend is ready."
-	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667
+	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 --dev
 
 # ── CLI mode ──────────────────────────────────────────────────────────────────
 dev-cli:
@@ -232,8 +232,8 @@ docker-dev-calibre: docker-calibre
 	docker run --rm -p 8080:80 \
 	  -v $(PWD)/books:/books \
 	  openbooks-abs-calibre \
-	  server --name $(NAME) --dir /books --port 80 \
-	  --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book"
+	  server --name $(NAME) --dir /books --port 80 --dev \
+	  --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--compress-images"
 
 # ─── Clean ───────────────────────────────────────────────────────────────────
 clean:

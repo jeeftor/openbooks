@@ -18,6 +18,7 @@ const filterOpen = ref(false);
 const authorFilter = ref("");
 const titleFilter = ref("");
 const formatFilter = ref(prefStore.preferredFormats[0] ?? "");
+const excludeNoSize = ref(false);
 
 const sortedBooks = computed(() => {
   if (!servers.value.length) return props.books;
@@ -36,6 +37,7 @@ function matchesBook(b: BookDetail) {
   if (authorFilter.value && !b.author.toLowerCase().includes(authorFilter.value.toLowerCase())) return false;
   if (titleFilter.value && !b.title.toLowerCase().includes(titleFilter.value.toLowerCase())) return false;
   if (formatFilter.value && b.format !== formatFilter.value) return false;
+  if (excludeNoSize.value && (!b.size || b.size === "N/A")) return false;
   return true;
 }
 
@@ -68,6 +70,7 @@ watch(
     authorFilter.value = "";
     titleFilter.value = "";
     formatFilter.value = prefStore.preferredFormats[0] ?? "";
+    excludeNoSize.value = false;
   }
 );
 </script>
@@ -166,6 +169,7 @@ watch(
       :formats="formats"
       v-model:author-filter="authorFilter"
       v-model:title-filter="titleFilter"
-      v-model:format-filter="formatFilter" />
+      v-model:format-filter="formatFilter"
+      v-model:exclude-no-size="excludeNoSize" />
   </div>
 </template>

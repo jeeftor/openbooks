@@ -20,9 +20,11 @@ const (
 	SEARCH
 	DOWNLOAD
 	RATELIMIT
-	RENAME_PROMPT   // server → client: book staged, awaiting rename decision
-	RENAME_CONFIRM  // client → server: user's rename decision
-	DOWNLOAD_WAITING // server → client: IRC request sent, waiting for DCC response
+	RENAME_PROMPT        // server → client: book staged, awaiting rename decision
+	RENAME_CONFIRM       // client → server: user's rename decision
+	DOWNLOAD_WAITING     // server → client: IRC request sent, waiting for DCC response
+	DOWNLOAD_STARTED     // server → client: DCC accepted, file transfer in progress
+	POST_PROCESS_STARTED // server → client: post-processing (ebook-polish) running
 )
 
 type NotificationType int
@@ -203,6 +205,14 @@ func newDownloadWaitingClear() DownloadWaitingResponse {
 		StatusResponse: StatusResponse{MessageType: DOWNLOAD_WAITING},
 		Active:         false,
 	}
+}
+
+func newDownloadStartedResponse() StatusResponse {
+	return StatusResponse{MessageType: DOWNLOAD_STARTED}
+}
+
+func newPostProcessStartedResponse() StatusResponse {
+	return StatusResponse{MessageType: POST_PROCESS_STARTED}
 }
 
 func newErrorResponse(title string) StatusResponse {

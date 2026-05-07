@@ -111,13 +111,20 @@ export function useWebSocket() {
         break;
       case MessageType.RENAME_PROMPT:
         appStore.pendingRename = response as RenamePromptResponse;
-        appStore.waitingDownload = null; // clear waiting state when modal appears
+        appStore.waitingDownload = null;
+        appStore.setDownloadPhase(null);
         return;
       case MessageType.DOWNLOAD_WAITING: {
         const dw = response as DownloadWaitingResponse;
         appStore.waitingDownload = dw.active ? dw : null;
         return;
       }
+      case MessageType.DOWNLOAD_STARTED:
+        appStore.setDownloadPhase("transferring");
+        return;
+      case MessageType.POST_PROCESS_STARTED:
+        appStore.setDownloadPhase("cleaning");
+        return;
       case MessageType.RATELIMIT:
         historyStore.deleteItem(undefined);
         break;

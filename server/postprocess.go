@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"os"
 	"os/exec"
 )
 
@@ -28,6 +29,12 @@ func runPostProcess(cmd []string, filePath string, lb bookLogger) {
 	if len(cmd) == 0 {
 		return
 	}
+
+	var sizeBefore int64
+	if info, err := os.Stat(filePath); err == nil {
+		sizeBefore = info.Size()
+	}
+
 	args := append(append([]string{}, cmd[1:]...), filePath)
 	out, err := exec.Command(cmd[0], args...).CombinedOutput()
 	detail := string(out)
@@ -37,6 +44,35 @@ func runPostProcess(cmd []string, filePath string, lb bookLogger) {
 		lb.errorDetail(fmt.Sprintf("❌ Cleaning failed: %s", cmd[0]), detail)
 		return
 	}
+
 	slog.Info("post-process complete", "cmd", cmd[0], "file", filePath)
-	lb.infoDetail(fmt.Sprintf("✨ Cleaned: %s", cmd[0]), detail)
+	msg := fmt.Sprintf("✨ Cleaned: %s", cmd[0])
+	if sizeBefore > 0 {
+		if info, err := os.Stat(filePath); err == nil {
+			sizeAfter := info.Size()
+			delta := sizeAfter - sizeBefore
+			pct := float64(delta) / float64(sizeBefore) * 100
+			sign := "+"
+			if delta <= 0 {
+				sign = ""
+			}
+			msg += fmt.Sprintf(" (%s%.1f%%, %s → %s)",
+				sign, pct,
+				formatBytes(sizeBefore), formatBytes(sizeAfter))
+		}
+	}
+	lb.infoDetail(msg, detail)
+}
+
+func formatBytes(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }

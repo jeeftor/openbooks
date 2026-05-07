@@ -13,7 +13,9 @@ export enum MessageType {
   RATELIMIT,
   RENAME_PROMPT,
   RENAME_CONFIRM,
-  DOWNLOAD_WAITING
+  DOWNLOAD_WAITING,
+  DOWNLOAD_STARTED,
+  POST_PROCESS_STARTED
 }
 
 export interface AppNotification {

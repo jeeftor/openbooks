@@ -18,7 +18,7 @@ const isMobile = useMediaQuery("(max-width: 767px)");
 </script>
 
 <template>
-  <div class="h-dvh flex overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-50">
+  <div class="h-dvh flex overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-50" style="padding-top: env(safe-area-inset-top)">
     <Sidebar v-if="!isMobile && appStore.isSidebarOpen" />
 
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden">

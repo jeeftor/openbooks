@@ -27,6 +27,9 @@ export const useAppStore = defineStore("app", () => {
   // Set while waiting for an IRC bot to send its DCC offer.
   const waitingDownload = ref<DownloadWaitingResponse | null>(null);
 
+  // Phase of the currently-active (first in queue) download after the DCC offer is accepted.
+  const downloadPhase = ref<"transferring" | "cleaning" | null>(null);
+
   function setConnected(connected: boolean) {
     isConnected.value = connected;
   }
@@ -53,7 +56,12 @@ export const useAppStore = defineStore("app", () => {
 
   function removeInFlightDownload() {
     inFlightDownloads.value.shift();
+    downloadPhase.value = null;
     libraryVersion.value++;
+  }
+
+  function setDownloadPhase(phase: "transferring" | "cleaning" | null) {
+    downloadPhase.value = phase;
   }
 
   function isDownloading(book: string) {
@@ -70,6 +78,7 @@ export const useAppStore = defineStore("app", () => {
     pendingQuery,
     pendingRename,
     waitingDownload,
+    downloadPhase,
     libraryVersion,
     setConnected,
     setConnecting,
@@ -78,6 +87,7 @@ export const useAppStore = defineStore("app", () => {
     toggleSidebar,
     addInFlightDownload,
     removeInFlightDownload,
+    setDownloadPhase,
     isDownloading
   };
 });

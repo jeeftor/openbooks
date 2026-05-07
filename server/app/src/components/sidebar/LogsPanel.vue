@@ -8,6 +8,7 @@ const { logs, loading, refresh } = useLogs();
 
 // Click-to-toggle detail popup — works on both desktop and mobile.
 const activeDetail = ref<{ text: string; x: number; y: number; w: number } | null>(null);
+const isMobile = window.innerWidth < 768;
 
 // Group hover — hovering any entry with a group highlights all entries in that group.
 const hoveredGroup = ref<string | null>(null);
@@ -86,16 +87,18 @@ onUnmounted(() => document.removeEventListener("click", closeDetail));
     <!-- Entries -->
     <ul
       v-else
-      class="flex-1 overflow-y-auto divide-y divide-slate-100/60 dark:divide-slate-800/40 font-mono">
+      class="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100/60 dark:divide-slate-800/40 font-mono">
       <li
         v-for="(entry, i) in logs"
         :key="i"
-        class="px-3 py-1.5 flex gap-1.5 items-start transition-colors"
+        class="px-3 py-1.5 flex gap-1.5 items-start transition-colors cursor-pointer"
         :class="entry.group && hoveredGroup === entry.group
           ? 'bg-brand-50 dark:bg-brand-900/20 border-l-2 border-l-brand-400'
           : 'hover:bg-slate-50 dark:hover:bg-slate-800/30 border-l-2 border-l-transparent'"
         @mouseenter="entry.group ? hoveredGroup = entry.group : null"
-        @mouseleave="hoveredGroup = null">
+        @mouseleave="hoveredGroup = null"
+        @click.stop="toggleDetail($event, entry.detail || entry.message)"
+        @touchend.stop.prevent="toggleDetail($event, entry.detail || entry.message)">
         <span
           class="flex-shrink-0 text-[10px] text-slate-400 dark:text-slate-500 mt-px tabular-nums whitespace-nowrap">
           {{ formatTime(entry.time) }}
@@ -108,29 +111,43 @@ onUnmounted(() => document.removeEventListener("click", closeDetail));
         </span>
         <span
           class="text-[11px] leading-relaxed min-w-0 truncate flex-1"
-          :class="entry.level === 'info' ? 'text-slate-700 dark:text-slate-300' : levelClass(entry.level)"
-          :title="entry.detail ? undefined : entry.message">
+          :class="entry.level === 'info' ? 'text-slate-700 dark:text-slate-300' : levelClass(entry.level)">
           {{ entry.message }}
         </span>
-        <button
+        <Info
           v-if="entry.detail"
+          :size="11"
           class="flex-shrink-0 mt-px transition-colors"
           :class="activeDetail?.text === entry.detail
             ? 'text-brand-400'
-            : 'text-slate-300 dark:text-slate-600 hover:text-brand-400 dark:hover:text-brand-400'"
-          title="Show details"
-          @click.stop="toggleDetail($event, entry.detail)"
-          @touchend.stop.prevent="toggleDetail($event, entry.detail)">
-          <Info :size="11" />
-        </button>
+            : 'text-slate-300 dark:text-slate-600'" />
       </li>
     </ul>
 
-    <!-- Detail popup — click ℹ to open, click anywhere to close -->
+    <!-- Detail popup — desktop: floating popover; mobile: centered modal -->
     <Teleport to="body">
+      <!-- Mobile: full-screen modal overlay -->
       <div
-        v-if="activeDetail"
-        class="fixed z-[9999] p-3 rounded-lg shadow-xl bg-slate-900 border border-slate-700"
+        v-if="activeDetail && isMobile"
+        class="fixed inset-0 z-[9999] flex flex-col bg-black/70 backdrop-blur-sm"
+        @click.self="closeDetail">
+        <div class="flex-1 overflow-hidden flex flex-col mx-3 my-8 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl">
+          <div class="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-700">
+            <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Detail</span>
+            <button
+              class="text-slate-400 hover:text-slate-200 p-1"
+              @click="closeDetail">✕</button>
+          </div>
+          <div class="flex-1 overflow-y-auto p-3">
+            <pre class="text-[11px] text-slate-200 whitespace-pre-wrap font-mono leading-relaxed">{{ activeDetail.text }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop: floating popover -->
+      <div
+        v-else-if="activeDetail"
+        class="fixed z-[9999] p-3 rounded-lg shadow-xl bg-slate-900 border border-slate-700 max-h-[60vh] overflow-y-auto"
         :style="{ left: activeDetail.x + 'px', top: activeDetail.y + 'px', width: activeDetail.w + 'px' }"
         @click.stop>
         <pre class="text-[10px] text-slate-200 whitespace-pre-wrap font-mono leading-relaxed">{{ activeDetail.text }}</pre>

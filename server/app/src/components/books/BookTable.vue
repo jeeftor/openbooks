@@ -70,6 +70,7 @@ const serverDropdownOpen = ref(false);
 const authorFilter = ref("");
 const titleFilter = ref("");
 const formatFilter = ref<string[]>([...prefStore.preferredFormats]);
+const excludeNoSize = ref(false);
 const groupBooks = ref(false);
 const expandedGroups = ref<Set<string>>(new Set());
 
@@ -86,6 +87,7 @@ function matchesBook(book: BookDetail): boolean {
   if (authorFilter.value && !book.author.toLowerCase().includes(authorFilter.value.toLowerCase())) return false;
   if (titleFilter.value && !book.title.toLowerCase().includes(titleFilter.value.toLowerCase())) return false;
   if (formatFilter.value.length && !formatFilter.value.includes(book.format)) return false;
+  if (excludeNoSize.value && (!book.size || book.size === "N/A")) return false;
   return true;
 }
 
@@ -303,6 +305,7 @@ watch(
     authorFilter.value = "";
     titleFilter.value = "";
     formatFilter.value = [...prefStore.preferredFormats];
+    excludeNoSize.value = false;
   }
 );
 
@@ -450,6 +453,16 @@ function toggleFormat(fmt: string) {
             : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300'"
           @click="toggleFormat(fmt)">
           {{ fmt.toUpperCase() }}
+        </button>
+        <!-- Exclude N/A size toggle -->
+        <button
+          class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap"
+          :class="excludeNoSize
+            ? 'bg-brand-400 border-brand-400 text-white'
+            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300'"
+          title="Hide entries with unknown file size"
+          @click="excludeNoSize = !excludeNoSize">
+          N/A size
         </button>
         <!-- Group Books toggle -->
         <button

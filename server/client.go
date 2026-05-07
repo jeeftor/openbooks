@@ -116,7 +116,7 @@ func (c *Client) processDownloadQueue(server *server) {
 // reads from this goroutine.
 func (server *server) readPump(c *Client) {
 	defer func() {
-		server.logBuf.info(fmt.Sprintf("IRC disconnected: %s", c.irc.Username))
+		server.logBuf.info(fmt.Sprintf("🔌 IRC disconnected: %s", c.irc.Username))
 		c.irc.Disconnect()
 		c.conn.Close()
 		server.unregister <- c

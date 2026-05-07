@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { useAppStore } from "../stores/app";
+
+const isMobile = useMediaQuery("(max-width: 767px)");
 
 const appStore = useAppStore();
 const waiting = computed(() => appStore.waitingDownload);
@@ -34,8 +37,11 @@ function formatTime(secs: number) {
   <Transition name="banner">
     <div
       v-if="waiting?.active"
-      class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[min(420px,calc(100vw-2rem))]
+      class="fixed left-1/2 -translate-x-1/2 z-40 w-[min(420px,calc(100vw-2rem))]
              bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+      :style="isMobile
+        ? { bottom: 'calc(3.5rem + env(safe-area-inset-bottom) + 0.5rem)' }
+        : { bottom: '1rem' }"
     >
       <!-- Progress bar along the top -->
       <div class="h-0.5 bg-slate-700">

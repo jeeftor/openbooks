@@ -69,7 +69,7 @@ func (c *Client) startIrcConnection(server *server) {
 		return
 	}
 
-	server.logBuf.info(fmt.Sprintf("IRC connected: %s", c.irc.Username))
+	server.logBuf.info(fmt.Sprintf("🔌 IRC connected: %s", c.irc.Username))
 	handler := server.NewIrcEventHandler(c)
 
 	if server.config.Log {
@@ -124,7 +124,7 @@ func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 	}
 
 	c.log.Printf("Searching for: %q\n", s.Query)
-	server.logBuf.info(fmt.Sprintf("Search: %q", s.Query))
+	server.logBuf.info(fmt.Sprintf("🔍 Search: %q", s.Query))
 	core.SearchBook(c.irc, server.config.SearchBot, s.Query)
 	server.lastSearch = time.Now()
 
@@ -173,9 +173,9 @@ func (c *Client) sendDownloadRequest(d *DownloadRequest, server *server) {
 		c.send <- newStatusResponse(NOTIFY, fmt.Sprintf("Download queued (position %d).", pending+1))
 	} else {
 		if d.Title != "" && d.Author != "" {
-			server.logBuf.info(fmt.Sprintf("Download: %s by %s", d.Title, d.Author))
+			server.logBuf.info(fmt.Sprintf("📚 Download: %s by %s", d.Title, d.Author))
 		} else {
-			server.logBuf.info(fmt.Sprintf("Download: %s", d.Book))
+			server.logBuf.info(fmt.Sprintf("📚 Download: %s", d.Book))
 		}
 		c.send <- newStatusResponse(NOTIFY, "Download request received.")
 	}

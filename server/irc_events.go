@@ -100,8 +100,9 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 		}
 		stage := stagingDir(dir)
 
-		// DCC offer received — clear the "waiting for bot" UI state immediately.
+		// DCC offer received — clear the "waiting for bot" UI state and signal transfer start.
 		safeSend(c, newDownloadWaitingClear())
+		safeSend(c, newDownloadStartedResponse())
 
 		// Determine the filename for the initial log entry and session group.
 		var ircFilenamePreview string
@@ -146,6 +147,9 @@ func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFun
 		}
 
 		// 2. Run post-processor on the staged file first so metadata is clean.
+		if len(config.PostProcessCmd) > 0 {
+			safeSend(c, newPostProcessStartedResponse())
+		}
 		runPostProcess(config.PostProcessCmd, extractedPath, sess)
 
 		// 3. Read EPUB metadata and cover (from the polished file).
