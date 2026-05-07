@@ -114,6 +114,7 @@ func Start(config Config) {
 	server.log.Printf("Search bot:             %s", config.SearchBot)
 	if len(config.PostProcessCmd) > 0 {
 		server.log.Printf("Post-process command:   %v", config.PostProcessCmd)
+		validatePostProcessCmd(config.PostProcessCmd, server.log)
 	}
 	server.log.Fatal(http.ListenAndServe(":"+config.Port, router))
 }
