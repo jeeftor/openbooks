@@ -5,7 +5,7 @@
 | Tag | Description |
 |-----|-------------|
 | `ghcr.io/jeeftor/openbooks:latest` | Minimal distroless image. No post-processing. |
-| `ghcr.io/jeeftor/openbooks:latest-calibre` | Includes Calibre CLI. Runs `calibre-polish` on every downloaded EPUB by default. |
+| `ghcr.io/jeeftor/openbooks:latest-calibre` | Includes Calibre CLI. Runs `ebook-polish` on every downloaded EPUB by default. |
 
 Semver tags follow the same pattern: `v1.2.3` and `v1.2.3-calibre`.
 
@@ -22,7 +22,7 @@ docker run -p 8080:80 \
 
 ## With Calibre Polish (recommended)
 
-The calibre image runs `calibre-polish` automatically after each download:
+The calibre image runs `ebook-polish` automatically after each download:
 
 ```bash
 docker run -p 8080:80 \
@@ -37,7 +37,7 @@ docker run -p 8080:80 \
   -v ./books:/books \
   ghcr.io/jeeftor/openbooks:latest-calibre \
   server --name my_irc_name --dir /books --port 80 \
-  --post-process-cmd "calibre-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images"
+  --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images"
 ```
 
 ## Docker Compose
@@ -61,7 +61,7 @@ services:
       --port 80
       --organize-downloads
       --replace-space .
-      --post-process-cmd "calibre-polish,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images"
+      --post-process-cmd "ebook-polish,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images"
 
 volumes:
   books:

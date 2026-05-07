@@ -20,22 +20,10 @@ WORKDIR /go/src/cmd/openbooks/
 RUN go build -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}"
 
 FROM debian:bookworm-slim AS app
-# Install Calibre using the official installer, which includes calibre-polish
-# and all CLI tools. The Debian apt package omits most CLI tools.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        wget \
-        python3 \
-        libgl1 \
-        libglib2.0-0 \
-        libdbus-1-3 \
-    && wget -nv -O /tmp/calibre-install.py "https://download.calibre-ebook.com/linux-installer.py" \
-    && python3 /tmp/calibre-install.py install_dir=/opt/calibre dont_update_profile=1 \
-    && rm -f /tmp/calibre-install.py \
-    && apt-get purge -y --auto-remove wget \
+# Install Calibre from Debian repos. The CLI polish tool is ebook-polish.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    calibre \
     && rm -rf /var/lib/apt/lists/*
-ENV PATH="/opt/calibre:${PATH}"
 
 WORKDIR /app
 COPY --from=build /go/src/cmd/openbooks/openbooks .
@@ -48,4 +36,4 @@ ENV BASE_PATH=/
 # Override by passing a different --post-process-cmd or omitting it entirely.
 ENTRYPOINT ["./openbooks"]
 CMD ["server", "--name", "openbooks", "--dir", "/books", "--port", "80", \
-     "--post-process-cmd", "calibre-polish,--embed-fonts,--subset-fonts,--smarten-punctuation"]
+     "--post-process-cmd", "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation"]
