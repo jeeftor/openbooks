@@ -20,10 +20,10 @@ type Config struct {
 	irc       *irc.Conn
 }
 
-// StartInteractive instantiates the OpenBooks CLI interface
+// StartInteractive instantiates the openbooks-abs CLI interface
 func StartInteractive(config Config) {
 	fmt.Println("=======================================")
-	fmt.Println("          Welcome to OpenBooks         ")
+	fmt.Println("        Welcome to openbooks-abs       ")
 	fmt.Println("=======================================")
 
 	instantiate(&config)

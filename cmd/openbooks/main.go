@@ -61,9 +61,9 @@ func init() {
 }
 
 var desktopCmd = &cobra.Command{
-	Use:   "openbooks",
+	Use:   "openbooks-abs",
 	Short: "Quickly and easily download eBooks from IRCHighway.",
-	Long:  "Runs OpenBooks in desktop mode. This allows you to run OpenBooks like a regular desktop application. This functionality utilizes your OS's native browser renderer and as such may not work on certain operating systems.",
+	Long:  "Runs openbooks-abs in desktop mode. This allows you to run openbooks-abs like a regular desktop application. This functionality utilizes your OS's native browser renderer and as such may not work on certain operating systems.",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		bindGlobalServerFlags(&desktopConfig)
 		rateLimit, _ := cmd.Flags().GetInt("rate-limit")

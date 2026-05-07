@@ -37,4 +37,4 @@ VOLUME ["/books"]
 ENV BASE_PATH=/
 
 ENTRYPOINT ["./openbooks"]
-CMD ["server", "--name", "openbooks", "--dir", "/books", "--port", "80"]
+CMD ["server", "--name", "openbooks_abs", "--dir", "/books", "--port", "80"]

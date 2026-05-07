@@ -20,18 +20,19 @@ func init() {
 
 	serverCmd.Flags().StringVarP(&serverConfig.Port, "port", "p", "5228", "Set the local network port for browser mode.")
 	serverCmd.Flags().IntP("rate-limit", "r", 10, "The number of seconds to wait between searches to reduce strain on IRC search servers. Minimum is 10 seconds.")
-	serverCmd.Flags().StringVar(&serverConfig.Basepath, "basepath", "/", `Base path where the application is accessible. For example "/openbooks/".`)
+	serverCmd.Flags().StringVar(&serverConfig.Basepath, "basepath", "/", `Base path where the application is accessible. For example "/openbooks-abs/".`)
 	serverCmd.Flags().BoolVarP(&openBrowser, "browser", "b", false, "Open the browser on server start.")
-	serverCmd.Flags().StringVarP(&serverConfig.DownloadDir, "dir", "d", filepath.Join(os.TempDir(), "openbooks"), "The directory where eBooks are saved.")
+	serverCmd.Flags().StringVarP(&serverConfig.DownloadDir, "dir", "d", filepath.Join(os.TempDir(), "openbooks-abs"), "The directory where eBooks are saved.")
 	serverCmd.Flags().BoolVar(&serverConfig.OrganizeDownloads, "organize-downloads", false, "Organize downloads into author/title/FILE subdirectories.")
+	serverCmd.Flags().BoolVar(&serverConfig.DevMode, "dev", false, "Keep a raw .orig copy beside each saved download for local testing.")
 	serverCmd.Flags().StringVar(&replaceSpace, "replace-space", "", "Replace spaces in author/title directory names with this character (e.g. '.', '-', '_').")
 	serverCmd.Flags().StringSliceVar(&serverConfig.PostProcessCmd, "post-process-cmd", nil, "Command to run after each book download. File path is appended as last argument. Example: --post-process-cmd 'calibre-polish,--embed-fonts,--smarten-punctuation'")
 }
 
 var serverCmd = &cobra.Command{
 	Use:   "server",
-	Short: "Run OpenBooks in server mode.",
-	Long:  "Run OpenBooks in server mode. This allows you to use a web interface to search and download eBooks.",
+	Short: "Run openbooks-abs in server mode.",
+	Long:  "Run openbooks-abs in server mode. This allows you to use a web interface to search, clean, rename, and organize eBooks.",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		bindGlobalServerFlags(&serverConfig)
 		rateLimit, _ := cmd.Flags().GetInt("rate-limit")

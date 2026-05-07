@@ -1,6 +1,6 @@
 {
-  "short_name": "OpenBooks",
-  "name": "eBook Downloads",
+  "short_name": "openbooks-abs",
+  "name": "openbooks-abs",
   "icons": [
     {
       "src": "favicon.ico",
