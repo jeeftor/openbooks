@@ -60,10 +60,12 @@ func (c *Client) startIrcConnection(server *server) {
 	err := core.Join(c.irc, server.config.Server, server.config.EnableTLS)
 	if err != nil {
 		c.log.Println(err)
+		server.logBuf.error(fmt.Sprintf("IRC connect failed: %v", err))
 		safeSend(c, newErrorResponse("Unable to connect to IRC server."))
 		return
 	}
 
+	server.logBuf.info(fmt.Sprintf("IRC connected: %s", c.irc.Username))
 	handler := server.NewIrcEventHandler(c)
 
 	if server.config.Log {

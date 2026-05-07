@@ -49,6 +49,17 @@ watch(
   }
 );
 
+// Re-issue a search triggered from outside (e.g. clicking a timed-out history item)
+watch(
+  () => appStore.pendingQuery,
+  (q) => {
+    if (q && appStore.isConnected) {
+      appStore.pendingQuery = null;
+      issueSearch(q);
+    }
+  }
+);
+
 // Watch for results arriving to clear the timeout
 watch(
   () => appStore.activeItem?.results,
@@ -71,6 +82,48 @@ onUnmounted(() => {
   if (searchProgressInterval) clearInterval(searchProgressInterval);
 });
 
+function issueSearch(q: string) {
+  const timestamp = Date.now();
+  appStore.setActiveItem({ query: q, timestamp });
+  historyStore.addItem({ query: q, timestamp });
+  sendMessage({ type: MessageType.SEARCH, payload: { query: q } });
+
+  // Start countdown progress bar
+  searchStartTime.value = Date.now();
+  searchProgress.value = 0;
+  if (searchProgressInterval) clearInterval(searchProgressInterval);
+  searchProgressInterval = setInterval(() => {
+    if (searchStartTime.value) {
+      const elapsed = Date.now() - searchStartTime.value;
+      searchProgress.value = Math.min((elapsed / 60000) * 100, 100);
+    }
+  }, 100);
+
+  // Set a 60s timeout — if no results arrive, mark as failed
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    const active = appStore.activeItem;
+    if (active && active.results === undefined) {
+      const timedOut = { ...active, results: [], errors: [], timedOut: true };
+      appStore.setActiveItem(timedOut);
+      historyStore.updateItem(timedOut);
+    }
+    searchTimeout = null;
+    if (searchProgressInterval) {
+      clearInterval(searchProgressInterval);
+      searchProgressInterval = null;
+    }
+    searchStartTime.value = null;
+    searchProgress.value = 0;
+  }, 60000);
+}
+
+function retrySearch() {
+  if (appStore.activeItem?.query) {
+    issueSearch(appStore.activeItem.query);
+  }
+}
+
 function handleSearch(e: Event) {
   e.preventDefault();
   if (!validInput.value) return;
@@ -79,44 +132,7 @@ function handleSearch(e: Event) {
     sendMessage({ type: MessageType.DOWNLOAD, payload: { book: query.value } });
   } else {
     const q = query.value.trim();
-    const timestamp = Date.now();
-    appStore.setActiveItem({ query: q, timestamp });
-    historyStore.addItem({ query: q, timestamp });
-    sendMessage({ type: MessageType.SEARCH, payload: { query: q } });
-
-    // Start countdown progress bar
-    searchStartTime.value = Date.now();
-    searchProgress.value = 0;
-    if (searchProgressInterval) clearInterval(searchProgressInterval);
-    searchProgressInterval = setInterval(() => {
-      if (searchStartTime.value) {
-        const elapsed = Date.now() - searchStartTime.value;
-        searchProgress.value = Math.min((elapsed / 60000) * 100, 100);
-      }
-    }, 100);
-
-    // Set a 60s timeout — if no results arrive, mark as failed
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      const active = appStore.activeItem;
-      if (active && active.results === undefined) {
-        const timedOut = {
-          ...active,
-          results: [],
-          errors: [],
-          timedOut: true
-        };
-        appStore.setActiveItem(timedOut);
-        historyStore.updateItem(timedOut);
-      }
-      searchTimeout = null;
-      if (searchProgressInterval) {
-        clearInterval(searchProgressInterval);
-        searchProgressInterval = null;
-      }
-      searchStartTime.value = null;
-      searchProgress.value = 0;
-    }, 60000);
+    issueSearch(q);
   }
   query.value = "";
 }
@@ -283,8 +299,14 @@ function handleSearch(e: Event) {
           </div>
           <p class="text-sm font-medium text-slate-600 dark:text-slate-300">Search timed out</p>
           <p class="text-xs text-slate-400 dark:text-slate-500">
-            No response from the IRC server after 60 seconds. The bot may be offline or overloaded. Try again later.
+            No response from the IRC server after 60 seconds. The bot may be offline or overloaded.
           </p>
+          <button
+            v-if="appStore.isConnected"
+            class="mt-1 px-4 py-2 rounded-lg text-sm font-semibold bg-brand-400 hover:bg-brand-500 text-white transition"
+            @click="retrySearch">
+            Search again
+          </button>
         </div>
       </div>
 

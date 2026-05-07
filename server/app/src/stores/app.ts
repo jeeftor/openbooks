@@ -16,6 +16,10 @@ export const useAppStore = defineStore("app", () => {
   // results were in-flight, so the WS handler would discard them.
   const activeItem = ref<HistoryItem | null>(null);
 
+  // Set to a query string to trigger a new search from any component.
+  // SearchView watches this and clears it after issuing the search.
+  const pendingQuery = ref<string | null>(null);
+
   function setConnected(connected: boolean) {
     isConnected.value = connected;
   }
@@ -56,6 +60,7 @@ export const useAppStore = defineStore("app", () => {
     username,
     inFlightDownloads,
     activeItem,
+    pendingQuery,
     libraryVersion,
     setConnected,
     setConnecting,

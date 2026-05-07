@@ -25,7 +25,13 @@ function isToday(timestamp: number) {
 }
 
 function select(item: HistoryItem) {
-  historyStore.restoreItem(item);
+  // If the item has cached results and didn't time out, just show them.
+  // Otherwise re-issue the search.
+  if (item.results !== undefined && !item.timedOut) {
+    historyStore.restoreItem(item);
+  } else {
+    appStore.pendingQuery = item.query;
+  }
 }
 </script>
 
@@ -84,7 +90,8 @@ function select(item: HistoryItem) {
                 ? formatTime(item.timestamp)
                 : formatDate(item.timestamp)
             }}
-            <span v-if="item.results != null" class="ml-1"
+            <span v-if="item.timedOut" class="ml-1 text-red-400">· timed out</span>
+            <span v-else-if="item.results != null" class="ml-1"
               >· {{ item.results.length }} results</span
             >
           </p>

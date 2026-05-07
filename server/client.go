@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -61,6 +62,7 @@ type Client struct {
 // reads from this goroutine.
 func (server *server) readPump(c *Client) {
 	defer func() {
+		server.logBuf.info(fmt.Sprintf("IRC disconnected: %s", c.irc.Username))
 		c.irc.Disconnect()
 		c.conn.Close()
 		server.unregister <- c
