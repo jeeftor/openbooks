@@ -96,10 +96,11 @@ export function useWebSocket() {
         // Internal status ping — no toast/notification.
         return;
       case MessageType.SEARCH: {
-        const { books, errors } = response as SearchResponse;
+        const { books, errors, raw } = response as SearchResponse;
         const active = appStore.activeItem;
         if (active) {
           const updated = { ...active, results: books, errors };
+          appStore.setRawSearchResult(active.timestamp, raw);
           appStore.setActiveItem(updated);
           historyStore.updateItem(updated);
         }

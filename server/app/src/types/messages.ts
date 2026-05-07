@@ -39,6 +39,7 @@ export interface ConnectionResponse extends WsResponse {
 export interface SearchResponse extends WsResponse {
   books: BookDetail[];
   errors: ParseError[];
+  raw?: string;
 }
 
 export interface DownloadResponse extends WsResponse {
