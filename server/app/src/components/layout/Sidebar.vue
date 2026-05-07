@@ -40,7 +40,7 @@ const TABS: { id: Tab; label: string }[] = [
     <!-- Header -->
     <div class="px-4 pt-4 pb-2 flex-shrink-0">
       <div class="flex items-center justify-between mb-1">
-        <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-slate-50">OpenBooks</span>
+        <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-slate-50">openbooks-abs</span>
         <button
           class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-30 transition-colors"
           :disabled="!appStore.isConnected"
@@ -50,7 +50,7 @@ const TABS: { id: Tab; label: string }[] = [
           <Bell :size="18" />
         </button>
       </div>
-      <p class="text-xs text-slate-400 dark:text-slate-500">Download eBooks from IRC Highway</p>
+      <p class="text-xs text-slate-400 dark:text-slate-500">Prepare eBooks for Audiobookshelf</p>
 
       <!-- Tabs -->
       <div class="mt-3 flex rounded-lg bg-slate-100 dark:bg-slate-800/60 p-0.5 gap-0.5">

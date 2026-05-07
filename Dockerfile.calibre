@@ -42,5 +42,5 @@ VOLUME ["/books"]
 ENV BASE_PATH=/
 
 ENTRYPOINT ["./openbooks"]
-CMD ["server", "--name", "openbooks", "--dir", "/books", "--port", "80", "--dev", \
+CMD ["server", "--name", "openbooks_abs", "--dir", "/books", "--port", "80", "--dev", \
      "--post-process-cmd", "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"]

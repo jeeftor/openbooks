@@ -1,6 +1,6 @@
-# OpenBooks for Audiobookshelf
+# openbooks-abs
 
-This repository is a focused fork of [OpenBooks](https://github.com/evan-buss/openbooks). The original project is a general-purpose IRC ebook search and download tool. This fork keeps that core workflow, but reshapes the server mode around building a clean ebook library that can be mounted directly into [Audiobookshelf](https://www.audiobookshelf.org/).
+openbooks-abs is a focused fork of [OpenBooks](https://github.com/evan-buss/openbooks). The original project is a general-purpose IRC ebook search and download tool. This fork keeps that core workflow, but reshapes the server mode around building a clean ebook library that can be mounted directly into [Audiobookshelf](https://www.audiobookshelf.org/).
 
 [Audiobookshelf](https://www.audiobookshelf.org/) works best when books are stored in predictable author/title folders. For EPUB libraries, this fork is designed to turn IRC downloads into layouts like:
 
@@ -13,12 +13,12 @@ The goal is simple: search from the browser, download from IRC, clean the EPUB, 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./.github/home_v3_dark.png">
-  <img alt="openbooks screenshot" src="./.github/home_v3.png">
+  <img alt="openbooks-abs screenshot" src="./.github/home_v3.png">
 </picture>
 
 ## How This Fork Differs
 
-This fork is disk-first. Upstream OpenBooks historically focused on delivering downloaded files back to the browser, with persistence as an option. This fork removes that browser-download-centered workflow: downloads are saved to the configured directory, and the browser UI is used to search, monitor, rename, and organize.
+openbooks-abs is disk-first. Upstream OpenBooks historically focused on delivering downloaded files back to the browser, with persistence as an option. This fork removes that browser-download-centered workflow: downloads are saved to the configured directory, and the browser UI is used to search, monitor, rename, and organize.
 
 Important differences from upstream:
 
@@ -35,14 +35,23 @@ Important differences from upstream:
 
 ## Docker
 
-Two image variants are published to GitHub Container Registry:
+Two image variants are published to GitHub Container Registry. Each variant is available under the new `openbooks-abs` image name and the backwards-compatible `openbooks` image name:
 
 | Tag | Description |
 |-----|-------------|
-| `ghcr.io/jeeftor/openbooks:latest` | Minimal image. Saves downloads to disk with no default post-processing. |
-| `ghcr.io/jeeftor/openbooks:latest-calibre` | Includes Calibre CLI tools and runs `ebook-polish` on downloaded EPUBs by default. |
+| `ghcr.io/jeeftor/openbooks-abs:latest` | Minimal image. Saves downloads to disk with no default post-processing. |
+| `ghcr.io/jeeftor/openbooks:latest` | Backwards-compatible alias for the minimal image. |
+| `ghcr.io/jeeftor/openbooks-abs:latest-calibre` | Includes Calibre CLI tools and runs `ebook-polish` on downloaded EPUBs by default. |
+| `ghcr.io/jeeftor/openbooks:latest-calibre` | Backwards-compatible alias for the Calibre image. |
 
-Semver releases follow the same pattern: `v1.2.3` and `v1.2.3-calibre`.
+Semver releases follow the same pattern for both image names:
+
+```text
+ghcr.io/jeeftor/openbooks-abs:v1.2.3
+ghcr.io/jeeftor/openbooks:v1.2.3
+ghcr.io/jeeftor/openbooks-abs:v1.2.3-calibre
+ghcr.io/jeeftor/openbooks:v1.2.3-calibre
+```
 
 ### Recommended: Calibre Image
 
@@ -51,7 +60,7 @@ The Calibre image is the easiest way to use this fork as an Audiobookshelf intak
 ```bash
 docker run -p 8080:80 \
   -v ./books:/books \
-  ghcr.io/jeeftor/openbooks:latest-calibre
+  ghcr.io/jeeftor/openbooks-abs:latest-calibre
 ```
 
 By default, the Calibre image starts the server with:
@@ -60,7 +69,7 @@ By default, the Calibre image starts the server with:
 - `--port 80`
 - `--post-process-cmd ebook-polish,...`
 - `--dev`
-- `--name openbooks`
+- `--name openbooks_abs`
 
 That means the cleaned EPUB is saved normally, and the original pre-polish EPUB is kept beside it as `.orig.epub` for comparison.
 
@@ -71,7 +80,7 @@ Use the minimal image when you want full control over post-processing:
 ```bash
 docker run -p 8080:80 \
   -v ./books:/books \
-  ghcr.io/jeeftor/openbooks:latest \
+  ghcr.io/jeeftor/openbooks-abs:latest \
   server \
   --name my_irc_name \
   --dir /books \
@@ -84,7 +93,7 @@ To add your own cleanup command:
 ```bash
 docker run -p 8080:80 \
   -v ./books:/books \
-  ghcr.io/jeeftor/openbooks:latest \
+  ghcr.io/jeeftor/openbooks-abs:latest \
   server \
   --name my_irc_name \
   --dir /books \
@@ -94,11 +103,13 @@ docker run -p 8080:80 \
 
 ## Docker Compose
 
+Minimal openbooks-abs compose:
+
 ```yaml
 services:
-  openbooks:
-    image: ghcr.io/jeeftor/openbooks:latest-calibre
-    container_name: openbooks
+  openbooks-abs:
+    image: ghcr.io/jeeftor/openbooks-abs:latest-calibre
+    container_name: openbooks-abs
     ports:
       - "8080:80"
     volumes:
@@ -110,6 +121,68 @@ services:
 
 Mount the same `./books` directory into Audiobookshelf as an ebook library, then scan it from Audiobookshelf after downloads complete.
 
+### Running Beside Audiobookshelf
+
+In a homelab compose stack, the useful part is the shared volume. openbooks-abs writes completed EPUBs into the same host directory that Audiobookshelf sees as an ebook library.
+
+Example `.env`:
+
+```dotenv
+PUID=1000
+PGID=1000
+TZ=Etc/UTC
+
+CONFIG_DIR=/srv/appdata
+BOOKS_DIR=/srv/media/books
+
+OPENBOOKS_ABS_PORT=8080
+AUDIOBOOKSHELF_PORT=13378
+```
+
+Example `docker-compose.yml`:
+
+```yaml
+services:
+  openbooks-abs:
+    image: ghcr.io/jeeftor/openbooks-abs:latest-calibre
+    container_name: openbooks-abs
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - BASE_PATH=/
+    volumes:
+      - ${BOOKS_DIR}:/books
+    ports:
+      - "${OPENBOOKS_ABS_PORT}:80"
+    restart: unless-stopped
+
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_DIR}/audiobookshelf/config:/config
+      - ${CONFIG_DIR}/audiobookshelf/metadata:/metadata
+      - ${BOOKS_DIR}:/books
+    ports:
+      - "${AUDIOBOOKSHELF_PORT}:80"
+    restart: unless-stopped
+```
+
+Then in Audiobookshelf:
+
+1. Open Audiobookshelf and create an ebook library.
+2. Point that library at `/books`.
+3. Use openbooks-abs to search and download a book.
+4. Choose an organized rename option, such as `Author / Series / Title / Title.epub` or `Author / Title / Title.epub`.
+5. Scan the Audiobookshelf library.
+
+Because both containers mount the same host path, a book saved by openbooks-abs to `${BOOKS_DIR}/Author/Title/Title.epub` is immediately present inside Audiobookshelf at `/books/Author/Title/Title.epub`. Audiobookshelf will pick it up on the next manual or scheduled library scan.
+
 ## Important Flags
 
 | Flag | Description |
@@ -120,7 +193,7 @@ Mount the same `./books` directory into Audiobookshelf as an ebook library, then
 | `--replace-space` | Replace spaces in generated folder names, for example `.` or `_`. |
 | `--post-process-cmd` | Command to run after each book download. The downloaded file path is appended as the final argument. |
 | `--dev` | Preserve the raw download beside the cleaned file as `name.orig.ext`. Useful when validating `ebook-polish`. |
-| `--basepath` | Serve the web UI under a reverse-proxy subpath, such as `/openbooks/`. |
+| `--basepath` | Serve the web UI under a reverse-proxy subpath, such as `/openbooks-abs/`. |
 | `--rate-limit` | Seconds between IRC search requests. Minimum is 10. |
 | `--searchbot` | IRC search bot name. Defaults to `search`; try `searchook` if needed. |
 
@@ -138,19 +211,19 @@ You can replace that with your own script if you want to run validation, convers
 
 ## Reverse Proxy Base Path
 
-OpenBooks can run behind a reverse proxy at a subpath. The base path must include leading and trailing slashes.
+openbooks-abs can run behind a reverse proxy at a subpath. The base path must include leading and trailing slashes.
 
 ```bash
 docker run -p 8080:80 \
-  -e BASE_PATH=/openbooks/ \
+  -e BASE_PATH=/openbooks-abs/ \
   -v ./books:/books \
-  ghcr.io/jeeftor/openbooks:latest-calibre
+  ghcr.io/jeeftor/openbooks-abs:latest-calibre
 ```
 
 For binaries or explicit commands:
 
 ```bash
-./openbooks server --basepath /openbooks/ --name my_irc_name --dir ./books
+./openbooks server --basepath /openbooks-abs/ --name my_irc_name --dir ./books
 ```
 
 ## Local Development

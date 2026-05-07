@@ -9,7 +9,7 @@ func StartWebView(url string, debug bool) {
 		Debug: debug,
 		URL:   url,
 		WindowConfig: &gowebview.WindowConfig{
-			Title:      "OpenBooks",
+			Title:      "openbooks-abs",
 			Visibility: gowebview.VisibilityDefault,
 			Size: &gowebview.Point{
 				X: 1200,

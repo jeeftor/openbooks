@@ -12,7 +12,7 @@
 # ─── Default target ──────────────────────────────────────────────────────────
 help:
 	@echo ""
-	@echo "  OpenBooks — Development Commands"
+	@echo "  openbooks-abs — Development Commands"
 	@echo "  Vue 3 frontend + Go backend"
 	@echo ""
 	@echo "  ── Setup ──────────────────────────────────────────────"
@@ -46,14 +46,14 @@ help:
 	@echo "  make fmt               Format all code"
 	@echo ""
 	@echo "  ── Other ───────────────────────────────────────────────"
-	@echo "  make dev-cli           OpenBooks CLI mode (mock IRC)"
+	@echo "  make dev-cli           openbooks-abs CLI mode (mock IRC)"
 	@echo "  make docker            Build Docker image (distroless)"
 	@echo "  make docker-run        Run Docker image on :8080"
 	@echo "  make docker-calibre    Build calibre image (includes ebook-polish)"
 	@echo "  make docker-dev-calibre  Build + run calibre image locally on :8080"
 	@echo "  make clean             Remove build artifacts"
 	@echo ""
-	@echo "  Override username: make dev NAME=myuser  (default: openbooks_dev)"
+	@echo "  Override username: make dev NAME=myuser  (default: openbooks_abs_dev)"
 	@echo ""
 
 # ─── Setup ───────────────────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ install-npm:
 # =============================================================================
 
 # Default username (override with: make dev NAME=myname)
-NAME ?= openbooks_dev
+NAME ?= openbooks_abs_dev
 
 # ── All-in-one: Real IRC ──────────────────────────────────────────────────────
 dev: build-frontend install-npm
@@ -95,7 +95,7 @@ dev: build-frontend install-npm
 	@echo "  Username: $(NAME)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --persist --organize-downloads 2>&1 | sed 's/^/[backend] /') & \
+	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads 2>&1 | sed 's/^/[backend] /') & \
 	sleep 2 && (cd server/app && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -109,7 +109,7 @@ dev-mobile: build-frontend install-npm
 	echo "  Username: $(NAME)"; \
 	echo ""; \
 	trap 'kill 0' EXIT; \
-	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --persist --organize-downloads 2>&1 | sed 's/^/[backend] /') & \
+	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads 2>&1 | sed 's/^/[backend] /') & \
 	sleep 2 && (cd server/app && npm run dev -- --host 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -146,7 +146,7 @@ dev-mock-mobile: build-frontend install-npm
 dev1: build-frontend
 	@echo "Backend → :5228  (username: $(NAME))"
 	@echo "Run 'make dev2' in another terminal once backend is ready."
-	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --persist --organize-downloads
+	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads
 
 dev2: install-npm
 	@echo "Frontend → :5173  (http://localhost:5173)"
@@ -214,16 +214,16 @@ fmt-frontend:
 
 # ─── Docker ──────────────────────────────────────────────────────────────────
 docker:
-	docker build -t openbooks .
+	docker build -t openbooks-abs .
 
 docker-run:
-	docker run -p 8080:80 -v $(PWD)/books:/books openbooks
+	docker run -p 8080:80 -v $(PWD)/books:/books openbooks-abs
 
 docker-calibre:
-	docker build -f Dockerfile.calibre -t openbooks-calibre .
+	docker build -f Dockerfile.calibre -t openbooks-abs-calibre .
 
 docker-run-calibre:
-	docker run -p 8080:80 -v $(PWD)/books:/books openbooks-calibre
+	docker run -p 8080:80 -v $(PWD)/books:/books openbooks-abs-calibre
 
 # Build the calibre image and run it locally for end-to-end testing.
 # ebook-polish is the post-processor; books land in ./books/.
@@ -231,7 +231,7 @@ docker-run-calibre:
 docker-dev-calibre: docker-calibre
 	docker run --rm -p 8080:80 \
 	  -v $(PWD)/books:/books \
-	  openbooks-calibre \
+	  openbooks-abs-calibre \
 	  server --name $(NAME) --dir /books --port 80 \
 	  --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book"
 
