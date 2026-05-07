@@ -20,10 +20,22 @@ WORKDIR /go/src/cmd/openbooks/
 RUN go build -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}"
 
 FROM debian:bookworm-slim AS app
-# Install Calibre from Debian repos (includes calibre-polish and all CLI tools)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    calibre \
+# Install Calibre using the official installer, which includes calibre-polish
+# and all CLI tools. The Debian apt package omits most CLI tools.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        wget \
+        python3 \
+        libgl1 \
+        libglib2.0-0 \
+        libdbus-1-3 \
+    && wget -nv -O /tmp/calibre-install.py "https://download.calibre-ebook.com/linux-installer.py" \
+    && python3 /tmp/calibre-install.py install_dir=/opt/calibre dont_update_profile=1 \
+    && rm -f /tmp/calibre-install.py \
+    && apt-get purge -y --auto-remove wget \
     && rm -rf /var/lib/apt/lists/*
+ENV PATH="/opt/calibre:${PATH}"
 
 WORKDIR /app
 COPY --from=build /go/src/cmd/openbooks/openbooks .
