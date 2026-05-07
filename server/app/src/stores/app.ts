@@ -3,6 +3,8 @@ import { ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
 import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse } from "../types/messages";
 
+type LibrarySortMode = "newest" | "alpha";
+
 export const useAppStore = defineStore("app", () => {
   const isConnected = ref(false);
   const isConnecting = ref(true); // true until first successful connect or max retries
@@ -11,6 +13,7 @@ export const useAppStore = defineStore("app", () => {
   const inFlightDownloads = ref<string[]>([]);
   const libraryVersion = ref(0);
   const rawSearchResults = ref<Record<number, string>>({});
+  const librarySortMode = useLocalStorage<LibrarySortMode>("ob-library-sort", "newest");
 
   // Session-only — not persisted. Results arrive async via WebSocket;
   // using localStorage + computed caused the getter to return null while
@@ -78,6 +81,10 @@ export const useAppStore = defineStore("app", () => {
     downloadPhase.value = phase;
   }
 
+  function toggleLibrarySortMode() {
+    librarySortMode.value = librarySortMode.value === "newest" ? "alpha" : "newest";
+  }
+
   function isDownloading(book: string) {
     return inFlightDownloads.value.includes(book);
   }
@@ -95,6 +102,7 @@ export const useAppStore = defineStore("app", () => {
     waitingDownload,
     downloadPhase,
     libraryVersion,
+    librarySortMode,
     setConnected,
     setConnecting,
     setUsername,
@@ -104,6 +112,7 @@ export const useAppStore = defineStore("app", () => {
     addInFlightDownload,
     removeInFlightDownload,
     setDownloadPhase,
+    toggleLibrarySortMode,
     isDownloading
   };
 });
