@@ -71,7 +71,7 @@ function formatTime(iso: string) {
           {{ entry.level }}
         </span>
         <span
-          class="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed break-all">
+          class="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed break-words min-w-0">
           {{ entry.message }}
         </span>
       </li>
