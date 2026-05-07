@@ -40,7 +40,7 @@ const TABS: { id: Tab; label: string }[] = [
     <!-- Header -->
     <div class="px-4 pt-4 pb-2 flex-shrink-0">
       <div class="flex items-center justify-between mb-1">
-        <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-slate-50">openbooks-abs</span>
+        <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-slate-50">OpenBooks ABS</span>
         <button
           class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-30 transition-colors"
           :disabled="!appStore.isConnected"
