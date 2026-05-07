@@ -1,4 +1,12 @@
-# openbooks-abs
+<p align="center">
+  <img src="./server/app/src/assets/icon.svg" alt="Audiobookshelf logo" width="84" height="84">
+</p>
+
+<h1 align="center">openbooks-abs</h1>
+
+<p align="center">
+  A focused OpenBooks fork for preparing EPUB libraries for Audiobookshelf.
+</p>
 
 openbooks-abs is a focused fork of [OpenBooks](https://github.com/evan-buss/openbooks). The original project is a general-purpose IRC ebook search and download tool. This fork keeps that core workflow, but reshapes the server mode around building a clean ebook library that can be mounted directly into [Audiobookshelf](https://www.audiobookshelf.org/).
 
@@ -10,6 +18,8 @@ Author/Title/Title.epub
 ```
 
 The goal is simple: search from the browser, download from IRC, clean the EPUB, choose the final name, and leave the finished file in a library folder that Audiobookshelf can scan.
+
+openbooks-abs is not affiliated with Audiobookshelf.
 
 ## Table of Contents
 
