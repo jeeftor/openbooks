@@ -200,6 +200,47 @@ The Calibre image uses `ebook-polish`, for example:
 
 You can replace that with your own script if you want to run validation, conversion, metadata checks, or other cleanup.
 
+Annotated compose example:
+
+```yaml
+services:
+  openbooks-abs:
+    image: ghcr.io/jeeftor/openbooks-abs:latest-calibre
+    container_name: openbooks-abs
+    environment:
+      - BASE_PATH=/
+    volumes:
+      # Completed books land here. Mount the same path into Audiobookshelf.
+      - ./books:/books
+
+      # Optional: mount helper scripts if you want a custom post-processor.
+      - ./scripts:/scripts:ro
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+    # Override the image default if you want a lighter Calibre cleanup.
+    # The downloaded file path is appended automatically as the final argument.
+    command: >
+      server
+      --name openbooks_abs
+      --dir /books
+      --port 80
+      --dev
+      --post-process-cmd "ebook-polish,--smarten-punctuation,--upgrade-book,--remove-unused-css"
+
+    # Other useful options:
+    #
+    # Conservative metadata/container cleanup:
+    # --post-process-cmd "ebook-polish,--upgrade-book"
+    #
+    # More aggressive EPUB cleanup:
+    # --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"
+    #
+    # Custom script. openbooks-abs appends the downloaded file path:
+    # --post-process-cmd "/scripts/cleanup-epub.sh,--strict"
+```
+
 ## Reverse Proxy Base Path
 
 openbooks-abs can run behind a reverse proxy at a subpath. The base path must include leading and trailing slashes.
