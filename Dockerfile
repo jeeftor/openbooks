@@ -1,30 +1,39 @@
-FROM node:22 as web
+### Stage 1: Build the Vue frontend
+### npm install is cached until package*.json changes — Go source changes don't bust this layer.
+FROM node:22 AS web
 WORKDIR /web
-COPY . .
-WORKDIR /web/server/app/
-RUN npm install
+COPY server/app/package*.json ./
+RUN npm ci
+COPY server/app/ ./
 RUN npm run build
 
-FROM golang as build
-WORKDIR /go/src/
+### Stage 2: Build the Go binary
+### go mod download is cached until go.mod/go.sum change — source changes don't re-download deps.
+FROM golang AS build
+WORKDIR /go/src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
-COPY --from=web /web/ .
+COPY --from=web /web/dist ./server/app/dist
 
 ARG VERSION=dev
 ARG COMMIT_SHA=unknown
 ARG BUILD_DATE=unknown
 ENV CGO_ENABLED=0
-RUN go get -d -v ./...
-RUN go install -v ./...
-WORKDIR /go/src/cmd/openbooks/
-RUN go build -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}"
+RUN go build \
+    -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}" \
+    -o openbooks \
+    ./cmd/openbooks
 
-FROM gcr.io/distroless/static as app
+### Stage 3: Minimal distroless runtime — just copy the binary
+FROM gcr.io/distroless/static AS app
 WORKDIR /app
-COPY --from=build /go/src/cmd/openbooks/openbooks .
+COPY --from=build /go/src/openbooks .
 
 EXPOSE 80
-VOLUME [ "/books" ]
+VOLUME ["/books"]
 ENV BASE_PATH=/
 
 ENTRYPOINT ["./openbooks"]

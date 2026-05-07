@@ -7,6 +7,7 @@ import {
   type ConnectionResponse,
   type SearchResponse,
   type DownloadResponse,
+  type RenamePromptResponse,
   type AppNotification
 } from "../types/messages";
 import { useAppStore } from "../stores/app";
@@ -107,6 +108,10 @@ export function useWebSocket() {
         downloadFile((response as DownloadResponse).downloadPath);
         appStore.removeInFlightDownload();
         break;
+      case MessageType.RENAME_PROMPT:
+        appStore.pendingRename = response as RenamePromptResponse;
+        // Don't show a toast — the modal handles UX entirely.
+        return;
       case MessageType.RATELIMIT:
         historyStore.deleteItem(undefined);
         break;

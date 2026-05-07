@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import type { HistoryItem } from "../types/messages";
+import type { HistoryItem, RenamePromptResponse } from "../types/messages";
 
 export const useAppStore = defineStore("app", () => {
   const isConnected = ref(false);
@@ -19,6 +19,10 @@ export const useAppStore = defineStore("app", () => {
   // Set to a query string to trigger a new search from any component.
   // SearchView watches this and clears it after issuing the search.
   const pendingQuery = ref<string | null>(null);
+
+  // Set when the server sends a RENAME_PROMPT. RenameModal watches this
+  // and clears it after the user confirms or cancels.
+  const pendingRename = ref<RenamePromptResponse | null>(null);
 
   function setConnected(connected: boolean) {
     isConnected.value = connected;
@@ -61,6 +65,7 @@ export const useAppStore = defineStore("app", () => {
     inFlightDownloads,
     activeItem,
     pendingQuery,
+    pendingRename,
     libraryVersion,
     setConnected,
     setConnecting,

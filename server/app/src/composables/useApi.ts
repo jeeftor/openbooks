@@ -85,5 +85,7 @@ export function useLogs() {
   }
 
   fetchLogs();
+  const interval = setInterval(fetchLogs, 5_000);
+  onUnmounted(() => clearInterval(interval));
   return { logs, loading, refresh: fetchLogs };
 }

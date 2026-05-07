@@ -13,11 +13,13 @@ func _() {
 	_ = x[SEARCH-2]
 	_ = x[DOWNLOAD-3]
 	_ = x[RATELIMIT-4]
+	_ = x[RENAME_PROMPT-5]
+	_ = x[RENAME_CONFIRM-6]
 }
 
-const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMIT"
+const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITRENAME_promptrename_confirm"
 
-var _MessageType_index = [...]uint8{0, 6, 13, 19, 27, 36}
+var _MessageType_index = [...]uint8{0, 6, 13, 19, 27, 36, 49, 63}
 
 func (i MessageType) String() string {
 	if i < 0 || i >= MessageType(len(_MessageType_index)-1) {

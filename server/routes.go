@@ -86,6 +86,7 @@ func (server *server) serveWs() http.HandlerFunc {
 			ctx:           context.Background(),
 			downloadQueue: make(chan downloadJob, 50),
 			downloadDone:  make(chan struct{}, 1),
+			renameConfirm: make(chan RenameChoice, 1),
 		}
 
 		server.log.Printf("Client connected from %s\n", conn.RemoteAddr().String())
@@ -171,8 +172,15 @@ func (server *server) getAllBooksHandler() http.HandlerFunc {
 		output := make([]download, 0)
 
 		err := filepath.WalkDir(libraryDir, func(p string, d os.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
+			if err != nil {
 				return err
+			}
+			// Skip hidden directories (including .staging)
+			if d.IsDir() {
+				if strings.HasPrefix(d.Name(), ".") {
+					return filepath.SkipDir
+				}
+				return nil
 			}
 			name := d.Name()
 			if strings.HasPrefix(name, ".") || filepath.Ext(name) == ".temp" {

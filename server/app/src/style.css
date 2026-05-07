@@ -16,6 +16,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Prevent iOS double-tap zoom on interactive elements */
+button, input, select, textarea, label, a {
+  touch-action: manipulation;
+}
+
 /* Thin scrollbar */
 * {
   scrollbar-width: thin;

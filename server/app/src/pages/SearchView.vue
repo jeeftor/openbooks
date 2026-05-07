@@ -176,6 +176,10 @@ function handleSearch(e: Event) {
             <input
               v-model="query"
               type="search"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="none"
+              spellcheck="false"
               :placeholder="
                 errorMode
                   ? 'Enter download command (starts with !)'

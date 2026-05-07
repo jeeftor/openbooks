@@ -206,7 +206,15 @@ func parseLineV2(line string) (BookDetail, error) {
 		// Handles case with weird author characters %\w% ("%F77FE9FF1CCD% Michael Haag")
 		if strings.Contains(author, "%") {
 			split := strings.SplitAfterN(author, " ", 2)
-			return split[1], nil
+			if len(split) == 2 {
+				return strings.TrimSpace(split[1]), nil
+			}
+		}
+
+		// Handles "HASH | Author Name" format used by some bots
+		// e.g. "ab94ae567320 | Brandon Sanderson"
+		if pipeIdx := strings.Index(author, " | "); pipeIdx != -1 {
+			return strings.TrimSpace(author[pipeIdx+3:]), nil
 		}
 
 		return author, nil

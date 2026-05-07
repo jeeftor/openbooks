@@ -24,6 +24,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 		obj = new(SearchRequest)
 	case DOWNLOAD:
 		obj = new(DownloadRequest)
+	case RENAME_CONFIRM:
+		obj = new(RenameConfirmRequest)
 	}
 
 	err := json.Unmarshal(message.Payload, &obj)
@@ -43,6 +45,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 		c.sendSearchRequest(obj.(*SearchRequest), server)
 	case DOWNLOAD:
 		c.sendDownloadRequest(obj.(*DownloadRequest), server)
+	case RENAME_CONFIRM:
+		c.handleRenameConfirm(obj.(*RenameConfirmRequest))
 	default:
 		server.log.Println("Unknown request type received.")
 	}
@@ -137,6 +141,24 @@ func sanitizePathComponent(s, replaceSpace string) string {
 		s = strings.ReplaceAll(s, " ", replaceSpace)
 	}
 	return s
+}
+
+// handleRenameConfirm forwards the user's rename decision to the waiting bookResultHandler.
+func (c *Client) handleRenameConfirm(req *RenameConfirmRequest) {
+	choice := RenameChoice{
+		OptionID:        req.OptionID,
+		CustomName:      req.CustomName,
+		RewriteMetadata: req.RewriteMetadata,
+		Author:          req.Author,
+		Title:           req.Title,
+		Series:          req.Series,
+		SeriesIndex:     req.SeriesIndex,
+	}
+	select {
+	case c.renameConfirm <- choice:
+	default:
+		c.log.Println("handleRenameConfirm: no pending rename awaiting confirmation")
+	}
 }
 
 // handle DownloadRequests by sending the request to the book server

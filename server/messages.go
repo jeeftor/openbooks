@@ -20,6 +20,8 @@ const (
 	SEARCH
 	DOWNLOAD
 	RATELIMIT
+	RENAME_PROMPT  // server → client: book staged, awaiting rename decision
+	RENAME_CONFIRM // client → server: user's rename decision
 )
 
 type NotificationType int
@@ -77,6 +79,48 @@ type DownloadResponse struct {
 	StatusResponse
 	Name         string `json:"name"`
 	DownloadPath string `json:"downloadPath"`
+}
+
+// RenameOption is one naming choice shown in the rename modal.
+type RenameOption struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Preview     string `json:"preview"`     // path relative to downloadDir, forward slashes
+	IsOrganized bool   `json:"isOrganized"` // true if it creates subdirectories
+}
+
+// RenamePromptResponse is sent when a book is staged and ready for the user to name.
+type RenamePromptResponse struct {
+	StatusResponse
+	IRCFilename  string             `json:"ircFilename"`
+	Metadata     *core.EPUBMetadata `json:"metadata,omitempty"`
+	Options      []RenameOption     `json:"options"`
+	ReplaceSpace string             `json:"replaceSpace"`
+	CoverBase64  string             `json:"coverBase64,omitempty"` // base64-encoded cover image
+	CoverMime    string             `json:"coverMime,omitempty"`   // e.g. "image/jpeg"
+}
+
+// RenameConfirmRequest is sent by the client with the user's rename decision.
+type RenameConfirmRequest struct {
+	OptionID        string `json:"optionId"`
+	CustomName      string `json:"customName"`
+	RewriteMetadata bool   `json:"rewriteMetadata"`
+	// Metadata fields to write (may differ from extracted if user edited them)
+	Author      string `json:"author,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Series      string `json:"series,omitempty"`
+	SeriesIndex string `json:"seriesIndex,omitempty"`
+}
+
+// RenameChoice is the internal representation passed from the WS handler to bookResultHandler.
+type RenameChoice struct {
+	OptionID        string
+	CustomName      string
+	RewriteMetadata bool
+	Author          string
+	Title           string
+	Series          string
+	SeriesIndex     string
 }
 
 func newRateLimitResponse(remainingSeconds float64) StatusResponse {

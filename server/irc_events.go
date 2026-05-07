@@ -1,9 +1,12 @@
 package server
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/evan-buss/openbooks/core"
 	"github.com/evan-buss/openbooks/dcc"
@@ -16,56 +19,6 @@ func fileSizeMB(path string) string {
 	}
 	mb := float64(info.Size()) / 1024 / 1024
 	return fmt.Sprintf("%.1f MB", mb)
-}
-
-// organizeByMetadata moves an EPUB to a metadata-derived subdirectory.
-// Returns the final path (original path if unchanged or on error).
-func (c *Client) organizeByMetadata(extractedPath string, config Config, lb *logBuffer) string {
-	name := filepath.Base(extractedPath)
-
-	if !config.OrganizeDownloads {
-		return extractedPath
-	}
-	if filepath.Ext(extractedPath) != ".epub" {
-		lb.info(fmt.Sprintf("Saved (flat, non-EPUB): %s", name))
-		return extractedPath
-	}
-
-	meta, err := core.ReadEPUBMetadata(extractedPath)
-	if err != nil || meta == nil || meta.Author == "" || meta.Title == "" {
-		c.log.Printf("organizeByMetadata: skipping metadata organization for %s (err=%v)", name, err)
-		lb.warn(fmt.Sprintf("Saved (flat, metadata unavailable): %s", name))
-		return extractedPath
-	}
-
-	rs := config.ReplaceSpace
-	author := sanitizePathComponent(meta.Author, rs)
-	title := sanitizePathComponent(meta.Title, rs)
-
-	var targetDir string
-	if meta.Series != "" {
-		series := sanitizePathComponent(meta.Series, rs)
-		targetDir = filepath.Join(config.DownloadDir, author, series, title)
-	} else {
-		targetDir = filepath.Join(config.DownloadDir, author, title)
-	}
-
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		c.log.Printf("organizeByMetadata: failed to create dir %s: %v", targetDir, err)
-		lb.error(fmt.Sprintf("Failed to create directory for %s: %v", name, err))
-		return extractedPath
-	}
-
-	newPath := filepath.Join(targetDir, name)
-	if err := os.Rename(extractedPath, newPath); err != nil {
-		c.log.Printf("organizeByMetadata: failed to move file: %v", err)
-		lb.error(fmt.Sprintf("Failed to move %s: %v", name, err))
-		return extractedPath
-	}
-
-	rel, _ := filepath.Rel(config.DownloadDir, newPath)
-	lb.info(fmt.Sprintf("Saved: %s", rel))
-	return newPath
 }
 
 func (server *server) NewIrcEventHandler(client *Client) core.EventHandler {
@@ -113,7 +66,7 @@ func (c *Client) searchResultHandler(downloadDir string, lb *logBuffer) core.Han
 		}
 
 		c.log.Printf("Sending %d search results.\n", len(bookResults))
-		lb.info(fmt.Sprintf("Search results: %d found, %d unparseable", len(bookResults), len(parseErrors)))
+		lb.info(fmt.Sprintf("🔍 Search results: %d found, %d unparseable", len(bookResults), len(parseErrors)))
 		c.send <- newSearchResponse(bookResults, parseErrors)
 
 		err = os.Remove(extractedPath)
@@ -123,60 +76,175 @@ func (c *Client) searchResultHandler(downloadDir string, lb *logBuffer) core.Han
 	}
 }
 
-// bookResultHandler downloads the book file and sends it over the websocket
+// bookResultHandler implements the staging→post-process→prompt→confirm→move flow.
+//
+//  1. Download the book to the hidden .staging directory.
+//  2. Run the post-processor (e.g. ebook-polish) on the staged file so metadata is clean.
+//  3. Read EPUB metadata from the now-polished file.
+//  4. Send RENAME_PROMPT to the frontend with generated naming options.
+//  5. Block until the user confirms (or a 30-min timeout elapses).
+//  6. Move from staging to the confirmed final path.
+//  7. Optionally rewrite EPUB internal metadata.
+//  8. Signal the download queue so the next book can begin.
 func (c *Client) bookResultHandler(config Config, lb *logBuffer) core.HandlerFunc {
 	return func(text string) {
 		dir := config.DownloadDir
-		if d, err := dcc.ParseString(text); err == nil {
-			lb.info(fmt.Sprintf("Downloading: %s", d.Filename))
+
+		// Ensure the staging directory exists before downloading.
+		if err := ensureStagingDir(dir); err != nil {
+			c.log.Printf("Failed to create staging dir: %v", err)
+			lb.error("Failed to create staging directory.")
+			c.send <- newErrorResponse("Internal error: could not create staging directory.")
+			signalDone(c)
+			return
 		}
-		extractedPath, err := core.DownloadExtractDCCString(dir, text, nil)
+		stage := stagingDir(dir)
+
+		// Determine the filename for the initial log entry and session group.
+		var ircFilenamePreview string
+		if d, err := dcc.ParseString(text); err == nil {
+			ircFilenamePreview = d.Filename
+		}
+
+		// Create a session so all entries for this download are grouped together.
+		// Group is set to the IRC filename; falls back to a timestamp if unavailable.
+		group := ircFilenamePreview
+		if group == "" {
+			group = fmt.Sprintf("dl-%d", time.Now().UnixMilli())
+		}
+		sess := lb.session(group)
+		sess.info(fmt.Sprintf("⬇️  Downloading: %s", ircFilenamePreview))
+
+		// 1. Download to staging.
+		extractedPath, err := core.DownloadExtractDCCString(stage, text, nil)
 		if err != nil {
 			c.log.Println(err)
-			lb.error(fmt.Sprintf("Download failed: %v", err))
+			sess.error(fmt.Sprintf("Download failed: %v", err))
 			c.send <- newErrorResponse("Error when downloading book.")
-			select {
-			case c.downloadDone <- struct{}{}:
-			default:
-			}
+			signalDone(c)
 			return
 		}
 
 		size := fileSizeMB(extractedPath)
-		lb.info(fmt.Sprintf("Downloaded: %s (%s)", filepath.Base(extractedPath), size))
+		ircFilename := filepath.Base(extractedPath)
+		sess.infoDetail(
+			fmt.Sprintf("📥 Downloaded: %s (%s)", ircFilename, size),
+			fmt.Sprintf("File: %s\nSize: %s\nStaged at: %s", ircFilename, size, extractedPath),
+		)
 
-		finalPath := c.organizeByMetadata(extractedPath, config, lb)
-		runPostProcess(config.PostProcessCmd, finalPath, lb)
-		// organizeByMetadata logs the path when organize is enabled; log it here for flat mode.
-		if !config.OrganizeDownloads {
-			lb.info(fmt.Sprintf("Saved: %s", filepath.Base(finalPath)))
+		// 2. Run post-processor on the staged file first so metadata is clean.
+		runPostProcess(config.PostProcessCmd, extractedPath, sess)
+
+		// 3. Read EPUB metadata and cover (from the polished file).
+		var meta *core.EPUBMetadata
+		var coverBase64, coverMime string
+		if strings.EqualFold(filepath.Ext(extractedPath), ".epub") {
+			if m, err := core.ReadEPUBMetadata(extractedPath); err == nil {
+				meta = m
+			} else {
+				c.log.Printf("Metadata read failed for %s: %v", ircFilename, err)
+			}
+			if imgBytes, mime, err := core.ExtractCoverImage(extractedPath); err == nil && imgBytes != nil {
+				coverBase64 = base64.StdEncoding.EncodeToString(imgBytes)
+				coverMime = mime
+			}
 		}
-		c.log.Printf("Book saved to: %s\n", finalPath)
-		c.send <- newDownloadResponse(finalPath, config.DownloadDir)
-		// Signal the download queue to proceed to the next item.
+
+		// 4. Build options and send prompt to the UI.
+		options := buildRenameOptions(ircFilename, meta, config.ReplaceSpace)
+		safeSend(c, RenamePromptResponse{
+			StatusResponse: StatusResponse{
+				MessageType:      RENAME_PROMPT,
+				NotificationType: NOTIFY,
+				Title:            "Book downloaded — how would you like to save it?",
+			},
+			IRCFilename:  ircFilename,
+			Metadata:     meta,
+			Options:      options,
+			ReplaceSpace: config.ReplaceSpace,
+			CoverBase64:  coverBase64,
+			CoverMime:    coverMime,
+		})
+
+		// 5. Wait for the user's rename decision.
+		var choice RenameChoice
 		select {
-		case c.downloadDone <- struct{}{}:
-		default:
+		case choice = <-c.renameConfirm:
+		case <-time.After(30 * time.Minute):
+			sess.warn(fmt.Sprintf("Rename timed out — keeping IRC filename: %s", ircFilename))
+			choice = RenameChoice{OptionID: "keep"}
+		case <-c.ctx.Done():
+			// Client disconnected — clean up the staged file and exit.
+			os.Remove(extractedPath)
+			return
 		}
+
+		// 6. Resolve option label, move from staging to final path.
+		optionLabel := choice.OptionID
+		for _, opt := range options {
+			if opt.ID == choice.OptionID {
+				optionLabel = opt.Label
+				break
+			}
+		}
+
+		finalPath := resolveFinalPath(dir, choice, ircFilename, meta, config.ReplaceSpace)
+
+		if err := moveFile(extractedPath, finalPath); err != nil {
+			c.log.Printf("Move failed: %v", err)
+			sess.error(fmt.Sprintf("Failed to move file: %v", err))
+			finalPath = extractedPath
+		}
+
+		// 7. Optionally rewrite the EPUB's internal OPF metadata.
+		if choice.RewriteMetadata && strings.EqualFold(filepath.Ext(finalPath), ".epub") {
+			if err := RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+				sess.warn(fmt.Sprintf("Metadata rewrite failed: %v", err))
+				c.log.Printf("RewriteEPUBMetadata: %v", err)
+			} else {
+				sess.infoDetail("✏️  Metadata rewritten",
+					fmt.Sprintf("Author: %s\nTitle: %s\nSeries: %s\nBook #: %s",
+						choice.Author, choice.Title, choice.Series, choice.SeriesIndex))
+			}
+		}
+
+		// 8. Single combined "saved" log entry (merges "saving as" + path).
+		rel, _ := filepath.Rel(dir, finalPath)
+		relSlash := filepath.ToSlash(rel)
+		savedDetail := fmt.Sprintf("Option: %s\nAuthor: %s\nTitle: %s\nSeries: %s\nBook #: %s\nPath: %s",
+			optionLabel, choice.Author, choice.Title, choice.Series, choice.SeriesIndex, finalPath)
+		sess.infoDetail(fmt.Sprintf("✅ Saved [%s]: %s", optionLabel, relSlash), savedDetail)
+
+		c.log.Printf("Book saved to: %s\n", finalPath)
+		safeSend(c, newDownloadResponse(finalPath, dir))
+		signalDone(c)
 	}
 }
 
-// NoResults is called when the server returns that nothing was found for the query
+// signalDone unblocks the download queue so the next job can start.
+func signalDone(c *Client) {
+	select {
+	case c.downloadDone <- struct{}{}:
+	default:
+	}
+}
+
+// noResultsHandler is called when the server returns that nothing was found for the query
 func (c *Client) noResultsHandler(_ string) {
 	c.send <- newErrorResponse("No results found for the query.")
 }
 
-// BadServer is called when the requested download fails because the server is not available
+// badServerHandler is called when the requested download fails because the server is not available
 func (c *Client) badServerHandler(_ string) {
 	c.send <- newErrorResponse("Server is not available. Try another one.")
 }
 
-// SearchAccepted is called when the user's query is accepted into the search queue
+// searchAcceptedHandler is called when the user's query is accepted into the search queue
 func (c *Client) searchAcceptedHandler(_ string) {
 	c.send <- newStatusResponse(NOTIFY, "Search accepted into the queue.")
 }
 
-// MatchesFound is called when the server finds matches for the user's query
+// matchesFoundHandler is called when the server finds matches for the user's query
 func (c *Client) matchesFoundHandler(num string) {
 	c.send <- newStatusResponse(NOTIFY, fmt.Sprintf("Found %s results for your query.", num))
 }

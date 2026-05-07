@@ -25,7 +25,7 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer.
-	maxMessageSize = 512
+	maxMessageSize = 4096
 )
 
 var upgrader = websocket.Upgrader{
@@ -64,6 +64,9 @@ type Client struct {
 
 	// downloadDone is signaled by bookResultHandler when a download finishes.
 	downloadDone chan struct{}
+
+	// renameConfirm receives the user's rename decision from the WebSocket handler.
+	renameConfirm chan RenameChoice
 }
 
 // processDownloadQueue drains downloadQueue one job at a time, sending each

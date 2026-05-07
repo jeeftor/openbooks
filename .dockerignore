@@ -1,7 +1,19 @@
+# Version control
+.git/
+.github/
+
+# Local build artifacts (built inside Docker)
 **/node_modules/
 **/build/
 **/dist/
-**/github/
-openbooks.exe
+server/app/dist/
+cmd/openbooks/openbooks
 openbooks
+openbooks.exe
 *.exe
+
+# Local dev data — don't bake books into the image
+books/
+
+# Docs and misc
+*.md

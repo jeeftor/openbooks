@@ -10,7 +10,9 @@ export enum MessageType {
   CONNECT,
   SEARCH,
   DOWNLOAD,
-  RATELIMIT
+  RATELIMIT,
+  RENAME_PROMPT,
+  RENAME_CONFIRM
 }
 
 export interface AppNotification {
@@ -65,6 +67,8 @@ export interface LogEntry {
   time: string;
   level: "info" | "warn" | "error";
   message: string;
+  detail?: string;
+  group?: string;
 }
 
 export interface HistoryItem {
@@ -73,4 +77,40 @@ export interface HistoryItem {
   results?: BookDetail[];
   errors?: ParseError[];
   timedOut?: boolean;
+}
+
+export interface EPUBMetadata {
+  Author: string;
+  Title: string;
+  Series: string;
+  SeriesIndex: string;
+}
+
+export interface RenameOption {
+  id: string;
+  label: string;
+  preview: string;
+  isOrganized: boolean;
+}
+
+export interface RenamePromptResponse extends WsResponse {
+  ircFilename: string;
+  metadata?: EPUBMetadata;
+  options: RenameOption[];
+  replaceSpace: string;
+  coverBase64?: string;
+  coverMime?: string;
+}
+
+export interface RenameConfirmRequest {
+  type: MessageType.RENAME_CONFIRM;
+  payload: {
+    optionId: string;
+    customName: string;
+    rewriteMetadata: boolean;
+    author: string;
+    title: string;
+    series: string;
+    seriesIndex: string;
+  };
 }

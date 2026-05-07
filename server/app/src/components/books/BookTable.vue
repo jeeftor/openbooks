@@ -306,6 +306,27 @@ watch(
   }
 );
 
+// ── Column resizing ──────────────────────────────────────────────────────────
+// Widths in px: [server, author, title, format, size, actions]
+const columnWidths = ref([110, 160, 320, 72, 64, 88]);
+
+function startResize(colIdx: number, event: MouseEvent) {
+  event.preventDefault();
+  const startX = event.clientX;
+  const startWidth = columnWidths.value[colIdx];
+
+  function onMove(e: MouseEvent) {
+    const newWidth = Math.max(40, startWidth + e.clientX - startX);
+    columnWidths.value = columnWidths.value.map((w, i) => (i === colIdx ? newWidth : w));
+  }
+  function onUp() {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+  }
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
+
 const virtualizer = useVirtualizer(
   computed(() => ({
     count: displayBooks.value.length,
@@ -472,45 +493,53 @@ function toggleFormat(fmt: string) {
 
     <!-- Virtualised table -->
     <div ref="scrollContainer" class="flex-1 overflow-auto">
-      <table class="w-full text-xs border-collapse">
+      <table class="w-full text-xs border-collapse" style="table-layout: fixed">
+        <colgroup>
+          <col v-for="(w, i) in columnWidths" :key="i" :style="{ width: w + 'px' }" />
+        </colgroup>
         <thead class="sticky top-0 bg-slate-50 dark:bg-slate-900/95 z-10 backdrop-blur-sm">
           <tr>
-            <th class="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 w-28">
+            <th class="relative px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 select-none">
               <button class="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" @click="toggleSort('server')">
                 Server
                 <ChevronDown v-if="sortColumn === 'server' && sortDirection === 'asc'" :size="12" />
                 <ChevronUp v-else-if="sortColumn === 'server' && sortDirection === 'desc'" :size="12" />
               </button>
+              <div class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-brand-400/60 opacity-0 hover:opacity-100 transition-opacity" @mousedown.stop="startResize(0, $event)" />
             </th>
-            <th class="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 w-40">
+            <th class="relative px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 select-none">
               <button class="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" @click="toggleSort('author')">
                 Author
                 <ChevronDown v-if="sortColumn === 'author' && sortDirection === 'asc'" :size="12" />
                 <ChevronUp v-else-if="sortColumn === 'author' && sortDirection === 'desc'" :size="12" />
               </button>
+              <div class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-brand-400/60 opacity-0 hover:opacity-100 transition-opacity" @mousedown.stop="startResize(1, $event)" />
             </th>
-            <th class="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800">
+            <th class="relative px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 select-none">
               <button class="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" @click="toggleSort('title')">
                 Title
                 <ChevronDown v-if="sortColumn === 'title' && sortDirection === 'asc'" :size="12" />
                 <ChevronUp v-else-if="sortColumn === 'title' && sortDirection === 'desc'" :size="12" />
               </button>
+              <div class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-brand-400/60 opacity-0 hover:opacity-100 transition-opacity" @mousedown.stop="startResize(2, $event)" />
             </th>
-            <th class="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 w-20">
+            <th class="relative px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 select-none">
               <button class="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" @click="toggleSort('format')">
                 Format
                 <ChevronDown v-if="sortColumn === 'format' && sortDirection === 'asc'" :size="12" />
                 <ChevronUp v-else-if="sortColumn === 'format' && sortDirection === 'desc'" :size="12" />
               </button>
+              <div class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-brand-400/60 opacity-0 hover:opacity-100 transition-opacity" @mousedown.stop="startResize(3, $event)" />
             </th>
-            <th class="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 w-16">
+            <th class="relative px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-800 select-none">
               <button class="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" @click="toggleSort('size')">
                 Size
                 <ChevronDown v-if="sortColumn === 'size' && sortDirection === 'asc'" :size="12" />
                 <ChevronUp v-else-if="sortColumn === 'size' && sortDirection === 'desc'" :size="12" />
               </button>
+              <div class="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-brand-400/60 opacity-0 hover:opacity-100 transition-opacity" @mousedown.stop="startResize(4, $event)" />
             </th>
-            <th class="px-3 py-2 border-b border-slate-200 dark:border-slate-800 w-24"></th>
+            <th class="px-3 py-2 border-b border-slate-200 dark:border-slate-800"></th>
           </tr>
         </thead>
         <tbody>
@@ -555,15 +584,15 @@ function toggleFormat(fmt: string) {
                   <span
                     class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
                     :class="servers.includes(displayBooks[vItem.index].server) ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'" />
-                  <span class="truncate text-slate-600 dark:text-slate-300 max-w-[90px]">
+                  <span class="truncate text-slate-600 dark:text-slate-300">
                     {{ displayBooks[vItem.index].server }}
                   </span>
                 </div>
               </td>
-              <td class="px-3 py-1.5 text-slate-700 dark:text-slate-300 max-w-[160px]">
+              <td class="px-3 py-1.5 text-slate-700 dark:text-slate-300 overflow-hidden">
                 <span class="truncate block">{{ displayBooks[vItem.index].author }}</span>
               </td>
-              <td class="px-3 py-1.5 text-slate-900 dark:text-slate-100 max-w-0">
+              <td class="px-3 py-1.5 text-slate-900 dark:text-slate-100 overflow-hidden">
                 <span class="truncate block">{{ displayBooks[vItem.index].title }}</span>
               </td>
               <td class="px-3 py-1.5">

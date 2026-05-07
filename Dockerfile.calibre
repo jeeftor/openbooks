@@ -1,39 +1,46 @@
+### Stage 1: Build the Vue frontend
+### npm install is cached until package*.json changes — Go source changes don't bust this layer.
 FROM node:22 AS web
 WORKDIR /web
-COPY . .
-WORKDIR /web/server/app/
-RUN npm install
+COPY server/app/package*.json ./
+RUN npm ci
+COPY server/app/ ./
 RUN npm run build
 
+### Stage 2: Build the Go binary
+### go mod download is cached until go.mod/go.sum change — source changes don't re-download deps.
 FROM golang AS build
-WORKDIR /go/src/
+WORKDIR /go/src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
-COPY --from=web /web/ .
+COPY --from=web /web/dist ./server/app/dist
 
 ARG VERSION=dev
 ARG COMMIT_SHA=unknown
 ARG BUILD_DATE=unknown
 ENV CGO_ENABLED=0
-RUN go get -d -v ./...
-RUN go install -v ./...
-WORKDIR /go/src/cmd/openbooks/
-RUN go build -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}"
+RUN go build \
+    -ldflags "-X main.version=${VERSION} -X main.commitSHA=${COMMIT_SHA} -X main.buildDate=${BUILD_DATE}" \
+    -o openbooks \
+    ./cmd/openbooks
 
+### Stage 3: Debian slim + Calibre (provides ebook-polish), then copy the binary
+### The apt layer is cached until the RUN apt-get line changes.
 FROM debian:bookworm-slim AS app
-# Install Calibre from Debian repos. The CLI polish tool is ebook-polish.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     calibre \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=build /go/src/cmd/openbooks/openbooks .
+COPY --from=build /go/src/openbooks .
 
 EXPOSE 80
 VOLUME ["/books"]
 ENV BASE_PATH=/
 
-# Default: run calibre-polish after every download.
-# Override by passing a different --post-process-cmd or omitting it entirely.
 ENTRYPOINT ["./openbooks"]
 CMD ["server", "--name", "openbooks", "--dir", "/books", "--port", "80", \
-     "--post-process-cmd", "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation"]
+     "--post-process-cmd", "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"]

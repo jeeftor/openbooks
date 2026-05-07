@@ -5,7 +5,9 @@
         test test-go test-frontend type-check \
         lint lint-go lint-frontend \
         fmt fmt-go fmt-frontend \
-        docker docker-run clean
+        docker docker-run \
+        docker-calibre docker-run-calibre docker-dev-calibre \
+        clean
 
 # ─── Default target ──────────────────────────────────────────────────────────
 help:
@@ -45,8 +47,10 @@ help:
 	@echo ""
 	@echo "  ── Other ───────────────────────────────────────────────"
 	@echo "  make dev-cli           OpenBooks CLI mode (mock IRC)"
-	@echo "  make docker            Build Docker image"
+	@echo "  make docker            Build Docker image (distroless)"
 	@echo "  make docker-run        Run Docker image on :8080"
+	@echo "  make docker-calibre    Build calibre image (includes ebook-polish)"
+	@echo "  make docker-dev-calibre  Build + run calibre image locally on :8080"
 	@echo "  make clean             Remove build artifacts"
 	@echo ""
 	@echo "  Override username: make dev NAME=myuser  (default: openbooks_dev)"
@@ -220,6 +224,16 @@ docker-calibre:
 
 docker-run-calibre:
 	docker run -p 8080:80 -v $(PWD)/books:/books openbooks-calibre
+
+# Build the calibre image and run it locally for end-to-end testing.
+# ebook-polish is the post-processor; books land in ./books/.
+# Open http://localhost:8080 to interact with the rename modal.
+docker-dev-calibre: docker-calibre
+	docker run --rm -p 8080:80 \
+	  -v $(PWD)/books:/books \
+	  openbooks-calibre \
+	  server --name $(NAME) --dir /books --port 80 \
+	  --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book"
 
 # ─── Clean ───────────────────────────────────────────────────────────────────
 clean:
