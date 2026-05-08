@@ -6,6 +6,7 @@
 
 - Updated browser favicon assets and metadata to match the bundled Audiobookshelf icon colors.
 - Show release builds as clickable version links to the matching GitHub release notes while keeping dev builds as plain labels.
+- Show a compact update indicator next to the UI version when a newer release is available.
 
 ## v2.0.1 - 2026-05-08
 

@@ -155,11 +155,16 @@ func (server *server) serverListHandler() http.HandlerFunc {
 func (server *server) versionHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(newVersionInfo(
+		info := newVersionInfo(
 			server.config.Version,
 			server.config.CommitSHA,
 			server.config.BuildDate,
-		))
+		)
+		if server.updateChecker != nil {
+			update := server.updateChecker.Check(r.Context(), info)
+			info.Update = &update
+		}
+		json.NewEncoder(w).Encode(info)
 	}
 }
 

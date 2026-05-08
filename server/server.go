@@ -37,6 +37,9 @@ type server struct {
 	// In-memory activity log (ring buffer)
 	logBuf *logBuffer
 
+	// Cached release update checker used by /version.
+	updateChecker updateChecker
+
 	// Mutex to guard the lastSearch timestamp
 	lastSearchMutex sync.Mutex
 
@@ -74,6 +77,11 @@ func New(config Config) *server {
 		unregister: make(chan *Client),
 		clients:    make(map[uuid.UUID]*Client),
 		log:        log.New(os.Stdout, "SERVER: ", log.LstdFlags|log.Lmsgprefix),
+		updateChecker: newGitHubUpdateChecker(log.New(
+			os.Stdout,
+			"UPDATE: ",
+			log.LstdFlags|log.Lmsgprefix,
+		)),
 	}
 }
 
