@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Added a repo-local OpenBooks issue flow skill for issue, branch, PR, changelog, release, and parallel worktree guidance.
+
 ### Fixed
 
 - Updated browser favicon assets and metadata to match the bundled Audiobookshelf icon colors.

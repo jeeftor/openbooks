@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenBooks Issue Flow"
+  short_description: "Follow OpenBooks issue-first workflow"
+  default_prompt: "Use $openbooks-issue-flow to start OpenBooks work from a tracked GitHub issue."
