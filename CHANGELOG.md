@@ -6,9 +6,6 @@
 
 - Show release builds as clickable version links to the matching GitHub release notes while keeping dev builds as plain labels.
 - Show a compact update indicator next to the UI version when a newer release is available.
-
-### Added
-
 - Added a repo-local OpenBooks issue flow skill for issue, branch, PR, changelog, release, and parallel worktree guidance.
 
 ### Fixed
