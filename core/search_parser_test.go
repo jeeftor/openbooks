@@ -3,17 +3,35 @@ package core
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestLocalSearchFixture(t *testing.T) {
+	path := os.Getenv("OPENBOOKS_SEARCH_FIXTURE")
+	if path == "" {
+		t.Skip("set OPENBOOKS_SEARCH_FIXTURE to test a local raw search results file")
+	}
+
+	file, err := os.Open(path)
+	require.NoError(t, err)
+	defer file.Close()
+
+	results, errors := ParseSearchV2(file)
+	t.Logf("parsed=%d errors=%d", len(results), len(errors))
+	for _, parseError := range errors {
+		t.Log(parseError)
+	}
+}
 
 func TestSearchParserV2(t *testing.T) {
 	reader := strings.NewReader(sampleData)
 	results, errors := ParseSearchV2(reader)
 
-	require.Len(t, errors, 19)
+	require.Empty(t, errors)
 
-	require.Len(t, results, 40)
+	require.Len(t, results, 59)
 }
 
 func TestSpecialCases(t *testing.T) {
@@ -80,6 +98,77 @@ func TestSpecialCases(t *testing.T) {
 				Format: "zip",
 				Size:   "445.09MB",
 				Full:   "!FWServer %DE7B9E7F6F34% Brown, Dan - Robert Langdon 04 - Inferno - Audiobook.zip",
+			},
+		},
+		{
+			"hash pipe, uppercase extension",
+			"!artemis_serv 10ac0e24db93 | Card, Orson Scott - Treasure Box.Lit ::INFO:: 313.21KB",
+			BookDetail{
+				Server: "artemis_serv",
+				Author: "Card, Orson Scott",
+				Title:  "Treasure Box",
+				Format: "lit",
+				Size:   "313.21KB",
+				Full:   "!artemis_serv 10ac0e24db93 | Card, Orson Scott - Treasure Box.Lit",
+			},
+		},
+		{
+			"hash pipe, filename only archive",
+			"!artemis_serv 2dd0e5eaae48 | Bronwyn Scott.rar ::INFO:: 586.65KB",
+			BookDetail{
+				Server: "artemis_serv",
+				Title:  "Bronwyn Scott",
+				Format: "rar",
+				Size:   "586.65KB",
+				Full:   "!artemis_serv 2dd0e5eaae48 | Bronwyn Scott.rar",
+			},
+		},
+		{
+			"hash pipe, pdb format",
+			"!artemis_serv 8f2ab1fe2ba9 | Card, Orson Scott - Ender 02 - Speaker For The Dead.pdb ::INFO:: 398.85KB",
+			BookDetail{
+				Server: "artemis_serv",
+				Author: "Card, Orson Scott",
+				Title:  "Ender 02 - Speaker For The Dead",
+				Format: "pdb",
+				Size:   "398.85KB",
+				Full:   "!artemis_serv 8f2ab1fe2ba9 | Card, Orson Scott - Ender 02 - Speaker For The Dead.pdb",
+			},
+		},
+		{
+			"missing space after author separator",
+			"!artemis_serv d8afad674a82 | Orson Scott Card -The Goldbug.pdf ::INFO:: 49.51KB",
+			BookDetail{
+				Server: "artemis_serv",
+				Author: "Orson Scott Card",
+				Title:  "The Goldbug",
+				Format: "pdf",
+				Size:   "49.51KB",
+				Full:   "!artemis_serv d8afad674a82 | Orson Scott Card -The Goldbug.pdf",
+			},
+		},
+		{
+			"ashurbanipal ebook metadata row",
+			"!Ashurbanipal hKn8Ju/Fck9GP+0tmYscRg - Orson Scott Card - A War of Gifts: An Ender Story [eng]  (EPUB) 84.8 KB - [Science Fiction]",
+			BookDetail{
+				Server: "Ashurbanipal",
+				Author: "Orson Scott Card",
+				Title:  "A War of Gifts: An Ender Story",
+				Format: "epub",
+				Size:   "84.8 KB",
+				Full:   "!Ashurbanipal hKn8Ju/Fck9GP+0tmYscRg - Orson Scott Card - A War of Gifts: An Ender Story [eng]  (EPUB) 84.8 KB",
+			},
+		},
+		{
+			"ashurbanipal audiobook metadata row",
+			"!Ashurbanipal BBdvuUmVjPeZ9vG5H1+ZDQ - Jasper T. Scott - Planet B (audiobook) (Narrated by: James Patrick Cronin) - Architects of the Apocalypse (M4B) 577.1 MB - [Apocalyptic, Near Future Sci-Fi]",
+			BookDetail{
+				Server: "Ashurbanipal",
+				Author: "Jasper T. Scott",
+				Title:  "Planet B (audiobook) (Narrated by: James Patrick Cronin) - Architects of the Apocalypse",
+				Format: "m4b",
+				Size:   "577.1 MB",
+				Full:   "!Ashurbanipal BBdvuUmVjPeZ9vG5H1+ZDQ - Jasper T. Scott - Planet B (audiobook) (Narrated by: James Patrick Cronin) - Architects of the Apocalypse (M4B) 577.1 MB",
 			},
 		},
 	}
