@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Updated browser favicon assets and metadata to match the bundled Audiobookshelf icon colors.
+
 ## v2.0.1 - 2026-05-08
 
 ### Fixed
