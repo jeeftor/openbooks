@@ -12,7 +12,7 @@ These options apply to both Server and CLI mode.
 | `--debug`        | `false`                   | Display additional debug information, including all config values.   |
 | `--help`/ `-h`   |                           | Display all commands and flags.                                      |
 | `--log`/`-l`     | `false`                   | Save raw IRC logs for each client connection.                        |
-| `--name`/`-n`    | **REQUIRED**              | Username used to connect to IRC server.                              |
+| `--name`/`-n`    | Optional in server mode   | Username prefix used to connect to IRC server. CLI mode requires it. |
 | `--searchbot`    | `search`                  | The IRC search operator to use. Try `searchook` if `search` is down. |
 | `--server`/`-s`  | `irc.irchighway.net:6697` | The IRC `server:port` to connect to.                                 |
 | `--tls`          | `true`                    | Connect to IRC server over TLS.                                      |

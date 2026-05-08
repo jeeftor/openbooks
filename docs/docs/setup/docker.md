@@ -18,7 +18,7 @@ services:
       - "8080:80"
     volumes:
       - "~/Downoads/openbooks:/books"
-    command: --persist --name
+    command: --persist
     environment:
       - BASE_PATH=/openbooks/
 ```

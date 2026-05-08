@@ -97,7 +97,6 @@ By default, the Calibre image starts the server with:
 - `--port 80`
 - `--post-process-cmd ebook-polish,...`
 - `--dev`
-- `--name openbooks_abs`
 
 That means the cleaned EPUB is saved normally, and the original pre-polish EPUB is kept beside it as `.orig.epub` for comparison.
 
@@ -110,7 +109,6 @@ docker run -p 8080:80 \
   -v ./books:/books \
   ghcr.io/jeeftor/openbooks-abs:latest \
   server \
-  --name my_irc_name \
   --dir /books \
   --port 80 \
   --replace-space .
@@ -129,7 +127,7 @@ FROM ghcr.io/jeeftor/openbooks-abs:latest-calibre
 
 COPY --chmod=755 cleanup-epub.sh /usr/local/bin/cleanup-epub
 
-CMD ["server", "--name", "openbooks_abs", "--dir", "/books", "--port", "80", "--dev", \
+CMD ["server", "--dir", "/books", "--port", "80", "--dev", \
      "--post-process-cmd", "cleanup-epub,--strict"]
 ```
 
@@ -142,7 +140,7 @@ FROM ghcr.io/jeeftor/openbooks-abs:latest-calibre
 
 COPY --from=epub-tools /usr/local/bin/my-epub-cleaner /usr/local/bin/my-epub-cleaner
 
-CMD ["server", "--name", "openbooks_abs", "--dir", "/books", "--port", "80", "--dev", \
+CMD ["server", "--dir", "/books", "--port", "80", "--dev", \
      "--post-process-cmd", "my-epub-cleaner,--strict"]
 ```
 
@@ -219,7 +217,7 @@ Because both containers mount `./books`, a book saved by OpenBooks ABS to `./boo
 
 | Flag | Description |
 |------|-------------|
-| `--name` | IRC username. Required when you override the default Docker command. |
+| `--name` | Optional IRC username prefix. If omitted in server mode, OpenBooks ABS generates a readable guest name for each browser client. |
 | `--dir` | Directory where books are saved. Use the directory mounted into Audiobookshelf. |
 | `--organize-downloads` | Legacy compatibility flag for organized download workflows. Final placement is chosen in the rename prompt. |
 | `--replace-space` | Replace spaces in generated folder names, for example `.` or `_`. |
@@ -262,7 +260,6 @@ services:
     # The downloaded file path is appended automatically as the final argument.
     command: >
       server
-      --name openbooks_abs
       --dir /books
       --port 80
       --dev
@@ -295,7 +292,7 @@ docker run -p 8080:80 \
 For binaries or explicit commands:
 
 ```bash
-./openbooks server --basepath /openbooks-abs/ --name my_irc_name --dir ./books
+./openbooks server --basepath /openbooks-abs/ --dir ./books
 ```
 
 ## Local Development

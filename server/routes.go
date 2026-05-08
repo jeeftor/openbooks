@@ -76,7 +76,7 @@ func (server *server) serveWs() http.HandlerFunc {
 			return
 		}
 
-		uniqueUsername := server.generateUniqueUsername()
+		uniqueUsername := server.generateUniqueUsername(userId)
 		client := &Client{
 			conn:          conn,
 			send:          make(chan interface{}, 128),
@@ -99,16 +99,43 @@ func (server *server) serveWs() http.HandlerFunc {
 	}
 }
 
-func (server *server) generateUniqueUsername() string {
-	baseUsername := server.config.UserName
-	suffix := fmt.Sprintf("_%s", uuid.New().String()[:4])
-
-	// Truncate base if needed (IRC has username limits)
-	maxBaseLen := 12
-	if len(baseUsername) > maxBaseLen {
-		baseUsername = baseUsername[:maxBaseLen]
+func (server *server) generateUniqueUsername(userID uuid.UUID) string {
+	baseUsername := strings.TrimSpace(server.config.UserName)
+	if baseUsername != "" {
+		return server.uniqueUsernameWithSuffix(userID, baseUsername)
 	}
-	return baseUsername + suffix
+
+	baseUsername = guestNameFromUUID(userID)
+	if !server.usernameInUseByAnotherClient(baseUsername, userID) {
+		return baseUsername
+	}
+
+	return server.uniqueUsernameWithSuffix(userID, baseUsername)
+}
+
+func (server *server) uniqueUsernameWithSuffix(userID uuid.UUID, baseUsername string) string {
+	suffix := guestNameCollisionSuffix(userID)
+	username := usernameWithSuffix(baseUsername, suffix)
+	if !server.usernameInUseByAnotherClient(username, userID) {
+		return username
+	}
+
+	for {
+		suffix = uuid.New().String()[:guestNameSuffixLength]
+		username = usernameWithSuffix(baseUsername, suffix)
+		if !server.usernameInUseByAnotherClient(username, userID) {
+			return username
+		}
+	}
+}
+
+func (server *server) usernameInUseByAnotherClient(username string, userID uuid.UUID) bool {
+	for clientID, client := range server.clients {
+		if clientID != userID && client.irc.Username == username {
+			return true
+		}
+	}
+	return false
 }
 
 func (server *server) staticFilesHandler(assetPath string) http.Handler {

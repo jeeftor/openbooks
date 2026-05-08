@@ -42,7 +42,6 @@ var desktopConfig server.Config
 func init() {
 	desktopCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enable debug mode.")
 	desktopCmd.PersistentFlags().StringVarP(&globalFlags.UserName, "name", "n", "", "Username used to connect to IRC server.")
-	desktopCmd.MarkPersistentFlagRequired("name")
 	desktopCmd.PersistentFlags().StringVarP(&globalFlags.Server, "server", "s", "irc.irchighway.net:6697", "IRC server to connect to.")
 	desktopCmd.PersistentFlags().BoolVar(&globalFlags.EnableTLS, "tls", true, "Connect to server using TLS.")
 	desktopCmd.PersistentFlags().BoolVarP(&globalFlags.Log, "log", "l", false, "Save raw IRC logs for each client connection.")
