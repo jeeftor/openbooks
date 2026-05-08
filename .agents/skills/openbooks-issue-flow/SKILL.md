@@ -74,9 +74,9 @@ Use this release sequence:
 4. Keep concise user-facing release notes grouped under `Added`, `Improved`, and `Fixed` only where useful.
 5. Run relevant checks before opening the release PR.
 6. Merge the release PR into `master`.
-7. Tag the merged commit with `vX.Y.Z`.
+7. Let the `.github/workflows/ghcr.yml` master workflow create the next patch tag automatically, or push an explicit `vX.Y.Z` tag when preparing a non-patch release.
 8. Create the GitHub release from that tag using the changelog section as release notes.
-9. Remember that `v*.*.*` tags trigger `.github/workflows/ghcr.yml` to publish minimal and Calibre GHCR images with semver tags.
+9. Remember that `.github/workflows/ghcr.yml` publishes minimal and Calibre GHCR images from the resolved semver tag.
 10. Delete the release branch and clean local worktrees.
 
 If the latest changelog version, Git tag, and GitHub release do not agree, state the assumption before publishing.
