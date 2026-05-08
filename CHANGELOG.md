@@ -6,6 +6,10 @@
 
 - Generate silly readable IRC guest names for server clients when `--name` is not provided, with active-connection collision handling.
 
+### Changed
+
+- Publish GHCR release images from semver tags only, with pushes to `master` automatically creating the next patch tag before publishing.
+
 ## v2.0.2 - 2026-05-08
 
 ### Added
