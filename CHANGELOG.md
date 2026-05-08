@@ -6,6 +6,10 @@
 
 - Generate silly readable IRC guest names for server clients when `--name` is not provided, with active-connection collision handling.
 
+### Changed
+
+- Show non-release builds with their branch or channel name, such as `master 15b38e1`, instead of the generic `dev` label.
+
 ## v2.0.2 - 2026-05-08
 
 ### Added
