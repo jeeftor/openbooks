@@ -1,0 +1,103 @@
+package server
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func TestNewVersionInfoRelease(t *testing.T) {
+	info := newVersionInfo("v2.0.1", "1234567890abcdef", "2026-05-08T10:00:00Z")
+
+	if !info.IsRelease {
+		t.Fatal("expected release version")
+	}
+	if info.DisplayVersion != "v2.0.1" {
+		t.Fatalf("display version = %q, want %q", info.DisplayVersion, "v2.0.1")
+	}
+	if info.RawVersion != "v2.0.1" {
+		t.Fatalf("raw version = %q, want %q", info.RawVersion, "v2.0.1")
+	}
+	if info.ReleaseNotesURL != "https://github.com/jeeftor/openbooks/releases/tag/v2.0.1" {
+		t.Fatalf("release notes URL = %q", info.ReleaseNotesURL)
+	}
+	if info.CommitSHA != "1234567890abcdef" {
+		t.Fatalf("commit SHA = %q", info.CommitSHA)
+	}
+	if info.BuildDate != "2026-05-08T10:00:00Z" {
+		t.Fatalf("build date = %q", info.BuildDate)
+	}
+}
+
+func TestNewVersionInfoNormalizesReleaseWithoutVPrefix(t *testing.T) {
+	info := newVersionInfo("2.0.1", "unknown", "unknown")
+
+	if !info.IsRelease {
+		t.Fatal("expected release version")
+	}
+	if info.DisplayVersion != "v2.0.1" {
+		t.Fatalf("display version = %q, want %q", info.DisplayVersion, "v2.0.1")
+	}
+	if info.ReleaseNotesURL != "https://github.com/jeeftor/openbooks/releases/tag/v2.0.1" {
+		t.Fatalf("release notes URL = %q", info.ReleaseNotesURL)
+	}
+}
+
+func TestNewVersionInfoSupportsPrereleaseBuildMetadata(t *testing.T) {
+	info := newVersionInfo("v2.1.0-rc.1+20260508", "unknown", "unknown")
+
+	if !info.IsRelease {
+		t.Fatal("expected release version")
+	}
+	if info.DisplayVersion != "v2.1.0-rc.1+20260508" {
+		t.Fatalf("display version = %q, want %q", info.DisplayVersion, "v2.1.0-rc.1+20260508")
+	}
+	if info.ReleaseNotesURL != "https://github.com/jeeftor/openbooks/releases/tag/v2.1.0-rc.1+20260508" {
+		t.Fatalf("release notes URL = %q", info.ReleaseNotesURL)
+	}
+}
+
+func TestNewVersionInfoDevBuildUsesCommitLabel(t *testing.T) {
+	info := newVersionInfo("master", "abcdef1234567890", "unknown")
+
+	if info.IsRelease {
+		t.Fatal("expected dev version")
+	}
+	if info.DisplayVersion != "dev abcdef1" {
+		t.Fatalf("display version = %q, want %q", info.DisplayVersion, "dev abcdef1")
+	}
+	if info.ReleaseNotesURL != "" {
+		t.Fatalf("release notes URL = %q, want empty", info.ReleaseNotesURL)
+	}
+	if info.RawVersion != "master" {
+		t.Fatalf("raw version = %q, want %q", info.RawVersion, "master")
+	}
+}
+
+func TestVersionHandlerReturnsStructuredMetadata(t *testing.T) {
+	server := New(Config{
+		Version:   "v2.0.1",
+		CommitSHA: "1234567890abcdef",
+		BuildDate: "2026-05-08T10:00:00Z",
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/version", nil)
+	server.versionHandler().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if contentType := recorder.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Fatalf("content type = %q, want application/json", contentType)
+	}
+
+	var info VersionInfo
+	if err := json.NewDecoder(recorder.Body).Decode(&info); err != nil {
+		t.Fatalf("decode version response: %v", err)
+	}
+	if !info.IsRelease || info.DisplayVersion != "v2.0.1" || info.ReleaseNotesURL == "" {
+		t.Fatalf("unexpected version response: %#v", info)
+	}
+}

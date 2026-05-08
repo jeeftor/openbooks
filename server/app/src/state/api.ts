@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { getApiURL } from "./util";
+import type { VersionInfo } from "../types/messages";
 
 export interface IrcServer {
   elevatedUsers?: string[];
@@ -47,7 +48,7 @@ export const openbooksApi = createApi({
     getLogs: builder.query<LogEntry[], null>({
       query: () => `logs`
     }),
-    getVersion: builder.query<string, null>({
+    getVersion: builder.query<VersionInfo, null>({
       query: () => `version`
     })
   })

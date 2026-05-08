@@ -15,6 +15,7 @@ import { useVersion } from "../../composables/useApi";
 import HistoryPanel from "../sidebar/HistoryPanel.vue";
 import LibraryPanel from "../sidebar/LibraryPanel.vue";
 import LogsPanel from "../sidebar/LogsPanel.vue";
+import VersionLink from "./VersionLink.vue";
 
 type Tab = "history" | "books" | "logs";
 
@@ -108,7 +109,7 @@ function selectTab(tab: Tab) {
 
         <!-- Controls -->
         <div class="flex items-center gap-1 flex-shrink-0">
-          <span v-if="version" class="text-xs text-slate-400 dark:text-slate-500 mr-1">{{ version }}</span>
+          <VersionLink v-if="version" :version="version" />
           <button
             class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
             :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"

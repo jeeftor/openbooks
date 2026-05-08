@@ -1,16 +1,30 @@
 import { ref, watch, onUnmounted } from "vue";
 import { getApiUrl } from "./useWebSocket";
-import type { Book, LogEntry } from "../types/messages";
+import type { Book, LogEntry, VersionInfo } from "../types/messages";
 
 export function useVersion() {
-  const version = ref<string | undefined>(undefined);
+  const version = ref<VersionInfo | undefined>(undefined);
   fetch(getApiUrl("/version"))
     .then((r) => r.json())
-    .then((v: string) => {
-      version.value = v;
+    .then((v: string | VersionInfo) => {
+      version.value = normalizeVersion(v);
     })
     .catch(() => {});
   return version;
+}
+
+function normalizeVersion(version: string | VersionInfo): VersionInfo {
+  if (typeof version !== "string") {
+    return version;
+  }
+
+  return {
+    displayVersion: version,
+    rawVersion: version,
+    commitSha: "",
+    buildDate: "",
+    isRelease: false
+  };
 }
 
 export function useServers() {

@@ -75,6 +75,15 @@ export interface LogEntry {
   group?: string;
 }
 
+export interface VersionInfo {
+  displayVersion: string;
+  rawVersion: string;
+  commitSha: string;
+  buildDate: string;
+  releaseNotesUrl?: string;
+  isRelease: boolean;
+}
+
 export interface HistoryItem {
   query: string;
   timestamp: number;

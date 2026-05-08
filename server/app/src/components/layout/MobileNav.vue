@@ -18,6 +18,7 @@ import { useVersion } from "../../composables/useApi";
 import HistoryPanel from "../sidebar/HistoryPanel.vue";
 import LibraryPanel from "../sidebar/LibraryPanel.vue";
 import LogsPanel from "../sidebar/LogsPanel.vue";
+import VersionLink from "./VersionLink.vue";
 
 type Tab = "history" | "books" | "logs";
 
@@ -60,20 +61,19 @@ function selectTab(tab: Tab) {
       <!-- Sheet header -->
       <div
         class="flex items-center justify-between px-4 pt-3 pb-2 flex-shrink-0">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
           <component
             :is="appStore.username ? BadgeCheck : PlugZap"
             :size="16"
+            class="flex-shrink-0"
             :class="appStore.username ? 'text-brand-400' : 'text-slate-500 dark:text-slate-600'"
           />
           <span class="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
             {{ appStore.username ?? "Not connected" }}
           </span>
         </div>
-        <div class="flex items-center gap-1">
-          <span v-if="version" class="text-xs text-slate-400 mr-1">{{
-            version
-          }}</span>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <VersionLink v-if="version" :version="version" />
           <button
             class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
             @click="notifStore.toggleDrawer()">
