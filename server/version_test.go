@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -81,6 +82,7 @@ func TestVersionHandlerReturnsStructuredMetadata(t *testing.T) {
 		CommitSHA: "1234567890abcdef",
 		BuildDate: "2026-05-08T10:00:00Z",
 	})
+	server.updateChecker = nil
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/version", nil)
@@ -100,4 +102,44 @@ func TestVersionHandlerReturnsStructuredMetadata(t *testing.T) {
 	if !info.IsRelease || info.DisplayVersion != "v2.0.1" || info.ReleaseNotesURL == "" {
 		t.Fatalf("unexpected version response: %#v", info)
 	}
+}
+
+func TestVersionHandlerReturnsUpdateMetadata(t *testing.T) {
+	server := New(Config{
+		Version:   "v2.0.1",
+		CommitSHA: "1234567890abcdef",
+		BuildDate: "2026-05-08T10:00:00Z",
+	})
+	server.updateChecker = staticUpdateChecker{
+		update: VersionUpdate{
+			Status:          updateStatusAvailable,
+			Available:       true,
+			CurrentVersion:  "v2.0.1",
+			LatestVersion:   "v2.0.2",
+			ReleaseNotesURL: "https://github.com/jeeftor/openbooks/releases/tag/v2.0.2",
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/version", nil)
+	server.versionHandler().ServeHTTP(recorder, request)
+
+	var info VersionInfo
+	if err := json.NewDecoder(recorder.Body).Decode(&info); err != nil {
+		t.Fatalf("decode version response: %v", err)
+	}
+	if info.Update == nil {
+		t.Fatal("expected update metadata")
+	}
+	if !info.Update.Available || info.Update.LatestVersion != "v2.0.2" {
+		t.Fatalf("unexpected update response: %#v", info.Update)
+	}
+}
+
+type staticUpdateChecker struct {
+	update VersionUpdate
+}
+
+func (checker staticUpdateChecker) Check(_ context.Context, _ VersionInfo) VersionUpdate {
+	return checker.update
 }

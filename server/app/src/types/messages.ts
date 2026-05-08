@@ -82,6 +82,17 @@ export interface VersionInfo {
   buildDate: string;
   releaseNotesUrl?: string;
   isRelease: boolean;
+  update?: VersionUpdate;
+}
+
+export interface VersionUpdate {
+  status: "available" | "current" | "unknown";
+  available: boolean;
+  currentVersion: string;
+  latestVersion?: string;
+  releaseNotesUrl?: string;
+  checkedAt?: string;
+  reason?: string;
 }
 
 export interface HistoryItem {

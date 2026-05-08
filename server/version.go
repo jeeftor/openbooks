@@ -11,12 +11,13 @@ var releaseVersionPattern = regexp.MustCompile(`^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-
 
 // VersionInfo describes the running build for UI display and release links.
 type VersionInfo struct {
-	DisplayVersion  string `json:"displayVersion"`
-	RawVersion      string `json:"rawVersion"`
-	CommitSHA       string `json:"commitSha"`
-	BuildDate       string `json:"buildDate"`
-	ReleaseNotesURL string `json:"releaseNotesUrl,omitempty"`
-	IsRelease       bool   `json:"isRelease"`
+	DisplayVersion  string         `json:"displayVersion"`
+	RawVersion      string         `json:"rawVersion"`
+	CommitSHA       string         `json:"commitSha"`
+	BuildDate       string         `json:"buildDate"`
+	ReleaseNotesURL string         `json:"releaseNotesUrl,omitempty"`
+	IsRelease       bool           `json:"isRelease"`
+	Update          *VersionUpdate `json:"update,omitempty"`
 }
 
 // newVersionInfo builds the public version metadata returned by /version.
