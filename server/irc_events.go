@@ -79,9 +79,20 @@ func (sess *session) bookResultHandler(
 	return func(text string) {
 		dir := config.DownloadDir
 
+		// Pop the slot handle for this download (FIFO — matches the order IRC requests
+		// were sent). Both this handler and the per-job timeout goroutine hold a reference;
+		// slotHandle.release() is idempotent via sync.Once.
+		var handle *slotHandle
+		select {
+		case handle = <-sess.pendingSlots:
+		default:
+		}
+
 		if err := ensureStagingDir(dir); err != nil {
 			lb.error("Failed to create staging directory.")
-			sess.signalDone()
+			if handle != nil {
+				handle.release()
+			}
 			return
 		}
 		stage := stagingDir(dir)
@@ -107,8 +118,16 @@ func (sess *session) bookResultHandler(
 		if err != nil {
 			sess_lb.error(fmt.Sprintf("Download failed: %v", err))
 			safeSend(sess.getClient(), newErrorResponse("Error when downloading book."))
-			sess.signalDone()
+			if handle != nil {
+				handle.release()
+			}
 			return
+		}
+
+		// File is safely on disk — release the download slot immediately so the
+		// queue can start the next IRC request while this one is being renamed.
+		if handle != nil {
+			handle.release()
 		}
 
 		size := fileSizeMB(extractedPath)
@@ -171,11 +190,21 @@ func (sess *session) bookResultHandler(
 			srv.broadcastStagedCount()
 		}
 
-		// 5. Check if a client is connected. If not, save to staged store directly.
+		// 5. Serialise the rename dialog.
+		// Only one RENAME_PROMPT is shown at a time — if another download already has
+		// the rename dialog open, block here until it finishes (or the session ends).
+		select {
+		case <-sess.renameMu:
+			defer func() { sess.renameMu <- struct{}{} }()
+		case <-sess.ctx.Done():
+			saveToStaged()
+			return
+		}
+
+		// Re-read client after acquiring the mutex — it may have changed.
 		currentClient := sess.getClient()
 		if currentClient == nil {
 			saveToStaged()
-			sess.signalDone()
 			return
 		}
 
@@ -203,14 +232,12 @@ func (sess *session) bookResultHandler(
 		case <-currentClient.ctx.Done():
 			// Client disconnected mid-rename — save to staged store.
 			saveToStaged()
-			sess.signalDone()
 			return
 		}
 
 		// Handle "queue for later" choice.
 		if choice.OptionID == "queue_later" {
 			saveToStaged()
-			sess.signalDone()
 			return
 		}
 
@@ -265,7 +292,6 @@ func (sess *session) bookResultHandler(
 		sess_lb.infoDetail(fmt.Sprintf("✅ Saved [%s]: %s", optionLabel, relSlash), savedDetail)
 
 		safeSend(sess.getClient(), newDownloadResponse(finalPath, dir))
-		sess.signalDone()
 	}
 }
 
