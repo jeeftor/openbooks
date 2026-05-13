@@ -2,6 +2,7 @@
 import { useLocalStorage } from "@vueuse/core";
 import {
   Bell,
+  BookMarked,
   PlugZap,
   BadgeCheck,
   PanelLeftClose,
@@ -12,6 +13,8 @@ import { useDark, useToggle } from "@vueuse/core";
 import { useAppStore } from "../../stores/app";
 import { useNotificationStore } from "../../stores/notifications";
 import { useVersion } from "../../composables/useApi";
+import { MessageType } from "../../types/messages";
+import { sendMessage } from "../../composables/useWebSocket";
 import HistoryPanel from "../sidebar/HistoryPanel.vue";
 import LibraryPanel from "../sidebar/LibraryPanel.vue";
 import LogsPanel from "../sidebar/LogsPanel.vue";
@@ -50,14 +53,27 @@ function selectTab(tab: Tab) {
     <div class="px-4 pt-4 pb-2 flex-shrink-0">
       <div class="flex items-center justify-between mb-1">
         <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-slate-50">OpenBooks ABS</span>
-        <button
-          class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-30 transition-colors"
-          :disabled="!appStore.isConnected"
-          :title="appStore.isConnected ? 'View notifications' : 'Not connected'"
-          @click="notifStore.toggleDrawer()"
-        >
-          <Bell :size="18" />
-        </button>
+        <div class="flex items-center gap-1">
+          <button
+            v-if="appStore.stagedBooksCount > 0"
+            class="relative p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600 dark:text-amber-400 transition-colors"
+            :title="`${appStore.stagedBooksCount} staged book${appStore.stagedBooksCount === 1 ? '' : 's'} — click to process`"
+            @click="sendMessage({ type: MessageType.PROCESS_STAGED_BOOKS })"
+          >
+            <BookMarked :size="18" />
+            <span class="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 text-[9px] font-bold leading-none rounded-full bg-amber-500 text-white flex items-center justify-center">
+              {{ appStore.stagedBooksCount }}
+            </span>
+          </button>
+          <button
+            class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-30 transition-colors"
+            :disabled="!appStore.isConnected"
+            :title="appStore.isConnected ? 'View notifications' : 'Not connected'"
+            @click="notifStore.toggleDrawer()"
+          >
+            <Bell :size="18" />
+          </button>
+        </div>
       </div>
       <p class="text-xs text-slate-400 dark:text-slate-500">Prepare eBooks for Audiobookshelf</p>
 

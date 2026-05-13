@@ -15,7 +15,12 @@ export enum MessageType {
   RENAME_CONFIRM,
   DOWNLOAD_WAITING,
   DOWNLOAD_STARTED,
-  POST_PROCESS_STARTED
+  POST_PROCESS_STARTED,
+  STAGED_BOOKS_NOTIFY,
+  STAGED_BOOK_RESUME,
+  STAGED_QUEUE_LATER,
+  SERIES_AUTOCOMPLETE,
+  PROCESS_STAGED_BOOKS
 }
 
 export interface AppNotification {
@@ -144,5 +149,34 @@ export interface RenameConfirmRequest {
     title: string;
     series: string;
     seriesIndex: string;
+    stagedId?: string;
+  };
+}
+
+export interface StagedBooksNotifyResponse extends WsResponse {
+  count: number;
+}
+
+export interface StagedBookResumeResponse extends WsResponse {
+  stagedId: string;
+  ircFilename: string;
+  metadata?: EPUBMetadata;
+  options: RenameOption[];
+  replaceSpace: string;
+  coverBase64?: string;
+  coverMime?: string;
+  stagedAt: string;
+  queuePosition: number;
+  totalQueued: number;
+}
+
+export interface SeriesAutocompleteResponse extends WsResponse {
+  series: string[];
+}
+
+export interface StageQueueLaterRequest {
+  type: MessageType.STAGED_QUEUE_LATER;
+  payload: {
+    stagedId: string;
   };
 }

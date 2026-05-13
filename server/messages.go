@@ -6,6 +6,7 @@ import (
 	"math"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/evan-buss/openbooks/core"
 )
@@ -25,6 +26,11 @@ const (
 	DOWNLOAD_WAITING     // server → client: IRC request sent, waiting for DCC response
 	DOWNLOAD_STARTED     // server → client: DCC accepted, file transfer in progress
 	POST_PROCESS_STARTED // server → client: post-processing (ebook-polish) running
+	STAGED_BOOKS_NOTIFY  // server → client: N books are waiting in staging
+	STAGED_BOOK_RESUME   // server → client: one staged book ready to process (like RENAME_PROMPT but with stagedId + progress)
+	STAGED_QUEUE_LATER   // client → server: defer this rename back to staged store
+	SERIES_AUTOCOMPLETE  // server → client: list of known series names (sent on connect)
+	PROCESS_STAGED_BOOKS // client → server: start processing the staged books queue
 )
 
 type NotificationType int
@@ -115,6 +121,41 @@ type RenameConfirmRequest struct {
 	Title       string `json:"title,omitempty"`
 	Series      string `json:"series,omitempty"`
 	SeriesIndex string `json:"seriesIndex,omitempty"`
+	// StagedID is non-empty when confirming the rename of a staged (already-downloaded) book.
+	StagedID string `json:"stagedId,omitempty"`
+}
+
+// StageQueueLaterRequest is sent by the client to defer processing of a staged book.
+type StageQueueLaterRequest struct {
+	StagedID string `json:"stagedId"`
+}
+
+// StagedBooksNotifyResponse is sent when there are books waiting in staging.
+type StagedBooksNotifyResponse struct {
+	StatusResponse
+	Count int `json:"count"`
+}
+
+// StagedBookResumeResponse is sent when the server is ready to process one staged book.
+// It carries the same data as RenamePromptResponse plus staged-book identity and progress.
+type StagedBookResumeResponse struct {
+	StatusResponse
+	StagedID      string             `json:"stagedId"`
+	IRCFilename   string             `json:"ircFilename"`
+	Metadata      *core.EPUBMetadata `json:"metadata,omitempty"`
+	Options       []RenameOption     `json:"options"`
+	ReplaceSpace  string             `json:"replaceSpace"`
+	CoverBase64   string             `json:"coverBase64,omitempty"`
+	CoverMime     string             `json:"coverMime,omitempty"`
+	StagedAt      time.Time          `json:"stagedAt"`
+	QueuePosition int                `json:"queuePosition"` // 1-based
+	TotalQueued   int                `json:"totalQueued"`
+}
+
+// SeriesAutocompleteResponse carries known series names for the frontend input.
+type SeriesAutocompleteResponse struct {
+	StatusResponse
+	Series []string `json:"series"`
 }
 
 // RenameChoice is the internal representation passed from the WS handler to bookResultHandler.
@@ -224,5 +265,19 @@ func newErrorResponse(title string) StatusResponse {
 		MessageType:      STATUS,
 		NotificationType: DANGER,
 		Title:            title,
+	}
+}
+
+func newStagedBooksNotifyResponse(count int) StagedBooksNotifyResponse {
+	return StagedBooksNotifyResponse{
+		StatusResponse: StatusResponse{MessageType: STAGED_BOOKS_NOTIFY},
+		Count:          count,
+	}
+}
+
+func newSeriesAutocompleteResponse(series []string) SeriesAutocompleteResponse {
+	return SeriesAutocompleteResponse{
+		StatusResponse: StatusResponse{MessageType: SERIES_AUTOCOMPLETE},
+		Series:         series,
 	}
 }
