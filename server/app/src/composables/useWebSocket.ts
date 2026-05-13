@@ -9,6 +9,9 @@ import {
   type DownloadResponse,
   type RenamePromptResponse,
   type DownloadWaitingResponse,
+  type StagedBooksNotifyResponse,
+  type StagedBookResumeResponse,
+  type SeriesAutocompleteResponse,
   type AppNotification
 } from "../types/messages";
 import { useAppStore } from "../stores/app";
@@ -129,6 +132,15 @@ export function useWebSocket() {
       case MessageType.RATELIMIT:
         historyStore.deleteItem(undefined);
         break;
+      case MessageType.STAGED_BOOKS_NOTIFY:
+        appStore.setStagedBooksCount((response as StagedBooksNotifyResponse).count);
+        return;
+      case MessageType.STAGED_BOOK_RESUME:
+        appStore.setPendingStagedBook(response as StagedBookResumeResponse);
+        return;
+      case MessageType.SERIES_AUTOCOMPLETE:
+        appStore.setKnownSeries((response as SeriesAutocompleteResponse).series);
+        return;
       default:
         console.error("Unknown WS message type:", response);
     }

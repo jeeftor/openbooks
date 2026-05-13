@@ -5,11 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
-	"github.com/evan-buss/openbooks/core"
-	"github.com/evan-buss/openbooks/irc"
 	"github.com/google/uuid"
 
 	"github.com/gorilla/websocket"
@@ -43,8 +40,11 @@ type downloadJob struct {
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	// Unique ID for the client
+	// Unique ID for the client (matches the browser cookie, used to look up the IRC session).
 	uuid uuid.UUID
+
+	// IRC username for this client's session — used for logging and stats.
+	username string
 
 	// The websocket connection.
 	conn *websocket.Conn
@@ -52,62 +52,15 @@ type Client struct {
 	// Message to send to the client ws connection
 	send chan interface{}
 
-	// Individual IRC connection per connected client.
-	irc *irc.Conn
-
 	log *log.Logger
 
 	// Context is used to signal when this client should close.
 	ctx context.Context
 
-	// downloadQueue serializes downloads so only one DCC transfer is active at a time.
-	downloadQueue chan downloadJob
-
-	// downloadDone is signaled by bookResultHandler when a download finishes.
-	downloadDone chan struct{}
-
 	// renameConfirm receives the user's rename decision from the WebSocket handler.
 	renameConfirm chan RenameChoice
 }
 
-// processDownloadQueue drains downloadQueue one job at a time, sending each
-// request to IRC and waiting for bookResultHandler to signal completion before
-// proceeding to the next. This prevents flooding IRC with concurrent DCC requests.
-func (c *Client) processDownloadQueue(server *server) {
-	for {
-		select {
-		case job, ok := <-c.downloadQueue:
-			if !ok {
-				return
-			}
-			pending := len(c.downloadQueue)
-			if pending > 0 {
-				server.logBuf.info(fmt.Sprintf("📋 Queued: %s (%d pending)", job.title, pending))
-			}
-			// Extract bot name from the book string (first word after "!")
-			botName := job.book
-			if idx := strings.Index(job.book, " "); idx > 1 {
-				botName = job.book[1:idx] // strip leading "!"
-			}
-			server.logBuf.info(fmt.Sprintf("📡 Requesting from %s — waiting for IRC bot to send file…", botName))
-			c.send <- newDownloadWaitingResponse(botName, job.title)
-			core.DownloadBook(c.irc, job.book)
-			// Wait for bookResultHandler to signal completion or give up after 5 min.
-			select {
-			case <-c.downloadDone:
-				// bookResultHandler already sent the clear after download finished.
-			case <-time.After(5 * time.Minute):
-				c.send <- newDownloadWaitingClear()
-				server.logBuf.warn(fmt.Sprintf("⏱️  Timed out waiting for %s — bot may be offline or throttling. Skipping.", botName))
-			case <-c.ctx.Done():
-				c.send <- newDownloadWaitingClear()
-				return
-			}
-		case <-c.ctx.Done():
-			return
-		}
-	}
-}
 
 // readPump pumps messages from the websocket connection to the hub.
 //
@@ -116,8 +69,12 @@ func (c *Client) processDownloadQueue(server *server) {
 // reads from this goroutine.
 func (server *server) readPump(c *Client) {
 	defer func() {
-		server.logBuf.info(fmt.Sprintf("🔌 IRC disconnected: %s", c.irc.Username))
-		c.irc.Disconnect()
+		server.logBuf.info(fmt.Sprintf("🔌 Browser disconnected: %s", c.username))
+		// Detach this client from its session. The IRC connection and download queue
+		// continue running so background downloads can complete.
+		if sess := server.getSession(c.uuid); sess != nil {
+			sess.detachClient(c)
+		}
 		c.conn.Close()
 		server.unregister <- c
 	}()

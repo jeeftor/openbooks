@@ -6,7 +6,6 @@ import { sendMessage } from "../composables/useWebSocket";
 
 const appStore = useAppStore();
 
-// Editable metadata fields — initialised from server payload when modal opens.
 const editAuthor = ref("");
 const editTitle = ref("");
 const editSeries = ref("");
@@ -17,19 +16,17 @@ const selectedId = ref("keep");
 const customName = ref("");
 const rewriteMetadata = ref(false);
 
-// Reset state whenever a new rename prompt arrives.
 watch(
-  () => appStore.pendingRename,
-  (prompt) => {
-    if (!prompt) return;
-    editAuthor.value = prompt.metadata?.Author ?? "";
-    editTitle.value = prompt.metadata?.Title ?? "";
-    editSeries.value = prompt.metadata?.Series ?? "";
-    editSeriesIndex.value = prompt.metadata?.SeriesIndex ?? "";
+  () => appStore.pendingStagedBook,
+  (book) => {
+    if (!book) return;
+    editAuthor.value = book.metadata?.Author ?? "";
+    editTitle.value = book.metadata?.Title ?? "";
+    editSeries.value = book.metadata?.Series ?? "";
+    editSeriesIndex.value = book.metadata?.SeriesIndex ?? "";
     fileNameEdited.value = false;
-    editFileName.value = defaultFileName(prompt.ircFilename, editTitle.value, prompt.replaceSpace);
-    // Default to the best organized option available.
-    const ids = prompt.options.map((o) => o.id);
+    editFileName.value = defaultFileName(book.ircFilename, editTitle.value, book.replaceSpace);
+    const ids = book.options.map((o) => o.id);
     if (ids.includes("series")) selectedId.value = "series";
     else if (ids.includes("organized")) selectedId.value = "organized";
     else selectedId.value = "keep";
@@ -38,9 +35,8 @@ watch(
   }
 );
 
-const prompt = computed(() => appStore.pendingRename);
+const book = computed(() => appStore.pendingStagedBook);
 
-// Sanitize a path component the same way the Go backend does.
 function sanitize(s: string, replaceSpace: string): string {
   s = s.trim().replace(/[/\\]/g, "-");
   if (replaceSpace) s = s.replace(/ /g, replaceSpace);
@@ -64,14 +60,12 @@ function fileNameWithExtension(filename: string, ext: string): string {
   return extension(trimmed) ? trimmed : `${trimmed}${ext}`;
 }
 
-// Recompute option previews from the (possibly edited) metadata fields.
-// Mirrors buildRenameOptions() in server/staging.go.
 const liveOptions = computed((): RenameOption[] => {
-  const p = prompt.value;
-  if (!p) return [];
+  const b = book.value;
+  if (!b) return [];
 
-  const rs = p.replaceSpace;
-  const irc = p.ircFilename;
+  const rs = b.replaceSpace;
+  const irc = b.ircFilename;
   const isEPUB = irc.toLowerCase().endsWith(".epub");
   const ext = extension(irc);
 
@@ -114,7 +108,6 @@ const liveOptions = computed((): RenameOption[] => {
   return opts;
 });
 
-// Ensure selectedId stays valid when options change (e.g. user clears author).
 watch(liveOptions, (opts) => {
   if (!opts.find((o) => o.id === selectedId.value)) {
     selectedId.value = opts[opts.length - 1]?.id ?? "keep";
@@ -131,35 +124,44 @@ watch(editSeries, () => {
 });
 
 watch(editTitle, () => {
-  const p = prompt.value;
-  if (p && !fileNameEdited.value) {
-    editFileName.value = defaultFileName(p.ircFilename, editTitle.value, p.replaceSpace);
+  const b = book.value;
+  if (b && !fileNameEdited.value) {
+    editFileName.value = defaultFileName(b.ircFilename, editTitle.value, b.replaceSpace);
   }
 });
 
 const hasMetadata = computed(
-  () => !!(prompt.value?.metadata?.Title || prompt.value?.metadata?.Author)
+  () => !!(book.value?.metadata?.Title || book.value?.metadata?.Author)
 );
 
-// True if the metadata fields were populated from the EPUB (not just empty defaults).
-const hasEmbeddedMetadata = computed(() => !!prompt.value?.metadata);
+const hasEmbeddedMetadata = computed(() => !!book.value?.metadata);
 
 const metadataEdited = computed(
   () =>
-    editAuthor.value !== (prompt.value?.metadata?.Author ?? "") ||
-    editTitle.value !== (prompt.value?.metadata?.Title ?? "") ||
-    editSeries.value !== (prompt.value?.metadata?.Series ?? "") ||
-    editSeriesIndex.value !== (prompt.value?.metadata?.SeriesIndex ?? "")
+    editAuthor.value !== (book.value?.metadata?.Author ?? "") ||
+    editTitle.value !== (book.value?.metadata?.Title ?? "") ||
+    editSeries.value !== (book.value?.metadata?.Series ?? "") ||
+    editSeriesIndex.value !== (book.value?.metadata?.SeriesIndex ?? "")
 );
 
-// Auto-enable rewrite when the user edits any metadata field.
 watch(metadataEdited, (edited) => {
   if (edited) rewriteMetadata.value = true;
 });
 
+const stagedAt = computed(() => {
+  const raw = book.value?.stagedAt;
+  if (!raw) return null;
+  const d = new Date(raw);
+  const diffMs = Date.now() - d.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0) return "staged today";
+  if (diffDays === 1) return "staged yesterday";
+  return `staged ${diffDays} days ago`;
+});
+
 function confirm() {
-  const p = prompt.value;
-  if (!p) return;
+  const b = book.value;
+  if (!b) return;
   sendMessage({
     type: MessageType.RENAME_CONFIRM,
     payload: {
@@ -171,62 +173,57 @@ function confirm() {
       title: editTitle.value,
       series: editSeries.value,
       seriesIndex: editSeriesIndex.value,
+      stagedId: b.stagedId,
     },
   });
-  appStore.pendingRename = null;
+  appStore.setPendingStagedBook(null);
 }
 
 function saveLater() {
+  const b = book.value;
+  if (!b) return;
   sendMessage({
     type: MessageType.STAGED_QUEUE_LATER,
-    payload: { stagedId: "" },
+    payload: { stagedId: b.stagedId },
   });
-  appStore.pendingRename = null;
-}
-
-function cancel() {
-  sendMessage({
-    type: MessageType.RENAME_CONFIRM,
-    payload: {
-      optionId: "keep",
-      customName: "",
-      fileName: "",
-      rewriteMetadata: false,
-      author: "",
-      title: "",
-      series: "",
-      seriesIndex: "",
-    },
-  });
-  appStore.pendingRename = null;
+  appStore.setPendingStagedBook(null);
 }
 </script>
 
 <template>
   <Transition name="modal">
     <div
-      v-if="prompt"
+      v-if="book"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      @click.self="cancel"
     >
       <div
         class="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden"
       >
         <!-- Header -->
         <div class="px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-700 flex gap-4 items-start">
-          <!-- Cover thumbnail -->
           <img
-            v-if="prompt.coverBase64"
-            :src="`data:${prompt.coverMime};base64,${prompt.coverBase64}`"
+            v-if="book.coverBase64"
+            :src="`data:${book.coverMime};base64,${book.coverBase64}`"
             alt="Book cover"
             class="flex-shrink-0 w-16 h-24 object-cover rounded shadow-md ring-1 ring-slate-200 dark:ring-slate-700"
           />
-          <div class="min-w-0">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              Book Ready to Save
-            </h2>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                Staged Book
+              </h2>
+              <div class="flex items-center gap-2">
+                <span
+                  v-if="stagedAt"
+                  class="text-xs text-slate-400 dark:text-slate-500"
+                >{{ stagedAt }}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 font-medium">
+                  {{ book.queuePosition }} of {{ book.totalQueued }}
+                </span>
+              </div>
+            </div>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 font-mono break-all">
-              {{ prompt.ircFilename }}
+              {{ book.ircFilename }}
             </p>
           </div>
         </div>
@@ -287,11 +284,11 @@ function cancel() {
                 <input
                   v-model="editSeries"
                   type="text"
-                  list="rename-series-suggestions"
+                  list="staged-series-suggestions"
                   placeholder="(none)"
                   class="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <datalist id="rename-series-suggestions">
+                <datalist id="staged-series-suggestions">
                   <option v-for="s in appStore.knownSeries" :key="s" :value="s" />
                 </datalist>
                 <div class="flex items-center gap-2">
@@ -345,7 +342,6 @@ function cancel() {
                       class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-medium"
                     >organized</span>
                   </div>
-                  <!-- Folder path visualization for organized options -->
                   <div v-if="opt.isOrganized" class="mt-1.5 flex items-center gap-1 flex-wrap text-[11px] font-mono">
                     <template v-for="(seg, si) in opt.preview.split('/')" :key="si">
                       <span
@@ -391,21 +387,21 @@ function cancel() {
             </div>
           </div>
 
-          <!-- Rewrite metadata toggle — only meaningful for EPUBs -->
+          <!-- Rewrite metadata toggle -->
           <div
-            v-if="prompt.ircFilename.toLowerCase().endsWith('.epub')"
+            v-if="book.ircFilename.toLowerCase().endsWith('.epub')"
             class="flex items-start gap-3 p-3 rounded-xl border transition-colors"
             :class="rewriteMetadata
               ? 'border-blue-400 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-950/20'
               : 'border-slate-200 dark:border-slate-700'"
           >
             <input
-              id="rewrite-toggle"
+              id="staged-rewrite-toggle"
               type="checkbox"
               v-model="rewriteMetadata"
               class="mt-0.5 accent-blue-500 shrink-0"
             />
-            <label for="rewrite-toggle" class="cursor-pointer">
+            <label for="staged-rewrite-toggle" class="cursor-pointer">
               <div class="text-sm font-medium text-slate-800 dark:text-slate-200">
                 Rewrite EPUB internal metadata
               </div>
@@ -427,25 +423,17 @@ function cancel() {
         <!-- Footer -->
         <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
           <button
-            @click="cancel"
-            class="px-4 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            @click="saveLater"
+            class="px-4 py-2 text-sm rounded-lg border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
           >
-            Keep IRC filename
+            Save Later
           </button>
-          <div class="flex items-center gap-3">
-            <button
-              @click="saveLater"
-              class="px-4 py-2 text-sm rounded-lg border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
-            >
-              Save Later
-            </button>
-            <button
-              @click="confirm"
-              class="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-            >
-              Save Book
-            </button>
-          </div>
+          <button
+            @click="confirm"
+            class="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+          >
+            Save Book
+          </button>
         </div>
       </div>
     </div>
@@ -457,17 +445,8 @@ function cancel() {
 .modal-leave-active {
   transition: opacity 0.2s ease;
 }
-.modal-enter-active .relative,
-.modal-leave-active .relative {
-  transition: transform 0.2s ease, opacity 0.2s ease;
-}
 .modal-enter-from,
 .modal-leave-to {
-  opacity: 0;
-}
-.modal-enter-from .relative,
-.modal-leave-to .relative {
-  transform: scale(0.96);
   opacity: 0;
 }
 </style>

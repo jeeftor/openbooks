@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/evan-buss/openbooks/irc"
 	"github.com/google/uuid"
 )
 
@@ -97,10 +96,7 @@ func TestGenerateUniqueUsernameAddsSuffixForActiveCollision(t *testing.T) {
 	otherID := uuid.MustParse("ecaaf931-90a9-4c16-8311-1337ccca25b7")
 	baseName := guestNameFromUUID(userID)
 	server := New(Config{})
-	server.clients[otherID] = &Client{
-		uuid: otherID,
-		irc:  irc.New(baseName, "test"),
-	}
+	server.sessions[otherID] = &session{username: baseName}
 
 	got := server.generateUniqueUsername(userID)
 	if got == baseName {
@@ -120,10 +116,7 @@ func TestGenerateUniqueUsernameAllowsSameUUIDReconnectToReuseBaseName(t *testing
 	userID := uuid.MustParse("1f7f30f0-6076-439e-8d4d-439744894caf")
 	baseName := guestNameFromUUID(userID)
 	server := New(Config{})
-	server.clients[userID] = &Client{
-		uuid: userID,
-		irc:  irc.New(baseName, "test"),
-	}
+	server.sessions[userID] = &session{username: baseName}
 
 	got := server.generateUniqueUsername(userID)
 	if got != baseName {
@@ -148,10 +141,7 @@ func TestGenerateUniqueUsernameKeepsManyActiveClientsUnique(t *testing.T) {
 		}
 
 		seen[username] = struct{}{}
-		server.clients[userID] = &Client{
-			uuid: userID,
-			irc:  irc.New(username, "test"),
-		}
+		server.sessions[userID] = &session{username: username}
 	}
 }
 

@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse } from "../types/messages";
+import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse, StagedBookResumeResponse } from "../types/messages";
 
 type LibrarySortMode = "newest" | "alpha";
 
@@ -33,6 +33,15 @@ export const useAppStore = defineStore("app", () => {
 
   // Phase of the currently-active (first in queue) download after the DCC offer is accepted.
   const downloadPhase = ref<"transferring" | "cleaning" | null>(null);
+
+  // Number of books waiting in staging (from STAGED_BOOKS_NOTIFY).
+  const stagedBooksCount = ref(0);
+
+  // The staged book currently being processed (from STAGED_BOOK_RESUME).
+  const pendingStagedBook = ref<StagedBookResumeResponse | null>(null);
+
+  // Known series names for autocomplete (from SERIES_AUTOCOMPLETE).
+  const knownSeries = ref<string[]>([]);
 
   function setConnected(connected: boolean) {
     isConnected.value = connected;
@@ -81,6 +90,18 @@ export const useAppStore = defineStore("app", () => {
     downloadPhase.value = phase;
   }
 
+  function setStagedBooksCount(count: number) {
+    stagedBooksCount.value = count;
+  }
+
+  function setPendingStagedBook(book: StagedBookResumeResponse | null) {
+    pendingStagedBook.value = book;
+  }
+
+  function setKnownSeries(series: string[]) {
+    knownSeries.value = series;
+  }
+
   function toggleLibrarySortMode() {
     librarySortMode.value = librarySortMode.value === "newest" ? "alpha" : "newest";
   }
@@ -103,6 +124,9 @@ export const useAppStore = defineStore("app", () => {
     downloadPhase,
     libraryVersion,
     librarySortMode,
+    stagedBooksCount,
+    pendingStagedBook,
+    knownSeries,
     setConnected,
     setConnecting,
     setUsername,
@@ -113,6 +137,9 @@ export const useAppStore = defineStore("app", () => {
     removeInFlightDownload,
     setDownloadPhase,
     toggleLibrarySortMode,
-    isDownloading
+    isDownloading,
+    setStagedBooksCount,
+    setPendingStagedBook,
+    setKnownSeries
   };
 });

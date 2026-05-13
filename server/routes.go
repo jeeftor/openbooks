@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/evan-buss/openbooks/irc"
 	"io/fs"
 	"log"
 	"net/http"
@@ -76,18 +75,20 @@ func (server *server) serveWs() http.HandlerFunc {
 			return
 		}
 
-		uniqueUsername := server.generateUniqueUsername(userId)
+		// Get or create the persistent IRC session for this browser UUID.
+		sess := server.getOrCreateSession(userId)
+
 		client := &Client{
 			conn:          conn,
 			send:          make(chan interface{}, 128),
 			uuid:          userId,
-			irc:           irc.New(uniqueUsername, server.config.UserAgent),
-			log:           log.New(os.Stdout, fmt.Sprintf("CLIENT (%s): ", uniqueUsername), log.LstdFlags|log.Lmsgprefix),
+			username:      sess.username,
+			log:           log.New(os.Stdout, fmt.Sprintf("CLIENT (%s): ", sess.username), log.LstdFlags|log.Lmsgprefix),
 			ctx:           context.Background(),
-			downloadQueue: make(chan downloadJob, 50),
-			downloadDone:  make(chan struct{}, 1),
 			renameConfirm: make(chan RenameChoice, 1),
 		}
+
+		sess.attachClient(client)
 
 		server.log.Printf("Client connected from %s\n", conn.RemoteAddr().String())
 		client.log.Println("New client created.")
@@ -99,14 +100,23 @@ func (server *server) serveWs() http.HandlerFunc {
 	}
 }
 
+// generateUniqueUsername generates a unique IRC username for the given user ID.
+// Used only in tests — production code uses generateUniqueUsernameUnsafe under sessionsMu.
 func (server *server) generateUniqueUsername(userID uuid.UUID) string {
+	server.sessionsMu.Lock()
+	defer server.sessionsMu.Unlock()
+	return server.generateUniqueUsernameUnsafe(userID)
+}
+
+// generateUniqueUsernameUnsafe must be called with sessionsMu held.
+func (server *server) generateUniqueUsernameUnsafe(userID uuid.UUID) string {
 	baseUsername := strings.TrimSpace(server.config.UserName)
 	if baseUsername != "" {
 		return server.uniqueUsernameWithSuffix(userID, baseUsername)
 	}
 
 	baseUsername = guestNameFromUUID(userID)
-	if !server.usernameInUseByAnotherClient(baseUsername, userID) {
+	if !server.usernameInUseByAnotherSession(baseUsername, userID) {
 		return baseUsername
 	}
 
@@ -116,22 +126,35 @@ func (server *server) generateUniqueUsername(userID uuid.UUID) string {
 func (server *server) uniqueUsernameWithSuffix(userID uuid.UUID, baseUsername string) string {
 	suffix := guestNameCollisionSuffix(userID)
 	username := usernameWithSuffix(baseUsername, suffix)
-	if !server.usernameInUseByAnotherClient(username, userID) {
+	if !server.usernameInUseByAnotherSession(username, userID) {
 		return username
 	}
 
 	for {
 		suffix = uuid.New().String()[:guestNameSuffixLength]
 		username = usernameWithSuffix(baseUsername, suffix)
-		if !server.usernameInUseByAnotherClient(username, userID) {
+		if !server.usernameInUseByAnotherSession(username, userID) {
 			return username
 		}
 	}
 }
 
+// usernameInUseByAnotherSession checks whether a username is already taken by a
+// different session. Must be called with sessionsMu held (or from generateUniqueUsername
+// which acquires it).
+func (server *server) usernameInUseByAnotherSession(username string, userID uuid.UUID) bool {
+	for sessID, sess := range server.sessions {
+		if sessID != userID && sess.username == username {
+			return true
+		}
+	}
+	return false
+}
+
+// usernameInUseByAnotherClient is kept for test compatibility; checks client map.
 func (server *server) usernameInUseByAnotherClient(username string, userID uuid.UUID) bool {
 	for clientID, client := range server.clients {
-		if clientID != userID && client.irc.Username == username {
+		if clientID != userID && client.username == username {
 			return true
 		}
 	}
@@ -162,7 +185,7 @@ func (server *server) statsHandler() http.HandlerFunc {
 		for _, client := range server.clients {
 			details := statsReponse{
 				UUID: client.uuid.String(),
-				Name: client.irc.Username,
+				Name: client.username,
 				IP:   client.conn.RemoteAddr().String(),
 			}
 

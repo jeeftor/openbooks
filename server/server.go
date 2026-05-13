@@ -23,14 +23,22 @@ type server struct {
 	// Shared data
 	repository *Repository
 
-	// Registered clients.
+	// Registered clients (active WebSocket connections).
 	clients map[uuid.UUID]*Client
+
+	// IRC sessions keyed by browser UUID — persist beyond WebSocket disconnects
+	// so downloads continue in the background.
+	sessions   map[uuid.UUID]*session
+	sessionsMu sync.RWMutex
 
 	// Register requests from the clients.
 	register chan *Client
 
 	// Unregister requests from clients.
 	unregister chan *Client
+
+	// broadcastCh sends a message to all currently connected clients.
+	broadcastCh chan interface{}
 
 	log *log.Logger
 
@@ -45,6 +53,12 @@ type server struct {
 
 	// The time the last search was performed. Used to rate limit searches.
 	lastSearch time.Time
+
+	// stagedBooks persists books that have been downloaded but not yet renamed.
+	stagedBooks *StagedBookStore
+
+	// seriesRegistry tracks known series names for autocomplete.
+	seriesRegistry *SeriesRegistry
 }
 
 // Config contains settings for server
@@ -70,13 +84,15 @@ type Config struct {
 
 func New(config Config) *server {
 	return &server{
-		repository: NewRepository(),
-		config:     &config,
-		logBuf:     newLogBuffer(500),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		clients:    make(map[uuid.UUID]*Client),
-		log:        log.New(os.Stdout, "SERVER: ", log.LstdFlags|log.Lmsgprefix),
+		repository:  NewRepository(),
+		config:      &config,
+		logBuf:      newLogBuffer(500),
+		register:    make(chan *Client),
+		unregister:  make(chan *Client),
+		broadcastCh: make(chan interface{}, 32),
+		clients:     make(map[uuid.UUID]*Client),
+		sessions:    make(map[uuid.UUID]*session),
+		log:         log.New(os.Stdout, "SERVER: ", log.LstdFlags|log.Lmsgprefix),
 		updateChecker: newGitHubUpdateChecker(log.New(
 			os.Stdout,
 			"UPDATE: ",
@@ -85,9 +101,49 @@ func New(config Config) *server {
 	}
 }
 
+// initStores initialises the staged book store and series registry.
+// Called from Start() after the books directory is guaranteed to exist.
+func (server *server) initStores() {
+	store, err := newStagedBookStore(server.config.DownloadDir)
+	if err != nil {
+		server.log.Fatalf("staged store init: %v", err)
+	}
+	server.stagedBooks = store
+	server.seriesRegistry = newSeriesRegistry(server.config.DownloadDir)
+}
+
+// broadcastStagedCount sends the current staged books count to all connected clients.
+func (server *server) broadcastStagedCount() {
+	select {
+	case server.broadcastCh <- newStagedBooksNotifyResponse(server.stagedBooks.Count()):
+	default:
+	}
+}
+
+// getOrCreateSession returns the IRC session for the given user UUID, creating one if needed.
+func (server *server) getOrCreateSession(userID uuid.UUID) *session {
+	server.sessionsMu.Lock()
+	defer server.sessionsMu.Unlock()
+	if sess, ok := server.sessions[userID]; ok {
+		return sess
+	}
+	username := server.generateUniqueUsernameUnsafe(userID)
+	sess := newSession(username, server.config.UserAgent)
+	server.sessions[userID] = sess
+	return sess
+}
+
+// getSession returns the IRC session for the given user UUID, or nil.
+func (server *server) getSession(userID uuid.UUID) *session {
+	server.sessionsMu.RLock()
+	defer server.sessionsMu.RUnlock()
+	return server.sessions[userID]
+}
+
 // Start instantiates the web server and opens the browser
 func Start(config Config) {
 	createBooksDirectory(config)
+
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
@@ -106,6 +162,7 @@ func Start(config Config) {
 	router.Use(cors.New(corsConfig).Handler)
 
 	server := New(config)
+	server.initStores()
 	routes := server.registerRoutes()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -140,7 +197,7 @@ func (server *server) startClientHub(ctx context.Context) {
 			if old, exists := server.clients[client.uuid]; exists {
 				old.conn.Close() // causes readPump ReadJSON to fail → defer fires
 				close(old.send)  // causes writePump to exit cleanly
-				server.log.Printf("Replaced stale connection for %s\n", old.irc.Username)
+				server.log.Printf("Replaced stale connection for %s\n", old.username)
 			}
 			server.clients[client.uuid] = client
 		case client := <-server.unregister:
@@ -151,6 +208,10 @@ func (server *server) startClientHub(ctx context.Context) {
 				close(client.send)
 				cancel()
 				delete(server.clients, client.uuid)
+			}
+		case msg := <-server.broadcastCh:
+			for _, client := range server.clients {
+				safeSend(client, msg)
 			}
 		case <-ctx.Done():
 			for _, client := range server.clients {
