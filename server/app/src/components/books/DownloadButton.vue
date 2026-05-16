@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { DownloadCloud, Loader, Clock, Sparkles } from "lucide-vue-next";
 import { useAppStore } from "../../stores/app";
 import { sendMessage } from "../../composables/useWebSocket";
@@ -14,14 +14,12 @@ const props = defineProps<{
 
 const appStore = useAppStore();
 
-// Track clicked state per book identity so state doesn't bleed across books
-// when the virtual list reuses the same component instance for a different row.
-const clickedBooks = ref(new Set<string>());
-const clicked = computed(() => clickedBooks.value.has(props.book));
+// clicked is derived from the store's session-scoped set so it persists
+// across filter changes and virtual-list instance recycling.
+const clicked = computed(() => appStore.clickedDownloads.has(props.book));
 
 function handleDownload() {
   if (clicked.value) return;
-  clickedBooks.value.add(props.book);
   appStore.addInFlightDownload(props.book);
   sendMessage({
     type: MessageType.DOWNLOAD,

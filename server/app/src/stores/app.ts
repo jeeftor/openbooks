@@ -11,6 +11,11 @@ export const useAppStore = defineStore("app", () => {
   const isSidebarOpen = useLocalStorage("ob-sidebar-open", true);
   const username = ref<string | undefined>(undefined);
   const inFlightDownloads = ref<string[]>([]);
+
+  // Session-scoped set of book IRC strings the user has clicked Download on.
+  // Persists across filter changes so a book doesn't revert to "Download"
+  // when you switch filters and come back.
+  const clickedDownloads = ref(new Set<string>());
   const libraryVersion = ref(0);
   const rawSearchResults = ref<Record<number, string>>({});
   const librarySortMode = useLocalStorage<LibrarySortMode>("ob-library-sort", "newest");
@@ -78,6 +83,7 @@ export const useAppStore = defineStore("app", () => {
 
   function addInFlightDownload(book: string) {
     inFlightDownloads.value.push(book);
+    clickedDownloads.value.add(book);
   }
 
   function removeInFlightDownload() {
@@ -137,6 +143,7 @@ export const useAppStore = defineStore("app", () => {
     removeInFlightDownload,
     setDownloadPhase,
     toggleLibrarySortMode,
+    clickedDownloads,
     isDownloading,
     setStagedBooksCount,
     setPendingStagedBook,
