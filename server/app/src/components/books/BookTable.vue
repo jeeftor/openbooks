@@ -559,7 +559,7 @@ function toggleFormat(fmt: string) {
 
           <tr
             v-for="vItem in virtualItems"
-            :key="String(vItem.key)"
+            :key="displayBooks[vItem.index]?.full ?? String(vItem.key)"
             class="border-b border-slate-100 dark:border-slate-800/60 h-12 transition-all"
             :class="[
               isMatched(vItem.index)

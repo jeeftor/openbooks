@@ -114,7 +114,7 @@ watch(
       <div :style="{ height: virtualizer.getTotalSize() + 'px', position: 'relative' }">
         <div
           v-for="vItem in virtualizer.getVirtualItems()"
-          :key="String(vItem.key)"
+          :key="displayBooks[vItem.index]?.full ?? String(vItem.key)"
           :style="{
             position: 'absolute',
             top: 0, left: 0, right: 0,
@@ -154,6 +154,7 @@ watch(
             <!-- Download (only for matched items) -->
             <DownloadButton
               v-if="!(prefStore.showUnmatched && vItem.index >= matchedBooks.length)"
+              :key="displayBooks[vItem.index]?.full ?? String(vItem.key)"
               :book="displayBooks[vItem.index]?.full ?? ''"
               :author="displayBooks[vItem.index]?.author ?? ''"
               :title="displayBooks[vItem.index]?.title ?? ''"
