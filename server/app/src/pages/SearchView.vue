@@ -37,6 +37,13 @@ const rawResults = computed(() => {
   return timestamp ? appStore.rawSearchResults[timestamp] : undefined;
 });
 const errorMode = computed(() => showErrors.value && !!appStore.activeItem);
+const isShowingCachedResults = computed(() => {
+  const ts = appStore.activeItem?.timestamp;
+  return !isSearching.value
+    && ts !== undefined
+    && appStore.activeItem?.results !== undefined
+    && historyStore.getCachedResults(ts) !== undefined;
+});
 const validInput = computed(() => {
   if (!appStore.isConnected) return false;
   return errorMode.value ? query.value.startsWith("!") : query.value.trim() !== "";
@@ -113,8 +120,10 @@ function issueSearch(q: string) {
 }
 
 function retrySearch() {
-  if (appStore.activeItem?.query) {
-    issueSearch(appStore.activeItem.query);
+  const active = appStore.activeItem;
+  if (active?.query) {
+    historyStore.clearCachedResults(active.timestamp);
+    issueSearch(active.query);
   }
 }
 
@@ -344,13 +353,22 @@ function handleSearch(e: Event) {
         </div>
       </div>
 
-      <!-- Always mount the table once results have arrived -->
-      <BookCards
-        v-else-if="isMobile"
-        :books="appStore.activeItem.results" />
-      <BookTable
-        v-else
-        :books="appStore.activeItem.results" />
+      <!-- Cached results banner + table -->
+      <template v-if="appStore.activeItem && appStore.activeItem.results !== undefined">
+        <div
+          v-if="isShowingCachedResults && appStore.isConnected"
+          class="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
+          <span>Showing saved results from a previous search.</span>
+          <button
+            class="flex items-center gap-1 font-medium px-2.5 py-1 rounded border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+            @click="retrySearch">
+            <RefreshCw :size="11" />
+            Search again
+          </button>
+        </div>
+        <BookCards v-if="isMobile" :books="appStore.activeItem.results" />
+        <BookTable v-else :books="appStore.activeItem.results" />
+      </template>
     </div>
   </div>
 </template>

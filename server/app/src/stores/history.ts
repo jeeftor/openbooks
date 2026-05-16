@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
+import { ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import type { HistoryItem } from "../types/messages";
+import type { BookDetail, HistoryItem, ParseError } from "../types/messages";
 import { useAppStore } from "./app";
 
 // Strip heavy result/error arrays before writing to localStorage.
@@ -9,8 +10,16 @@ function slim(item: HistoryItem): HistoryItem {
   return { query: item.query, timestamp: item.timestamp, timedOut: item.timedOut };
 }
 
+interface CachedResults {
+  results: BookDetail[];
+  errors: ParseError[];
+}
+
 export const useHistoryStore = defineStore("history", () => {
   const items = useLocalStorage<HistoryItem[]>("ob-history", []);
+
+  // In-memory cache of results keyed by timestamp. Never persisted.
+  const resultsCache = ref<Map<number, CachedResults>>(new Map());
 
   function addItem(item: HistoryItem) {
     items.value = [slim(item), ...items.value].slice(0, 16);
@@ -23,6 +32,27 @@ export const useHistoryStore = defineStore("history", () => {
       copy[idx] = slim(updated);
       items.value = copy;
     }
+    // Keep in-memory cache up to date when results arrive.
+    if (updated.results !== undefined) {
+      resultsCache.value = new Map(resultsCache.value).set(updated.timestamp, {
+        results: updated.results,
+        errors: updated.errors ?? [],
+      });
+    }
+  }
+
+  function cacheResults(timestamp: number, results: BookDetail[], errors: ParseError[]) {
+    resultsCache.value = new Map(resultsCache.value).set(timestamp, { results, errors });
+  }
+
+  function clearCachedResults(timestamp: number) {
+    const next = new Map(resultsCache.value);
+    next.delete(timestamp);
+    resultsCache.value = next;
+  }
+
+  function getCachedResults(timestamp: number): CachedResults | undefined {
+    return resultsCache.value.get(timestamp);
   }
 
   function deleteItem(timestamp?: number) {
@@ -32,6 +62,7 @@ export const useHistoryStore = defineStore("history", () => {
       const first = items.value[0]?.timestamp;
       if (first !== undefined) {
         items.value = items.value.filter((x) => x.timestamp !== first);
+        clearCachedResults(first);
       }
       return;
     }
@@ -39,12 +70,28 @@ export const useHistoryStore = defineStore("history", () => {
       appStore.setActiveItem(null);
     }
     items.value = items.value.filter((x) => x.timestamp !== timestamp);
+    clearCachedResults(timestamp);
   }
 
   function restoreItem(item: HistoryItem) {
     const appStore = useAppStore();
-    appStore.setActiveItem(item);
+    const cached = resultsCache.value.get(item.timestamp);
+    if (cached) {
+      appStore.setActiveItem({ ...item, results: cached.results, errors: cached.errors });
+    } else {
+      appStore.setActiveItem(item);
+    }
   }
 
-  return { items, addItem, updateItem, deleteItem, restoreItem };
+  return {
+    items,
+    resultsCache,
+    addItem,
+    updateItem,
+    cacheResults,
+    clearCachedResults,
+    getCachedResults,
+    restoreItem,
+    deleteItem,
+  };
 });

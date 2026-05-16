@@ -25,9 +25,9 @@ function isToday(timestamp: number) {
 }
 
 function select(item: HistoryItem) {
-  // If the item has cached results and didn't time out, just show them.
-  // Otherwise re-issue the search.
-  if (item.results !== undefined && !item.timedOut) {
+  // If we have cached in-memory results (this session), show them immediately.
+  // Otherwise re-issue the search (page reload or first time).
+  if (historyStore.getCachedResults(item.timestamp)) {
     historyStore.restoreItem(item);
   } else {
     appStore.pendingQuery = item.query;
