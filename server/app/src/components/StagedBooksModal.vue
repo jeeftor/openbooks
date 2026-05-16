@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useSessionStorage } from "@vueuse/core";
 import { BookMarked } from "lucide-vue-next";
 import { useAppStore } from "../stores/app";
 import { MessageType } from "../types/messages";
 import { sendMessage } from "../composables/useWebSocket";
 
 const appStore = useAppStore();
-const dismissed = ref(false);
+// Persist dismissed in sessionStorage so a page reload doesn't re-show the modal,
+// but a new tab or server restart will show it again.
+const dismissed = useSessionStorage("ob-staged-dismissed", false);
 
-// Reset dismissed state whenever staged count increases (new books arrived).
+// Reset dismissed whenever new books arrive (count increased).
 watch(
   () => appStore.stagedBooksCount,
   (count, prev) => {

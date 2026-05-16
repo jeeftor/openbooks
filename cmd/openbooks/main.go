@@ -55,7 +55,7 @@ func init() {
 	downloadDir := filepath.Join(homeDir, "Downloads")
 
 	desktopCmd.Flags().StringVarP(&desktopConfig.Port, "port", "p", "5228", "Set the local network port for browser mode.")
-	desktopCmd.Flags().IntP("rate-limit", "r", 10, "The number of seconds to wait between searches to reduce strain on IRC search servers. Minimum is 10 seconds.")
+	desktopCmd.Flags().IntP("rate-limit", "r", 30, "The number of seconds to wait between searches to reduce strain on IRC search servers. Minimum is 10 seconds.")
 	desktopCmd.Flags().StringVarP(&desktopConfig.DownloadDir, "dir", "d", downloadDir, "The directory where eBooks are saved.")
 }
 

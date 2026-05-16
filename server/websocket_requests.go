@@ -86,6 +86,10 @@ func (c *Client) startIrcConnection(server *server) {
 			c.log.Println(err)
 			server.logBuf.error(fmt.Sprintf("IRC connect failed: %v", err))
 			safeSend(c, newErrorResponse("Unable to connect to IRC server."))
+			// Still notify about any staged books — they're available regardless of IRC.
+			if count := server.stagedBooks.Count(); count > 0 {
+				safeSend(c, newStagedBooksNotifyResponse(count))
+			}
 			return
 		}
 

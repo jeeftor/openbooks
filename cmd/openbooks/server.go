@@ -19,7 +19,7 @@ func init() {
 	desktopCmd.AddCommand(serverCmd)
 
 	serverCmd.Flags().StringVarP(&serverConfig.Port, "port", "p", "5228", "Set the local network port for browser mode.")
-	serverCmd.Flags().IntP("rate-limit", "r", 10, "The number of seconds to wait between searches to reduce strain on IRC search servers. Minimum is 10 seconds.")
+	serverCmd.Flags().IntP("rate-limit", "r", 30, "The number of seconds to wait between searches to reduce strain on IRC search servers. Minimum is 10 seconds.")
 	serverCmd.Flags().StringVar(&serverConfig.Basepath, "basepath", "/", `Base path where the application is accessible. For example "/openbooks-abs/".`)
 	serverCmd.Flags().BoolVarP(&openBrowser, "browser", "b", false, "Open the browser on server start.")
 	serverCmd.Flags().StringVarP(&serverConfig.DownloadDir, "dir", "d", filepath.Join(os.TempDir(), "openbooks-abs"), "The directory where eBooks are saved.")
