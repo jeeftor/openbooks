@@ -19,10 +19,8 @@ const isMobile = useMediaQuery("(max-width: 767px)");
 
 const query = ref("");
 const showErrors = ref(false);
+const isSearching = ref(false);
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-let searchProgressInterval: ReturnType<typeof setInterval> | null = null;
-const searchStartTime = ref<number | null>(null);
-const searchProgress = ref(0); // 0-100
 
 const hasErrors = computed(
   () => (appStore.activeItem?.errors?.length ?? 0) > 0
@@ -64,26 +62,22 @@ watch(
   }
 );
 
-// Watch for results arriving to clear the timeout
+// Watch for results arriving to clear the searching state
 watch(
   () => appStore.activeItem?.results,
   (results) => {
-    if (results !== undefined && searchTimeout) {
-      clearTimeout(searchTimeout);
-      searchTimeout = null;
-    }
-    if (results !== undefined && searchProgressInterval) {
-      clearInterval(searchProgressInterval);
-      searchProgressInterval = null;
-      searchStartTime.value = null;
-      searchProgress.value = 0;
+    if (results !== undefined) {
+      isSearching.value = false;
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+      }
     }
   }
 );
 
 onUnmounted(() => {
   if (searchTimeout) clearTimeout(searchTimeout);
-  if (searchProgressInterval) clearInterval(searchProgressInterval);
 });
 
 function issueSearch(q: string) {
@@ -91,17 +85,7 @@ function issueSearch(q: string) {
   appStore.setActiveItem({ query: q, timestamp });
   historyStore.addItem({ query: q, timestamp });
   sendMessage({ type: MessageType.SEARCH, payload: { query: q } });
-
-  // Start countdown progress bar
-  searchStartTime.value = Date.now();
-  searchProgress.value = 0;
-  if (searchProgressInterval) clearInterval(searchProgressInterval);
-  searchProgressInterval = setInterval(() => {
-    if (searchStartTime.value) {
-      const elapsed = Date.now() - searchStartTime.value;
-      searchProgress.value = Math.min((elapsed / 60000) * 100, 100);
-    }
-  }, 100);
+  isSearching.value = true;
 
   // Set a 60s timeout — if no results arrive, mark as failed
   if (searchTimeout) clearTimeout(searchTimeout);
@@ -112,13 +96,8 @@ function issueSearch(q: string) {
       appStore.setActiveItem(timedOut);
       historyStore.updateItem(timedOut);
     }
+    isSearching.value = false;
     searchTimeout = null;
-    if (searchProgressInterval) {
-      clearInterval(searchProgressInterval);
-      searchProgressInterval = null;
-    }
-    searchStartTime.value = null;
-    searchProgress.value = 0;
   }, 60000);
 }
 
@@ -210,7 +189,7 @@ function handleSearch(e: Event) {
                   ? 'Enter download command (starts with !)'
                   : 'Search for a book…'
               "
-              :disabled="!appStore.isConnected || (appStore.activeItem !== null && !appStore.activeItem.results)"
+              :disabled="!appStore.isConnected"
               class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-50 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition" />
           </div>
           <button
@@ -229,7 +208,12 @@ function handleSearch(e: Event) {
 
       <!-- Result stats bar / connection indicator -->
       <div class="mt-1.5 flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
-        <template v-if="appStore.activeItem?.results">
+        <!-- Non-blocking searching indicator -->
+        <template v-if="isSearching && !appStore.activeItem?.results">
+          <Loader :size="11" class="animate-spin text-brand-400 flex-shrink-0" />
+          <span class="text-brand-400">Searching for &ldquo;{{ appStore.activeItem?.query }}&rdquo;&hellip;</span>
+        </template>
+        <template v-else-if="appStore.activeItem?.results">
           <span class="tabular-nums">{{ resultCount.toLocaleString() }} results</span>
           <span
             v-if="onlineCount > 0"
@@ -301,30 +285,8 @@ function handleSearch(e: Event) {
 
       <EmptyState v-else-if="!appStore.activeItem" />
 
-      <!-- Loading while waiting for search results -->
-      <div
-        v-else-if="
-          appStore.activeItem && appStore.activeItem.results === undefined
-        "
-        class="h-full flex items-center justify-center">
-        <div class="flex flex-col items-center gap-4 max-w-sm w-full px-4">
-          <Loader :size="28" class="animate-spin text-brand-400" />
-          <p class="text-sm text-slate-500 dark:text-slate-400 text-center">
-            Searching for &ldquo;{{ appStore.activeItem.query }}&rdquo;&hellip;
-          </p>
-          <!-- Progress bar -->
-          <div class="w-full">
-            <div class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-              <div
-                class="h-full bg-brand-400 transition-all duration-100 ease-linear"
-                :style="{ width: searchProgress + '%' }" />
-            </div>
-            <p class="text-xs text-slate-400 dark:text-slate-500 text-center mt-1.5">
-              {{ Math.ceil((60000 - (searchProgress / 100 * 60000)) / 1000) }}s remaining
-            </p>
-          </div>
-        </div>
-      </div>
+      <!-- Show empty state while waiting for first search results -->
+      <EmptyState v-else-if="appStore.activeItem && appStore.activeItem.results === undefined" />
 
       <!-- Timeout state -->
       <div
