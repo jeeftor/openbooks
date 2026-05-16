@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v3.0.18 - 2026-05-15
+
+### Added
+
+- **Staged books list view:** "Process Now" now opens a scrollable pick-list of all staged books (cover, title, author, IRC filename, staged time) instead of auto-queuing them one-by-one.
+- Each staged book row has a **Delete** button with an inline confirmation, permanently removing the file from disk and the staging registry.
+- Clicking **Save →** on a row opens the rename modal for just that one book; after saving, you return to the updated list.
+- Closing the list (backdrop click or X) leaves all books staged for later.
+- New backend message types: `GET_STAGED_LIST`, `STAGED_BOOKS_LIST`, `PROCESS_ONE_STAGED`.
+
+### Changed
+
+- `StagedRenameModal` backdrop click now triggers **Save Later** instead of silently dismissing.
+- Delete option removed from the rename modal footer — it now lives exclusively on the list view where context is clearer.
+
 ## v3.0.15 - 2026-05-15
 
 ### Changed
