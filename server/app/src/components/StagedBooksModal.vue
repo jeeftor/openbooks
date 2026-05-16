@@ -21,7 +21,7 @@ watch(
 
 function processNow() {
   dismissed.value = true;
-  sendMessage({ type: MessageType.PROCESS_STAGED_BOOKS });
+  sendMessage({ type: MessageType.GET_STAGED_LIST });
 }
 </script>
 

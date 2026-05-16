@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse, StagedBookResumeResponse } from "../types/messages";
+import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse, StagedBookResumeResponse, StagedBookSummary } from "../types/messages";
 
 type LibrarySortMode = "newest" | "alpha";
 
@@ -44,6 +44,7 @@ export const useAppStore = defineStore("app", () => {
 
   // The staged book currently being processed (from STAGED_BOOK_RESUME).
   const pendingStagedBook = ref<StagedBookResumeResponse | null>(null);
+  const stagedBooksList = ref<StagedBookSummary[] | null>(null); // null = list closed
 
   // Known series names for autocomplete (from SERIES_AUTOCOMPLETE).
   const knownSeries = ref<string[]>([]);
@@ -104,6 +105,10 @@ export const useAppStore = defineStore("app", () => {
     pendingStagedBook.value = book;
   }
 
+  function setStagedBooksList(books: StagedBookSummary[] | null) {
+    stagedBooksList.value = books;
+  }
+
   function setKnownSeries(series: string[]) {
     knownSeries.value = series;
   }
@@ -132,6 +137,7 @@ export const useAppStore = defineStore("app", () => {
     librarySortMode,
     stagedBooksCount,
     pendingStagedBook,
+    stagedBooksList,
     knownSeries,
     setConnected,
     setConnecting,
@@ -147,6 +153,7 @@ export const useAppStore = defineStore("app", () => {
     isDownloading,
     setStagedBooksCount,
     setPendingStagedBook,
+    setStagedBooksList,
     setKnownSeries
   };
 });

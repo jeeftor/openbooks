@@ -28,6 +28,9 @@ func (server *server) routeMessage(message Request, c *Client) {
 	case PROCESS_STAGED_BOOKS:
 		go c.handleProcessStagedBooks(server)
 		return
+	case GET_STAGED_LIST:
+		c.handleGetStagedList(server)
+		return
 	}
 
 	switch message.MessageType {
@@ -41,6 +44,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 		obj = new(StageQueueLaterRequest)
 	case DELETE_STAGED:
 		obj = new(DeleteStagedRequest)
+	case PROCESS_ONE_STAGED:
+		obj = new(ProcessOneStagedRequest)
 	default:
 		server.log.Println("Unknown request type received.")
 		return
@@ -67,6 +72,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 		c.handleStageQueueLater(obj.(*StageQueueLaterRequest))
 	case DELETE_STAGED:
 		c.handleDeleteStaged(obj.(*DeleteStagedRequest), server)
+	case PROCESS_ONE_STAGED:
+		go c.handleProcessOneStaged(obj.(*ProcessOneStagedRequest), server)
 	}
 }
 
@@ -212,6 +219,90 @@ func (c *Client) handleRenameConfirm(req *RenameConfirmRequest, server *server) 
 	default:
 		c.log.Println("handleRenameConfirm: no pending rename awaiting confirmation")
 	}
+}
+
+// handleGetStagedList sends the full list of staged books to the client.
+func (c *Client) handleGetStagedList(server *server) {
+	all := server.stagedBooks.All()
+	summaries := make([]StagedBookSummary, len(all))
+	for i, b := range all {
+		summaries[i] = StagedBookSummary{
+			ID:          b.ID,
+			IRCFilename: b.IRCFilename,
+			Metadata:    b.Metadata,
+			CoverBase64: b.CoverBase64,
+			CoverMime:   b.CoverMime,
+			StagedAt:    b.StagedAt.Format("2006-01-02T15:04:05Z"),
+		}
+	}
+	safeSend(c, StagedBooksListResponse{
+		StatusResponse: StatusResponse{
+			MessageType:      STAGED_BOOKS_LIST,
+			NotificationType: NOTIFY,
+		},
+		Books: summaries,
+	})
+}
+
+// handleProcessOneStaged sends a STAGED_BOOK_RESUME for a single specific book,
+// then waits for the user's rename decision and processes it.
+func (c *Client) handleProcessOneStaged(req *ProcessOneStagedRequest, server *server) {
+	staged, ok := server.stagedBooks.Get(req.StagedID)
+	if !ok {
+		safeSend(c, newErrorResponse("Staged book not found."))
+		return
+	}
+	safeSend(c, StagedBookResumeResponse{
+		StatusResponse: StatusResponse{
+			MessageType:      STAGED_BOOK_RESUME,
+			NotificationType: NOTIFY,
+			Title:            "How would you like to save this book?",
+		},
+		StagedID:      staged.ID,
+		IRCFilename:   staged.IRCFilename,
+		Metadata:      staged.Metadata,
+		Options:       staged.Options,
+		ReplaceSpace:  staged.ReplaceSpace,
+		CoverBase64:   staged.CoverBase64,
+		CoverMime:     staged.CoverMime,
+		StagedAt:      staged.StagedAt,
+		QueuePosition: 1,
+		TotalQueued:   1,
+	})
+
+	var choice RenameChoice
+	select {
+	case choice = <-c.renameConfirm:
+	case <-time.After(30 * time.Minute):
+		return
+	case <-c.ctx.Done():
+		return
+	}
+
+	if choice.OptionID == "queue_later" {
+		safeSend(c, newStatusResponse(NOTIFY, "Book saved for later."))
+		return
+	}
+
+	finalPath := resolveFinalPath(server.config.DownloadDir, choice, staged.IRCFilename, staged.Metadata, staged.ReplaceSpace)
+	if err := moveFile(staged.StagedPath, finalPath); err != nil {
+		safeSend(c, newErrorResponse(fmt.Sprintf("Move failed: %v", err)))
+		return
+	}
+
+	if choice.RewriteMetadata {
+		if err := RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+			c.log.Printf("RewriteEPUBMetadata: %v", err)
+		}
+	}
+
+	if choice.Series != "" {
+		server.seriesRegistry.AddIfNew(choice.Series)
+	}
+
+	server.stagedBooks.Remove(staged.ID)
+	safeSend(c, newDownloadResponse(finalPath, server.config.DownloadDir))
+	server.broadcastStagedCount()
 }
 
 // handleDeleteStaged permanently deletes a staged file from disk and removes it from the registry.

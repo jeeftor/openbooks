@@ -9,6 +9,7 @@ import SearchView from "./pages/SearchView.vue";
 import NotificationDrawer from "./components/notifications/NotificationDrawer.vue";
 import RenameModal from "./components/RenameModal.vue";
 import StagedBooksModal from "./components/StagedBooksModal.vue";
+import StagedBooksListModal from "./components/StagedBooksListModal.vue";
 import StagedRenameModal from "./components/StagedRenameModal.vue";
 import DownloadWaitingBanner from "./components/DownloadWaitingBanner.vue";
 
@@ -31,6 +32,7 @@ const isMobile = useMediaQuery("(max-width: 767px)");
     <NotificationDrawer />
     <RenameModal />
     <StagedBooksModal />
+    <StagedBooksListModal />
     <StagedRenameModal />
     <DownloadWaitingBanner />
     <Toaster rich-colors position="top-center" />

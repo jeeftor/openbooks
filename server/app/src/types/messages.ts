@@ -21,7 +21,10 @@ export enum MessageType {
   STAGED_QUEUE_LATER,
   SERIES_AUTOCOMPLETE,
   PROCESS_STAGED_BOOKS,
-  DELETE_STAGED
+  DELETE_STAGED,
+  GET_STAGED_LIST,
+  STAGED_BOOKS_LIST,
+  PROCESS_ONE_STAGED
 }
 
 export interface AppNotification {
@@ -173,6 +176,19 @@ export interface StagedBookResumeResponse extends WsResponse {
 
 export interface SeriesAutocompleteResponse extends WsResponse {
   series: string[];
+}
+
+export interface StagedBookSummary {
+  id: string;
+  ircFilename: string;
+  metadata?: EPUBMetadata;
+  coverBase64?: string;
+  coverMime?: string;
+  stagedAt: string;
+}
+
+export interface StagedBooksListResponse extends WsResponse {
+  books: StagedBookSummary[];
 }
 
 export interface StageQueueLaterRequest {

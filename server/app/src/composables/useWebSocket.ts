@@ -11,6 +11,7 @@ import {
   type DownloadWaitingResponse,
   type StagedBooksNotifyResponse,
   type StagedBookResumeResponse,
+  type StagedBooksListResponse,
   type SeriesAutocompleteResponse,
   type AppNotification
 } from "../types/messages";
@@ -141,6 +142,9 @@ export function useWebSocket() {
       case MessageType.STAGED_BOOKS_NOTIFY:
         appStore.setStagedBooksCount((response as StagedBooksNotifyResponse).count);
         return;
+      case MessageType.STAGED_BOOKS_LIST:
+        appStore.setStagedBooksList((response as StagedBooksListResponse).books);
+        break;
       case MessageType.STAGED_BOOK_RESUME:
         appStore.setPendingStagedBook(response as StagedBookResumeResponse);
         return;

@@ -30,8 +30,11 @@ const (
 	STAGED_BOOK_RESUME   // server → client: one staged book ready to process (like RENAME_PROMPT but with stagedId + progress)
 	STAGED_QUEUE_LATER   // client → server: defer this rename back to staged store
 	SERIES_AUTOCOMPLETE  // server → client: list of known series names (sent on connect)
-	PROCESS_STAGED_BOOKS // client → server: start processing the staged books queue
+	PROCESS_STAGED_BOOKS // client → server: process all staged books sequentially (legacy)
 	DELETE_STAGED        // client → server: permanently delete a staged file
+	GET_STAGED_LIST      // client → server: request the full list of staged books
+	STAGED_BOOKS_LIST    // server → client: full list of staged books with metadata
+	PROCESS_ONE_STAGED   // client → server: process a single staged book by ID
 )
 
 type NotificationType int
@@ -134,6 +137,27 @@ type StageQueueLaterRequest struct {
 // DeleteStagedRequest is sent by the client to permanently delete a staged file.
 type DeleteStagedRequest struct {
 	StagedID string `json:"stagedId"`
+}
+
+// ProcessOneStagedRequest asks the server to send STAGED_BOOK_RESUME for one specific book.
+type ProcessOneStagedRequest struct {
+	StagedID string `json:"stagedId"`
+}
+
+// StagedBookSummary is a lightweight entry in the staged books list.
+type StagedBookSummary struct {
+	ID          string             `json:"id"`
+	IRCFilename string             `json:"ircFilename"`
+	Metadata    *core.EPUBMetadata `json:"metadata,omitempty"`
+	CoverBase64 string             `json:"coverBase64,omitempty"`
+	CoverMime   string             `json:"coverMime,omitempty"`
+	StagedAt    string             `json:"stagedAt"`
+}
+
+// StagedBooksListResponse carries the full list of staged books.
+type StagedBooksListResponse struct {
+	StatusResponse
+	Books []StagedBookSummary `json:"books"`
 }
 
 // StagedBooksNotifyResponse is sent when there are books waiting in staging.

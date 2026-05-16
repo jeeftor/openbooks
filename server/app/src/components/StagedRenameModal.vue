@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { Trash2 } from "lucide-vue-next";
 import { useAppStore } from "../stores/app";
 import { MessageType, type RenameOption } from "../types/messages";
 import { sendMessage } from "../composables/useWebSocket";
@@ -190,18 +189,6 @@ function saveLater() {
   appStore.setPendingStagedBook(null);
 }
 
-const confirmingDelete = ref(false);
-
-function deleteStaged() {
-  const b = book.value;
-  if (!b) return;
-  sendMessage({
-    type: MessageType.DELETE_STAGED,
-    payload: { stagedId: b.stagedId },
-  });
-  appStore.setPendingStagedBook(null);
-  confirmingDelete.value = false;
-}
 </script>
 
 <template>
@@ -436,43 +423,19 @@ function deleteStaged() {
         </div>
 
         <!-- Footer -->
-        <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
-          <!-- Delete with inline confirmation -->
-          <div class="flex items-center gap-2">
-            <template v-if="confirmingDelete">
-              <span class="text-xs text-red-500 dark:text-red-400">Delete this file?</span>
-              <button
-                @click="deleteStaged"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
-              >Yes, delete</button>
-              <button
-                @click="confirmingDelete = false"
-                class="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >Cancel</button>
-            </template>
-            <button
-              v-else
-              @click="confirmingDelete = true"
-              class="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              title="Delete staged file"
-            >
-              <Trash2 :size="16" />
-            </button>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              @click="saveLater"
-              class="px-4 py-2 text-sm rounded-lg border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
-            >
-              Save Later
-            </button>
-            <button
-              @click="confirm"
-              class="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-            >
-              Save Book
-            </button>
-          </div>
+        <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-3">
+          <button
+            @click="saveLater"
+            class="px-4 py-2 text-sm rounded-lg border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+          >
+            Save Later
+          </button>
+          <button
+            @click="confirm"
+            class="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+          >
+            Save Book
+          </button>
         </div>
       </div>
     </div>

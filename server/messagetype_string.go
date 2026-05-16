@@ -24,16 +24,15 @@ func _() {
 	_ = x[SERIES_AUTOCOMPLETE-13]
 	_ = x[PROCESS_STAGED_BOOKS-14]
 	_ = x[DELETE_STAGED-15]
+	_ = x[GET_STAGED_LIST-16]
+	_ = x[STAGED_BOOKS_LIST-17]
+	_ = x[PROCESS_ONE_STAGED-18]
 }
 
-const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITrename_promptrename_confirmdownload_waitingdownload_startedpost_process_startedstagd_books_notifystaged_book_resumestaged_queue_laterseries_autocompleteprocess_staged_booksdelete_staged"
+const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITrename_promptrename_confirmdownload_waitingdownload_startedpost_process_startedstagd_books_notifystaged_book_resumestaged_queue_laterseries_autocompleteprocess_staged_booksdelete_stagedget_staged_liststaged_books_listprocess_one_staged"
 
-// index offsets (chars): STATUS=6 CONNECT=13 SEARCH=19 DOWNLOAD=27 RATELIMIT=36
-// rename_prompt=49 rename_confirm=63 download_waiting=79 download_started=95
-// post_process_started=115 staged_books_notify=133 staged_book_resume=151
-// staged_queue_later=169 series_autocomplete=188 process_staged_books=208
-// (Note: "stagd_books_notify" in name string is the 18-char display; compile check is authoritative)
-var _MessageType_index = [...]uint8{0, 6, 13, 19, 27, 36, 49, 63, 79, 95, 115, 133, 151, 169, 188, 208, 221}
+// index offsets: delete_staged ends at 221, get_staged_list=236, staged_books_list=253, process_one_staged=272
+var _MessageType_index = [...]uint16{0, 6, 13, 19, 27, 36, 49, 63, 79, 95, 115, 133, 151, 169, 188, 208, 221, 236, 253, 272}
 
 func (i MessageType) String() string {
 	if i < 0 || i >= MessageType(len(_MessageType_index)-1) {
