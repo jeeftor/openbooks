@@ -13,11 +13,15 @@ const props = defineProps<{
 }>();
 
 const appStore = useAppStore();
-const clicked = ref(false);
+
+// Track clicked state per book identity so state doesn't bleed across books
+// when the virtual list reuses the same component instance for a different row.
+const clickedBooks = ref(new Set<string>());
+const clicked = computed(() => clickedBooks.value.has(props.book));
 
 function handleDownload() {
   if (clicked.value) return;
-  clicked.value = true;
+  clickedBooks.value.add(props.book);
   appStore.addInFlightDownload(props.book);
   sendMessage({
     type: MessageType.DOWNLOAD,

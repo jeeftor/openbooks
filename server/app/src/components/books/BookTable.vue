@@ -621,6 +621,7 @@ function toggleFormat(fmt: string) {
               <td class="px-3 py-1.5">
                 <DownloadButton
                   v-if="isMatched(vItem.index)"
+                  :key="displayBooks[vItem.index].full"
                   :book="displayBooks[vItem.index].full"
                   :author="displayBooks[vItem.index].author"
                   :title="displayBooks[vItem.index].title" />
