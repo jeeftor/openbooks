@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## v3.0.15 - 2026-05-15
+
+### Changed
+
+- Author and title filter inputs now have autocorrect, autocomplete, autocapitalize, and spellcheck disabled so mobile/macOS does not mangle author names and book titles while filtering.
+- Search bar placeholder now reflects the active search query while results are displayed (e.g. `Showing: "Susanna Clarke" — type to search again`), making it clear which search produced the current results.
+
+### Fixed
+
+- Download button state no longer bleeds between books when switching searches or deleting history items. Virtual list rows are now keyed by book identity (`book.full`) rather than row position, so Vue correctly destroys and recreates rows when the underlying book changes. Applied to both desktop table and mobile cards.
+
 ## v3.0.11 - 2026-05-15
 
 ### Changed
