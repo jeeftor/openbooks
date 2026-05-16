@@ -63,13 +63,9 @@ watch(
   (q) => {
     if (q && appStore.isConnected) {
       appStore.pendingQuery = null;
-      // Only actually send to IRC if the item timed out or has no results.
-      // If it's currently in-flight (results === undefined, not timed out),
-      // just switch the view to it without re-queuing.
-      const existing = historyStore.items.find(i => i.query === q);
-      if (existing && existing.results === undefined && !existing.timedOut) {
-        // Already in-flight — just make it the active item
-        appStore.setActiveItem(existing);
+      // Already searching for this exact query — just switch the view, don't re-queue.
+      if (isSearching.value && appStore.activeItem?.query === q) {
+        // nothing to do, already in progress
       } else {
         issueSearch(q);
       }
