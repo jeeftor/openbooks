@@ -160,8 +160,8 @@ func (sess *session) processSearchQueue(srv *server) {
 				}
 			}
 
-			srv.logBuf.info(fmt.Sprintf("🔍 Search: %q", job.query))
-			safeSend(sess.getClient(), newStatusResponse(NOTIFY, "Search request sent."))
+			srv.logBuf.info(fmt.Sprintf("🔍 IRC SEARCH → %q", job.query))
+			safeSend(sess.getClient(), newStatusResponse(NOTIFY, fmt.Sprintf("Searching for %q…", job.query)))
 			core.SearchBook(sess.irc, srv.config.SearchBot, job.query)
 			lastSearch = time.Now()
 

@@ -100,12 +100,18 @@ export function useWebSocket() {
         return;
       case MessageType.SEARCH: {
         const { books, errors, raw } = response as SearchResponse;
-        const active = appStore.activeItem;
-        if (active) {
-          const updated = { ...active, results: books, errors };
-          appStore.setRawSearchResult(active.timestamp, raw);
-          appStore.setActiveItem(updated);
+        // Route results to the oldest pending (in-flight) history item, in
+        // case the user navigated to a different item while waiting.
+        const pending = historyStore.items.find(i => i.results === undefined && !i.timedOut);
+        const target = pending ?? appStore.activeItem;
+        if (target) {
+          const updated = { ...target, results: books, errors };
+          appStore.setRawSearchResult(target.timestamp, raw);
           historyStore.updateItem(updated);
+          // Only update activeItem if this is the one currently being viewed
+          if (appStore.activeItem?.timestamp === target.timestamp) {
+            appStore.setActiveItem(updated);
+          }
         }
         break;
       }
