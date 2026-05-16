@@ -31,6 +31,7 @@ const (
 	STAGED_QUEUE_LATER   // client → server: defer this rename back to staged store
 	SERIES_AUTOCOMPLETE  // server → client: list of known series names (sent on connect)
 	PROCESS_STAGED_BOOKS // client → server: start processing the staged books queue
+	DELETE_STAGED        // client → server: permanently delete a staged file
 )
 
 type NotificationType int
@@ -127,6 +128,11 @@ type RenameConfirmRequest struct {
 
 // StageQueueLaterRequest is sent by the client to defer processing of a staged book.
 type StageQueueLaterRequest struct {
+	StagedID string `json:"stagedId"`
+}
+
+// DeleteStagedRequest is sent by the client to permanently delete a staged file.
+type DeleteStagedRequest struct {
 	StagedID string `json:"stagedId"`
 }
 

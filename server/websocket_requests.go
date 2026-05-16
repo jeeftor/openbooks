@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -38,6 +39,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 		obj = new(RenameConfirmRequest)
 	case STAGED_QUEUE_LATER:
 		obj = new(StageQueueLaterRequest)
+	case DELETE_STAGED:
+		obj = new(DeleteStagedRequest)
 	default:
 		server.log.Println("Unknown request type received.")
 		return
@@ -62,6 +65,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 		c.handleRenameConfirm(obj.(*RenameConfirmRequest), server)
 	case STAGED_QUEUE_LATER:
 		c.handleStageQueueLater(obj.(*StageQueueLaterRequest))
+	case DELETE_STAGED:
+		c.handleDeleteStaged(obj.(*DeleteStagedRequest), server)
 	}
 }
 
@@ -207,6 +212,22 @@ func (c *Client) handleRenameConfirm(req *RenameConfirmRequest, server *server) 
 	default:
 		c.log.Println("handleRenameConfirm: no pending rename awaiting confirmation")
 	}
+}
+
+// handleDeleteStaged permanently deletes a staged file from disk and removes it from the registry.
+func (c *Client) handleDeleteStaged(req *DeleteStagedRequest, server *server) {
+	staged, ok := server.stagedBooks.Get(req.StagedID)
+	if !ok {
+		safeSend(c, newErrorResponse("Staged book not found."))
+		return
+	}
+	if err := os.Remove(staged.StagedPath); err != nil && !os.IsNotExist(err) {
+		safeSend(c, newErrorResponse(fmt.Sprintf("Delete failed: %v", err)))
+		return
+	}
+	server.stagedBooks.Remove(req.StagedID)
+	safeSend(c, newStatusResponse(SUCCESS, fmt.Sprintf("Deleted %q.", staged.IRCFilename)))
+	server.broadcastStagedCount()
 }
 
 // handleStageQueueLater re-queues the current staged book (or live rename) for later.

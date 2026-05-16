@@ -20,7 +20,8 @@ export enum MessageType {
   STAGED_BOOK_RESUME,
   STAGED_QUEUE_LATER,
   SERIES_AUTOCOMPLETE,
-  PROCESS_STAGED_BOOKS
+  PROCESS_STAGED_BOOKS,
+  DELETE_STAGED
 }
 
 export interface AppNotification {

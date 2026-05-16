@@ -23,16 +23,17 @@ func _() {
 	_ = x[STAGED_QUEUE_LATER-12]
 	_ = x[SERIES_AUTOCOMPLETE-13]
 	_ = x[PROCESS_STAGED_BOOKS-14]
+	_ = x[DELETE_STAGED-15]
 }
 
-const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITrename_promptrename_confirmdownload_waitingdownload_startedpost_process_startedstagd_books_notifystaged_book_resumestaged_queue_laterseries_autocompleteprocess_staged_books"
+const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITrename_promptrename_confirmdownload_waitingdownload_startedpost_process_startedstagd_books_notifystaged_book_resumestaged_queue_laterseries_autocompleteprocess_staged_booksdelete_staged"
 
 // index offsets (chars): STATUS=6 CONNECT=13 SEARCH=19 DOWNLOAD=27 RATELIMIT=36
 // rename_prompt=49 rename_confirm=63 download_waiting=79 download_started=95
 // post_process_started=115 staged_books_notify=133 staged_book_resume=151
 // staged_queue_later=169 series_autocomplete=188 process_staged_books=208
 // (Note: "stagd_books_notify" in name string is the 18-char display; compile check is authoritative)
-var _MessageType_index = [...]uint8{0, 6, 13, 19, 27, 36, 49, 63, 79, 95, 115, 133, 151, 169, 188, 208}
+var _MessageType_index = [...]uint8{0, 6, 13, 19, 27, 36, 49, 63, 79, 95, 115, 133, 151, 169, 188, 208, 221}
 
 func (i MessageType) String() string {
 	if i < 0 || i >= MessageType(len(_MessageType_index)-1) {
