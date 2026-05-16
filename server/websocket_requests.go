@@ -105,9 +105,10 @@ func (c *Client) startIrcConnection(server *server) {
 		}
 
 		go core.StartReader(sess.ctx, sess.irc, handler)
+		go sess.processSearchQueue(server)
 		go sess.processDownloadQueue(server)
 	}
-	// else: reconnecting — IRC and download queue are already running.
+	// else: reconnecting — IRC and both queues are already running.
 
 	safeSend(c, ConnectionResponse{
 		StatusResponse: StatusResponse{
@@ -147,29 +148,28 @@ func safeSend(c *Client, msg interface{}) {
 	}
 }
 
-// sendSearchRequest sends a search query to the IRC book server.
+// sendSearchRequest enqueues a search query in the session's search queue.
+// The queue is drained by processSearchQueue with a cooldown between each request.
 func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
-	server.lastSearchMutex.Lock()
-	defer server.lastSearchMutex.Unlock()
-
-	nextAvailableSearch := server.lastSearch.Add(server.config.SearchTimeout)
-	if time.Now().Before(nextAvailableSearch) {
-		remainingSeconds := time.Until(nextAvailableSearch).Seconds()
-		c.send <- newRateLimitResponse(remainingSeconds)
-		return
-	}
-
 	sess := server.getSession(c.uuid)
 	if sess == nil {
 		return
 	}
 
-	c.log.Printf("Searching for: %q\n", s.Query)
-	server.logBuf.info(fmt.Sprintf("🔍 Search: %q", s.Query))
-	core.SearchBook(sess.irc, server.config.SearchBot, s.Query)
-	server.lastSearch = time.Now()
+	pending := len(sess.searchQueue)
+	if pending > 0 {
+		c.log.Printf("Search queued (position %d): %q\n", pending+1, s.Query)
+		c.send <- newStatusResponse(NOTIFY, fmt.Sprintf("Search queued (position %d).", pending+1))
+	} else {
+		c.log.Printf("Search queued: %q\n", s.Query)
+		c.send <- newStatusResponse(NOTIFY, "Search queued.")
+	}
 
-	c.send <- newStatusResponse(NOTIFY, "Search request sent.")
+	select {
+	case sess.searchQueue <- searchJob{query: s.Query}:
+	default:
+		c.send <- newStatusResponse(WARNING, "Search queue is full. Please wait before searching again.")
+	}
 }
 
 // sanitizePathComponent trims whitespace, replaces path separators with dashes,

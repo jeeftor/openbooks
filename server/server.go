@@ -48,12 +48,6 @@ type server struct {
 	// Cached release update checker used by /version.
 	updateChecker updateChecker
 
-	// Mutex to guard the lastSearch timestamp
-	lastSearchMutex sync.Mutex
-
-	// The time the last search was performed. Used to rate limit searches.
-	lastSearch time.Time
-
 	// stagedBooks persists books that have been downloaded but not yet renamed.
 	stagedBooks *StagedBookStore
 

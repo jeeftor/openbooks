@@ -34,6 +34,11 @@ func (h *slotHandle) release() {
 	})
 }
 
+// searchJob holds a queued search request.
+type searchJob struct {
+	query string
+}
+
 // session represents a long-lived IRC session that persists beyond WebSocket connections.
 // One session is created per browser UUID (persisted via cookie). Downloads continue
 // in the background even when the browser tab is closed.
@@ -46,6 +51,10 @@ type session struct {
 	// ctx/cancel govern the lifetime of the session itself (not tied to any browser connection).
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// searchQueue holds pending search requests. Processed one at a time with a
+	// cooldown between each to avoid hammering the IRC search bot.
+	searchQueue chan searchJob
 
 	// downloadQueue holds pending download requests.
 	downloadQueue chan downloadJob
@@ -88,6 +97,7 @@ func newSession(username, userAgent string) *session {
 		irc:           irc.New(username, userAgent),
 		ctx:           ctx,
 		cancel:        cancel,
+		searchQueue:   make(chan searchJob, 20),
 		downloadQueue: make(chan downloadJob, 50),
 		downloadSlots: slots,
 		pendingSlots:  make(chan *slotHandle, concurrentDownloads),
@@ -117,6 +127,48 @@ func (sess *session) getClient() *Client {
 	sess.mu.RLock()
 	defer sess.mu.RUnlock()
 	return sess.client
+}
+
+// processSearchQueue drains searchQueue one at a time, enforcing a cooldown between
+// each IRC search request. This replaces the old server-global rate-limit rejection;
+// searches are now queued and fired automatically rather than dropped.
+func (sess *session) processSearchQueue(srv *server) {
+	var lastSearch time.Time
+	cooldown := srv.config.SearchTimeout
+
+	for {
+		select {
+		case job, ok := <-sess.searchQueue:
+			if !ok {
+				return
+			}
+
+			// Wait out any remaining cooldown from the previous search.
+			if wait := cooldown - time.Since(lastSearch); wait > 0 {
+				pending := len(sess.searchQueue)
+				if pending > 0 {
+					safeSend(sess.getClient(), newStatusResponse(NOTIFY,
+						fmt.Sprintf("Search queued (%d pending) — sending in %.0fs…", pending+1, wait.Seconds())))
+				} else {
+					safeSend(sess.getClient(), newStatusResponse(NOTIFY,
+						fmt.Sprintf("Search queued — sending in %.0fs…", wait.Seconds())))
+				}
+				select {
+				case <-time.After(wait):
+				case <-sess.ctx.Done():
+					return
+				}
+			}
+
+			srv.logBuf.info(fmt.Sprintf("🔍 Search: %q", job.query))
+			safeSend(sess.getClient(), newStatusResponse(NOTIFY, "Search request sent."))
+			core.SearchBook(sess.irc, srv.config.SearchBot, job.query)
+			lastSearch = time.Now()
+
+		case <-sess.ctx.Done():
+			return
+		}
+	}
 }
 
 // processDownloadQueue drains downloadQueue up to concurrentDownloads at a time.
