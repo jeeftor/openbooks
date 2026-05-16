@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useMediaQuery } from "@vueuse/core";
-import { Search, PanelLeftOpen, Loader, Wifi, WifiOff, Download } from "lucide-vue-next";
+import { Search, PanelLeftOpen, Loader, Wifi, WifiOff, Download, RefreshCw } from "lucide-vue-next";
 import { useAppStore } from "../stores/app";
 import { useHistoryStore } from "../stores/history";
 import { sendMessage } from "../composables/useWebSocket";
@@ -242,6 +242,14 @@ function handleSearch(e: Event) {
             @click="downloadRawResults">
             <Download :size="11" />
             Raw results
+          </button>
+          <button
+            v-if="appStore.isConnected && !isSearching"
+            class="ml-1 flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500 transition hover:border-brand-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            title="Re-run this search against IRC"
+            @click="retrySearch">
+            <RefreshCw :size="11" />
+            Refresh
           </button>
         </template>
         <!-- Connected indicator (always visible when connected, right-aligned) -->
