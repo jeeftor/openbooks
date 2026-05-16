@@ -98,8 +98,7 @@ function toggleServer(srv: string) {
 }
 
 const matchedBooks = computed(() => sortedBooks.value.filter(matchesBook));
-const hiddenBooks = computed(() => sortedBooks.value.filter((b) => !matchesBook(b)));
-const hiddenCount = computed(() => hiddenBooks.value.length);
+const hiddenCount = computed(() => sortedBooks.value.length - matchedBooks.value.length);
 
 // Grouping logic for EPUBs only
 interface BookGroup {

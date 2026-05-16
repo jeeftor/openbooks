@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## v3.0.11 - 2026-05-15
+
+### Changed
+
+- Filter bar (server, format, author, title toggles) now mounts immediately when a search is issued, before results arrive. A spinner is shown in the table body while waiting so filters are always accessible.
+- History entries no longer serialise full book result arrays to localStorage. Only `query`, `timestamp`, and `timedOut` are persisted, eliminating multi-MB localStorage writes on every search result (results remain available in-memory for the session).
+
+### Fixed
+
+- Eliminated a redundant full-list filter pass that was computing `hiddenBooks` separately from `matchedBooks` on every keystroke.
+
 ## v3.0.10 - 2026-05-15
 
 ### Added
