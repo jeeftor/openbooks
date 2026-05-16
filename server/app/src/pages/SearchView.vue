@@ -294,9 +294,6 @@ function handleSearch(e: Event) {
 
       <EmptyState v-else-if="!appStore.activeItem" />
 
-      <!-- Show empty state while waiting for first search results -->
-      <EmptyState v-else-if="appStore.activeItem && appStore.activeItem.results === undefined" />
-
       <!-- Timeout state -->
       <div
         v-else-if="isTimedOut"
@@ -326,10 +323,16 @@ function handleSearch(e: Event) {
             query = cmd;
           }
         " />
+      <!-- Always mount the table once a search is active so filters are
+           available immediately. Pass empty array while results are loading. -->
       <BookCards
         v-else-if="isMobile"
-        :books="appStore.activeItem.results ?? []" />
-      <BookTable v-else :books="appStore.activeItem.results ?? []" />
+        :books="appStore.activeItem.results ?? []"
+        :is-loading="appStore.activeItem.results === undefined" />
+      <BookTable
+        v-else
+        :books="appStore.activeItem.results ?? []"
+        :is-loading="appStore.activeItem.results === undefined" />
     </div>
   </div>
 </template>

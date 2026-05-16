@@ -7,7 +7,7 @@ import { useServers } from "../../composables/useApi";
 import { usePreferencesStore } from "../../stores/preferences";
 import DownloadButton from "./DownloadButton.vue";
 
-const props = defineProps<{ books: BookDetail[] }>();
+const props = defineProps<{ books: BookDetail[]; isLoading?: boolean }>();
 
 const prefStore = usePreferencesStore();
 const { servers } = useServers();
@@ -632,6 +632,18 @@ function toggleFormat(fmt: string) {
           <tr v-if="paddingBottom > 0"><td :style="{ height: paddingBottom + 'px' }" colspan="6" /></tr>
         </tbody>
       </table>
+
+      <div
+        v-if="isLoading && books.length === 0"
+        class="py-12 text-center">
+        <div class="flex items-center justify-center gap-2 text-sm text-slate-400">
+          <svg class="animate-spin w-4 h-4 text-brand-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          Waiting for results…
+        </div>
+      </div>
 
       <div
         v-if="matchedBooks.length === 0 && books.length > 0"
