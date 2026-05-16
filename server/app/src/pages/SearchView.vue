@@ -325,16 +325,28 @@ function handleSearch(e: Event) {
             query = cmd;
           }
         " />
-      <!-- Always mount the table once a search is active so filters are
-           available immediately. Pass empty array while results are loading. -->
+      <!-- Searching / queued waiting state -->
+      <div
+        v-else-if="appStore.activeItem.results === undefined"
+        class="h-full flex items-center justify-center">
+        <div class="flex flex-col items-center gap-3 text-center max-w-sm px-4">
+          <Loader :size="28" class="animate-spin text-brand-400" />
+          <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
+            Searching for &ldquo;{{ appStore.activeItem.query }}&rdquo;&hellip;
+          </p>
+          <p class="text-xs text-slate-400 dark:text-slate-500">
+            Waiting for IRC response
+          </p>
+        </div>
+      </div>
+
+      <!-- Always mount the table once results have arrived -->
       <BookCards
         v-else-if="isMobile"
-        :books="appStore.activeItem.results ?? []"
-        :is-loading="appStore.activeItem.results === undefined" />
+        :books="appStore.activeItem.results" />
       <BookTable
         v-else
-        :books="appStore.activeItem.results ?? []"
-        :is-loading="appStore.activeItem.results === undefined" />
+        :books="appStore.activeItem.results" />
     </div>
   </div>
 </template>
