@@ -42,6 +42,12 @@ const validInput = computed(() => {
   return errorMode.value ? query.value.startsWith("!") : query.value.trim() !== "";
 });
 
+const searchPlaceholder = computed(() => {
+  if (errorMode.value) return "Enter download command (starts with !)";
+  const active = appStore.activeItem?.query;
+  return active ? `Showing: \u201c${active}\u201d \u2014 type to search again` : "Search for a book\u2026";
+});
+
 watch(
   () => appStore.activeItem?.timestamp,
   () => {
@@ -193,11 +199,7 @@ function handleSearch(e: Event) {
               autocorrect="off"
               autocapitalize="none"
               spellcheck="false"
-              :placeholder="
-                errorMode
-                  ? 'Enter download command (starts with !)'
-                  : 'Search for a book…'
-              "
+              :placeholder="searchPlaceholder"
               :disabled="!appStore.isConnected"
               class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-50 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition" />
           </div>

@@ -401,6 +401,7 @@ function toggleFormat(fmt: string) {
           <input
             v-model="authorFilter"
             type="text" placeholder="Author…"
+            autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
             class="text-xs rounded border border-slate-200 dark:border-slate-700 bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-brand-400 px-2 py-0.5 w-24" />
           <button v-if="authorFilter" class="text-slate-400 hover:text-red-400 text-xs" @click="authorFilter = ''">✕</button>
         </div>
@@ -410,6 +411,7 @@ function toggleFormat(fmt: string) {
           <input
             v-model="titleFilter"
             type="text" placeholder="Title…"
+            autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
             class="text-xs rounded border border-slate-200 dark:border-slate-700 bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-brand-400 px-2 py-0.5 w-40" />
           <button v-if="titleFilter" class="text-slate-400 hover:text-red-400 text-xs" @click="titleFilter = ''">✕</button>
         </div>
