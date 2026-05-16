@@ -31,6 +31,9 @@ func (server *server) routeMessage(message Request, c *Client) {
 	case GET_STAGED_LIST:
 		c.handleGetStagedList(server)
 		return
+	case HISTORY_CLEAR:
+		server.searchHistory.Clear()
+		return
 	}
 
 	switch message.MessageType {
@@ -46,6 +49,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 		obj = new(DeleteStagedRequest)
 	case PROCESS_ONE_STAGED:
 		obj = new(ProcessOneStagedRequest)
+	case HISTORY_DELETE:
+		obj = new(HistoryDeleteRequest)
 	default:
 		server.log.Println("Unknown request type received.")
 		return
@@ -74,6 +79,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 		c.handleDeleteStaged(obj.(*DeleteStagedRequest), server)
 	case PROCESS_ONE_STAGED:
 		go c.handleProcessOneStaged(obj.(*ProcessOneStagedRequest), server)
+	case HISTORY_DELETE:
+		server.searchHistory.Delete(obj.(*HistoryDeleteRequest).Timestamp)
 	}
 }
 
@@ -139,6 +146,12 @@ func (c *Client) startIrcConnection(server *server) {
 
 	// Send series autocomplete data.
 	safeSend(c, newSeriesAutocompleteResponse(server.seriesRegistry.All()))
+
+	// Send server-side search history.
+	safeSend(c, HistoryListResponse{
+		StatusResponse: StatusResponse{MessageType: HISTORY_LIST, NotificationType: NOTIFY},
+		Entries:        server.searchHistory.All(),
+	})
 }
 
 // safeSend attempts to send on the client channel, recovering from panic if channel is closed.

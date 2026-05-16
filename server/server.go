@@ -53,6 +53,9 @@ type server struct {
 
 	// seriesRegistry tracks known series names for autocomplete.
 	seriesRegistry *SeriesRegistry
+
+	// searchHistory records recent searches, persisted to disk.
+	searchHistory *SearchHistoryStore
 }
 
 // Config contains settings for server
@@ -104,6 +107,12 @@ func (server *server) initStores() {
 	}
 	server.stagedBooks = store
 	server.seriesRegistry = newSeriesRegistry(server.config.DownloadDir)
+
+	hist, err := newSearchHistoryStore(server.config.DownloadDir)
+	if err != nil {
+		server.log.Fatalf("search history store init: %v", err)
+	}
+	server.searchHistory = hist
 }
 
 // broadcastStagedCount sends the current staged books count to all connected clients.

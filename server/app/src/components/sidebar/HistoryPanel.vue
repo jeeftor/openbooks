@@ -47,7 +47,7 @@ function select(item: HistoryItem) {
         v-if="historyStore.items.length"
         class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
         title="Clear all history"
-        @click="historyStore.items = []">
+        @click="historyStore.clearAll()">
         <Trash2 :size="13" />
       </button>
     </div>

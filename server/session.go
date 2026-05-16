@@ -78,6 +78,9 @@ type session struct {
 
 	// client is the currently attached WebSocket client. Nil when the browser is disconnected.
 	client *Client
+
+	// query is the most recently dispatched IRC search term.
+	query string
 }
 
 // newSession creates a new IRC session with its own connection and download queue.
@@ -163,6 +166,7 @@ func (sess *session) processSearchQueue(srv *server) {
 			srv.logBuf.info(fmt.Sprintf("CLIENT (%s): 🔍 IRC SEARCH → %q", sess.username, job.query))
 			srv.log.Printf("CLIENT (%s): IRC SEARCH → %q\n", sess.username, job.query)
 			safeSend(sess.getClient(), newStatusResponse(NOTIFY, fmt.Sprintf("Searching for %q…", job.query)))
+			sess.query = job.query
 			core.SearchBook(sess.irc, srv.config.SearchBot, job.query)
 			lastSearch = time.Now()
 

@@ -12,6 +12,7 @@ import {
   type StagedBooksNotifyResponse,
   type StagedBookResumeResponse,
   type StagedBooksListResponse,
+  type HistoryListResponse,
   type SeriesAutocompleteResponse,
   type AppNotification
 } from "../types/messages";
@@ -150,6 +151,9 @@ export function useWebSocket() {
         return;
       case MessageType.SERIES_AUTOCOMPLETE:
         appStore.setKnownSeries((response as SeriesAutocompleteResponse).series);
+        return;
+      case MessageType.HISTORY_LIST:
+        historyStore.loadFromServer((response as HistoryListResponse).entries);
         return;
       default:
         console.error("Unknown WS message type:", response);

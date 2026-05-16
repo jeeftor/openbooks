@@ -24,7 +24,10 @@ export enum MessageType {
   DELETE_STAGED,
   GET_STAGED_LIST,
   STAGED_BOOKS_LIST,
-  PROCESS_ONE_STAGED
+  PROCESS_ONE_STAGED,
+  HISTORY_LIST,
+  HISTORY_DELETE,
+  HISTORY_CLEAR
 }
 
 export interface AppNotification {
@@ -176,6 +179,10 @@ export interface StagedBookResumeResponse extends WsResponse {
 
 export interface SeriesAutocompleteResponse extends WsResponse {
   series: string[];
+}
+
+export interface HistoryListResponse extends WsResponse {
+  entries: Array<{ query: string; timestamp: number; timedOut?: boolean }>;
 }
 
 export interface StagedBookSummary {

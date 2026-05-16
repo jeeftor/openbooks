@@ -25,7 +25,7 @@ func fileSizeMB(path string) string {
 // NewIrcEventHandler builds the event handler map for a session's IRC connection.
 func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 	handler := core.EventHandler{}
-	handler[core.SearchResult] = sess.searchResultHandler(server.config.DownloadDir, server.logBuf)
+	handler[core.SearchResult] = sess.searchResultHandler(server.config.DownloadDir, server.logBuf, server)
 	handler[core.BookResult] = sess.bookResultHandler(*server.config, server.logBuf, server.stagedBooks, server.seriesRegistry, server)
 	handler[core.NoResults] = sess.noResultsHandler()
 	handler[core.BadServer] = sess.badServerHandler()
@@ -38,7 +38,7 @@ func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 }
 
 // searchResultHandler downloads from DCC server, parses data, and sends data to client.
-func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer) core.HandlerFunc {
+func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer, srv *server) core.HandlerFunc {
 	return func(text string) {
 		c := sess.getClient()
 		extractedPath, err := core.DownloadExtractDCCString(downloadDir, text, nil)
@@ -63,6 +63,11 @@ func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer) core
 		lb.info(fmt.Sprintf("🔍 Search results: %d found, %d unparseable", len(bookResults), len(parseErrors)))
 		safeSend(c, newSearchResponse(bookResults, parseErrors, string(rawResults)))
 		os.Remove(extractedPath)
+
+		// Record the search in server-side history.
+		if sess.query != "" {
+			srv.searchHistory.Add(sess.query)
+		}
 	}
 }
 

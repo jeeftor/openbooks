@@ -35,6 +35,9 @@ const (
 	GET_STAGED_LIST      // client → server: request the full list of staged books
 	STAGED_BOOKS_LIST    // server → client: full list of staged books with metadata
 	PROCESS_ONE_STAGED   // client → server: process a single staged book by ID
+	HISTORY_LIST         // server → client: full search history (sent on connect)
+	HISTORY_DELETE       // client → server: delete one history entry by timestamp
+	HISTORY_CLEAR        // client → server: delete all history entries
 )
 
 type NotificationType int
@@ -158,6 +161,17 @@ type StagedBookSummary struct {
 type StagedBooksListResponse struct {
 	StatusResponse
 	Books []StagedBookSummary `json:"books"`
+}
+
+// HistoryListResponse carries the server-side search history.
+type HistoryListResponse struct {
+	StatusResponse
+	Entries []HistoryEntry `json:"entries"`
+}
+
+// HistoryDeleteRequest asks the server to remove one history entry.
+type HistoryDeleteRequest struct {
+	Timestamp int64 `json:"timestamp"`
 }
 
 // StagedBooksNotifyResponse is sent when there are books waiting in staging.
