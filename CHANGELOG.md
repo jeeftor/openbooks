@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v3.0.2 - 2026-05-15
+
 ### Added
 
 - Generate silly readable IRC guest names for server clients when `--name` is not provided, with active-connection collision handling.
