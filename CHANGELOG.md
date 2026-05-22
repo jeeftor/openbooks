@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## v3.0.26 - 2026-05-22
+
+### Fixed
+
+- **Multiple browser windows now share the same IRC session correctly:** Previously, opening a second browser window would "steal" the session from the first, causing notifications to stop appearing in the first window. Now each session tracks all connected clients and broadcasts notifications to every window/tab.
+
+### Changed
+
+- `session.client` (single pointer) changed to `session.clients` (map of all connected WebSocket clients).
+- All notifications now broadcast to all connected clients via `broadcastToClients()`.
+- Rename prompts still go to only one client (arbitrary) to avoid duplicate dialogs.
+
+## v3.0.25 - 2026-05-22
+
 ### Fixed
 
 - **Server online status now session-scoped with real-time updates:** Previously, the global shared server list could get out of sync when multiple users were connected. Now each session tracks its own IRC server list with a timestamp, and updates are pushed via WebSocket in real-time. The UI shows a "(stale)" indicator when server list data is older than 2 minutes.
