@@ -40,17 +40,16 @@ func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 // searchResultHandler downloads from DCC server, parses data, and sends data to client.
 func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer, srv *server) core.HandlerFunc {
 	return func(text string) {
-		c := sess.getClient()
 		extractedPath, err := core.DownloadExtractDCCString(downloadDir, text, nil)
 		if err != nil {
 			lb.error(fmt.Sprintf("Search download failed: %v", err))
-			safeSend(c, newErrorResponse("Error when downloading search results."))
+			broadcastToClients(sess.getClients(), newErrorResponse("Error when downloading search results."))
 			return
 		}
 
 		bookResults, parseErrors, err := core.ParseSearchFile(extractedPath)
 		if err != nil {
-			safeSend(c, newErrorResponse("Error when parsing search results."))
+			broadcastToClients(sess.getClients(), newErrorResponse("Error when parsing search results."))
 			return
 		}
 		rawResults, _ := os.ReadFile(extractedPath)
@@ -61,7 +60,7 @@ func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer, srv 
 		}
 
 		lb.info(fmt.Sprintf("🔍 Search results: %d found, %d unparseable", len(bookResults), len(parseErrors)))
-		safeSend(c, newSearchResponse(bookResults, parseErrors, string(rawResults)))
+		broadcastToClients(sess.getClients(), newSearchResponse(bookResults, parseErrors, string(rawResults)))
 		os.Remove(extractedPath)
 
 		// Record the search in server-side history.
@@ -103,9 +102,8 @@ func (sess *session) bookResultHandler(
 		stage := stagingDir(dir)
 
 		// DCC offer received — clear the "waiting for bot" UI state and signal transfer start.
-		c := sess.getClient()
-		safeSend(c, newDownloadWaitingClear())
-		safeSend(c, newDownloadStartedResponse())
+		broadcastToClients(sess.getClients(), newDownloadWaitingClear())
+		broadcastToClients(sess.getClients(), newDownloadStartedResponse())
 
 		var ircFilenamePreview string
 		if d, err := dcc.ParseString(text); err == nil {
@@ -122,7 +120,7 @@ func (sess *session) bookResultHandler(
 		extractedPath, err := core.DownloadExtractDCCString(stage, text, nil)
 		if err != nil {
 			sess_lb.error(fmt.Sprintf("Download failed: %v", err))
-			safeSend(sess.getClient(), newErrorResponse("Error when downloading book."))
+			broadcastToClients(sess.getClients(), newErrorResponse("Error when downloading book."))
 			if handle != nil {
 				handle.release()
 			}
@@ -153,7 +151,7 @@ func (sess *session) bookResultHandler(
 
 		// 2. Run post-processor.
 		if len(config.PostProcessCmd) > 0 {
-			safeSend(sess.getClient(), newPostProcessStartedResponse())
+			broadcastToClients(sess.getClients(), newPostProcessStartedResponse())
 		}
 		runPostProcess(config.PostProcessCmd, extractedPath, sess_lb)
 
@@ -206,8 +204,8 @@ func (sess *session) bookResultHandler(
 			return
 		}
 
-		// Re-read client after acquiring the mutex — it may have changed.
-		currentClient := sess.getClient()
+		// Re-read any client after acquiring the mutex — if none connected, save to staged.
+		currentClient := sess.getAnyClient()
 		if currentClient == nil {
 			saveToStaged()
 			return
@@ -296,31 +294,31 @@ func (sess *session) bookResultHandler(
 			optionLabel, choice.Author, choice.Title, choice.Series, choice.SeriesIndex, finalPath)
 		sess_lb.infoDetail(fmt.Sprintf("✅ Saved [%s]: %s", optionLabel, relSlash), savedDetail)
 
-		safeSend(sess.getClient(), newDownloadResponse(finalPath, dir))
+		broadcastToClients(sess.getClients(), newDownloadResponse(finalPath, dir))
 	}
 }
 
 func (sess *session) noResultsHandler() core.HandlerFunc {
 	return func(_ string) {
-		safeSend(sess.getClient(), newErrorResponse("No results found for the query."))
+		broadcastToClients(sess.getClients(), newErrorResponse("No results found for the query."))
 	}
 }
 
 func (sess *session) badServerHandler() core.HandlerFunc {
 	return func(_ string) {
-		safeSend(sess.getClient(), newErrorResponse("Server is not available. Try another one."))
+		broadcastToClients(sess.getClients(), newErrorResponse("Server is not available. Try another one."))
 	}
 }
 
 func (sess *session) searchAcceptedHandler() core.HandlerFunc {
 	return func(_ string) {
-		safeSend(sess.getClient(), newStatusResponse(NOTIFY, "Search accepted into the queue."))
+		broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY, "Search accepted into the queue."))
 	}
 }
 
 func (sess *session) matchesFoundHandler() core.HandlerFunc {
 	return func(num string) {
-		safeSend(sess.getClient(), newStatusResponse(NOTIFY, fmt.Sprintf("Found %s results for your query.", num)))
+		broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY, fmt.Sprintf("Found %s results for your query.", num)))
 	}
 }
 
@@ -341,9 +339,7 @@ func (sess *session) userListHandler(srv *server) core.HandlerFunc {
 		servers := core.ParseServers(text)
 		sess.setServerList(servers)
 
-		// Notify connected client of updated server list with timestamp.
-		if c := sess.getClient(); c != nil {
-			safeSend(c, newServerListResponse(servers))
-		}
+		// Notify all connected clients of updated server list with timestamp.
+		broadcastToClients(sess.getClients(), newServerListResponse(servers))
 	}
 }
