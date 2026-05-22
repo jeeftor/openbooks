@@ -197,8 +197,43 @@ func (server *server) statsHandler() http.HandlerFunc {
 }
 
 func (server *server) serverListHandler() http.HandlerFunc {
+	type serverListResponse struct {
+		Servers   []string  `json:"servers"`   // Elevated users (download servers)
+		Timestamp time.Time `json:"timestamp"` // When the list was last updated
+		Fresh     bool      `json:"fresh"`     // True if data is less than 2 minutes old
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(server.repository.servers)
+		cookie, err := r.Cookie("OpenBooks")
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		userId, err := uuid.Parse(cookie.Value)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		sess := server.getSession(userId)
+		if sess == nil {
+			// No session yet — return empty list with zero timestamp
+			json.NewEncoder(w).Encode(serverListResponse{
+				Servers:   []string{},
+				Timestamp: time.Time{},
+				Fresh:     false,
+			})
+			return
+		}
+
+		// Get session's server list with freshness check (2 minute threshold)
+		servers, timestamp, fresh := sess.getServerList(2 * time.Minute)
+		json.NewEncoder(w).Encode(serverListResponse{
+			Servers:   servers.ElevatedUsers,
+			Timestamp: timestamp,
+			Fresh:     fresh,
+		})
 	}
 }
 

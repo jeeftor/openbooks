@@ -1,5 +1,6 @@
-import { ref, watch, onUnmounted } from "vue";
+import { ref, watch, onUnmounted, computed } from "vue";
 import { getApiUrl } from "./useWebSocket";
+import { useAppStore } from "../stores/app";
 import type { Book, LogEntry, VersionInfo } from "../types/messages";
 
 export function useVersion() {
@@ -28,25 +29,43 @@ function normalizeVersion(version: string | VersionInfo): VersionInfo {
 }
 
 export function useServers() {
-  const servers = ref<string[]>([]);
+  const appStore = useAppStore();
+
+  // Use the app store's server list (updated via WebSocket in real-time)
+  const servers = computed(() => appStore.serverList);
+  const timestamp = computed(() => appStore.serverListTimestamp);
+
+  // Calculate if data is fresh (less than 2 minutes old)
+  const isFresh = computed(() => {
+    if (!timestamp.value) return false;
+    return Date.now() - timestamp.value < 2 * 60 * 1000;
+  });
 
   async function fetchServers() {
     try {
       const res = await fetch(getApiUrl("/servers"));
       if (res.ok) {
-        const data = (await res.json()) as { elevatedUsers?: string[] };
-        servers.value = data.elevatedUsers ?? [];
+        const data = (await res.json()) as {
+          servers?: string[];
+          timestamp?: string;
+          fresh?: boolean;
+        };
+        const ts = data.timestamp ? new Date(data.timestamp).getTime() : Date.now();
+        appStore.setServerList(data.servers ?? [], ts);
       }
     } catch {
       /* network error */
     }
   }
 
+  // Initial fetch
   fetchServers();
-  const interval = setInterval(fetchServers, 30_000);
+
+  // Poll less frequently (60s) as WebSocket provides real-time updates
+  const interval = setInterval(fetchServers, 60_000);
   onUnmounted(() => clearInterval(interval));
 
-  return { servers, refresh: fetchServers };
+  return { servers, timestamp, isFresh, refresh: fetchServers };
 }
 
 export function useBooks(libraryVersion: { readonly value: number }) {

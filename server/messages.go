@@ -38,6 +38,7 @@ const (
 	HISTORY_LIST         // server → client: full search history (sent on connect)
 	HISTORY_DELETE       // client → server: delete one history entry by timestamp
 	HISTORY_CLEAR        // client → server: delete all history entries
+	SERVER_LIST          // server → client: updated IRC server list with timestamp
 )
 
 type NotificationType int
@@ -323,5 +324,20 @@ func newSeriesAutocompleteResponse(series []string) SeriesAutocompleteResponse {
 	return SeriesAutocompleteResponse{
 		StatusResponse: StatusResponse{MessageType: SERIES_AUTOCOMPLETE},
 		Series:         series,
+	}
+}
+
+// ServerListResponse carries the current IRC server list with freshness timestamp.
+type ServerListResponse struct {
+	StatusResponse
+	Servers   []string  `json:"servers"`   // Elevated users (download servers)
+	Timestamp time.Time `json:"timestamp"` // When the list was last updated
+}
+
+func newServerListResponse(servers core.IrcServers) ServerListResponse {
+	return ServerListResponse{
+		StatusResponse: StatusResponse{MessageType: SERVER_LIST},
+		Servers:        servers.ElevatedUsers,
+		Timestamp:      time.Now(),
 	}
 }
