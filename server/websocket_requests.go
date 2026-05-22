@@ -173,6 +173,17 @@ func safeSend(c *Client, msg interface{}) {
 	}
 }
 
+// broadcastToClients sends a message to all clients in the provided slice.
+// The clients slice should come from sess.getClients().
+func broadcastToClients(clients []*Client, msg interface{}) {
+	if clients == nil {
+		return
+	}
+	for _, c := range clients {
+		safeSend(c, msg)
+	}
+}
+
 // sendSearchRequest enqueues a search query in the session's search queue.
 // The queue is drained by processSearchQueue with a cooldown between each request.
 func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {

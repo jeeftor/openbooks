@@ -79,11 +79,12 @@ type session struct {
 	// at a time so the frontend never receives two overlapping rename dialogs.
 	renameMu chan struct{}
 
-	// mu protects the client pointer below.
+	// mu protects the clients map below.
 	mu sync.RWMutex
 
-	// client is the currently attached WebSocket client. Nil when the browser is disconnected.
-	client *Client
+	// clients holds all attached WebSocket clients for this session.
+	// Multiple browser windows/tabs can share the same session via the same cookie.
+	clients map[*Client]struct{}
 
 	// query is the most recently dispatched IRC search term.
 	query string
@@ -118,31 +119,50 @@ func newSession(username, userAgent string) *session {
 		downloadSlots: slots,
 		pendingSlots:  make(chan *slotHandle, concurrentDownloads),
 		renameMu:      renameMu,
+		clients:       make(map[*Client]struct{}),
 	}
 }
 
-// attachClient sets the active WebSocket client for this session.
+// attachClient adds a WebSocket client to this session.
+// Multiple browser windows/tabs can share the same session via the same cookie.
 func (sess *session) attachClient(c *Client) {
 	sess.mu.Lock()
-	sess.client = c
+	sess.clients[c] = struct{}{}
 	sess.mu.Unlock()
 }
 
-// detachClient removes the active client reference. Called when the browser disconnects.
-// Only removes the client if it matches the one we expect (guards against reconnect races).
+// detachClient removes a WebSocket client from this session.
+// Called when a browser window/tab disconnects.
 func (sess *session) detachClient(c *Client) {
 	sess.mu.Lock()
-	if sess.client == c {
-		sess.client = nil
-	}
+	delete(sess.clients, c)
 	sess.mu.Unlock()
 }
 
-// getClient returns the currently attached client (may be nil).
-func (sess *session) getClient() *Client {
+// getClients returns a snapshot of all attached clients.
+// Returns nil if no clients are connected.
+func (sess *session) getClients() []*Client {
 	sess.mu.RLock()
 	defer sess.mu.RUnlock()
-	return sess.client
+	if len(sess.clients) == 0 {
+		return nil
+	}
+	result := make([]*Client, 0, len(sess.clients))
+	for c := range sess.clients {
+		result = append(result, c)
+	}
+	return result
+}
+
+// getAnyClient returns an arbitrary attached client, or nil if none connected.
+// Useful for operations that only need to notify one client (e.g., rename prompt).
+func (sess *session) getAnyClient() *Client {
+	sess.mu.RLock()
+	defer sess.mu.RUnlock()
+	for c := range sess.clients {
+		return c
+	}
+	return nil
 }
 
 // setServerList updates the session's server list snapshot with the current time.
@@ -183,10 +203,10 @@ func (sess *session) processSearchQueue(srv *server) {
 			if wait := cooldown - time.Since(lastSearch); wait > 0 {
 				pending := len(sess.searchQueue)
 				if pending > 0 {
-					safeSend(sess.getClient(), newStatusResponse(NOTIFY,
+					broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY,
 						fmt.Sprintf("Search queued (%d pending) — sending in %.0fs…", pending+1, wait.Seconds())))
 				} else {
-					safeSend(sess.getClient(), newStatusResponse(NOTIFY,
+					broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY,
 						fmt.Sprintf("Search queued — sending in %.0fs…", wait.Seconds())))
 				}
 				select {
@@ -198,7 +218,7 @@ func (sess *session) processSearchQueue(srv *server) {
 
 			srv.logBuf.info(fmt.Sprintf("CLIENT (%s): 🔍 IRC SEARCH → %q", sess.username, job.query))
 			srv.log.Printf("CLIENT (%s): IRC SEARCH → %q\n", sess.username, job.query)
-			safeSend(sess.getClient(), newStatusResponse(NOTIFY, fmt.Sprintf("Searching for %q…", job.query)))
+			broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY, fmt.Sprintf("Searching for %q…", job.query)))
 			sess.query = job.query
 			core.SearchBook(sess.irc, srv.config.SearchBot, job.query)
 			lastSearch = time.Now()
@@ -239,7 +259,7 @@ func (sess *session) processDownloadQueue(server *server) {
 				botName = job.book[1:idx]
 			}
 			server.logBuf.info(fmt.Sprintf("📡 Requesting from %s — waiting for IRC bot to send file…", botName))
-			safeSend(sess.getClient(), newDownloadWaitingResponse(botName, job.title))
+			broadcastToClients(sess.getClients(), newDownloadWaitingResponse(botName, job.title))
 
 			// Push a handle into the FIFO before firing the IRC request so
 			// bookResultHandler can pop it in order.
@@ -253,7 +273,7 @@ func (sess *session) processDownloadQueue(server *server) {
 			go func(h *slotHandle, bot, title string) {
 				select {
 				case <-time.After(5 * time.Minute):
-					safeSend(sess.getClient(), newDownloadWaitingClear())
+					broadcastToClients(sess.getClients(), newDownloadWaitingClear())
 					server.logBuf.warn(fmt.Sprintf("⏱️  Timed out waiting for %s — bot may be offline or throttling. Skipping.", bot))
 					h.release()
 				case <-h.done:
