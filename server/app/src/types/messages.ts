@@ -27,7 +27,8 @@ export enum MessageType {
   PROCESS_ONE_STAGED,
   HISTORY_LIST,
   HISTORY_DELETE,
-  HISTORY_CLEAR
+  HISTORY_CLEAR,
+  SERVER_LIST
 }
 
 export interface AppNotification {
@@ -196,6 +197,11 @@ export interface StagedBookSummary {
 
 export interface StagedBooksListResponse extends WsResponse {
   books: StagedBookSummary[];
+}
+
+export interface ServerListResponse extends WsResponse {
+  servers: string[];
+  timestamp: string;
 }
 
 export interface StageQueueLaterRequest {

@@ -49,6 +49,10 @@ export const useAppStore = defineStore("app", () => {
   // Known series names for autocomplete (from SERIES_AUTOCOMPLETE).
   const knownSeries = ref<string[]>([]);
 
+  // Server list with timestamp for online/offline status (from SERVER_LIST).
+  const serverList = ref<string[]>([]);
+  const serverListTimestamp = ref<number>(0);
+
   function setConnected(connected: boolean) {
     isConnected.value = connected;
   }
@@ -113,6 +117,11 @@ export const useAppStore = defineStore("app", () => {
     knownSeries.value = series;
   }
 
+  function setServerList(servers: string[], timestamp: number) {
+    serverList.value = servers;
+    serverListTimestamp.value = timestamp;
+  }
+
   function toggleLibrarySortMode() {
     librarySortMode.value = librarySortMode.value === "newest" ? "alpha" : "newest";
   }
@@ -139,6 +148,8 @@ export const useAppStore = defineStore("app", () => {
     pendingStagedBook,
     stagedBooksList,
     knownSeries,
+    serverList,
+    serverListTimestamp,
     setConnected,
     setConnecting,
     setUsername,
@@ -154,6 +165,7 @@ export const useAppStore = defineStore("app", () => {
     setStagedBooksCount,
     setPendingStagedBook,
     setStagedBooksList,
-    setKnownSeries
+    setKnownSeries,
+    setServerList
   };
 });

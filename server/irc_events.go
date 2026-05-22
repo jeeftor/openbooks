@@ -32,7 +32,7 @@ func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 	handler[core.SearchAccepted] = sess.searchAcceptedHandler()
 	handler[core.MatchesFound] = sess.matchesFoundHandler()
 	handler[core.Ping] = sess.pingHandler()
-	handler[core.ServerList] = sess.userListHandler(server.repository)
+	handler[core.ServerList] = sess.userListHandler(server)
 	handler[core.Version] = sess.versionHandler(server.config.UserAgent)
 	return handler
 }
@@ -336,8 +336,14 @@ func (sess *session) versionHandler(version string) core.HandlerFunc {
 	}
 }
 
-func (sess *session) userListHandler(repo *Repository) core.HandlerFunc {
+func (sess *session) userListHandler(srv *server) core.HandlerFunc {
 	return func(text string) {
-		repo.servers = core.ParseServers(text)
+		servers := core.ParseServers(text)
+		sess.setServerList(servers)
+
+		// Notify connected client of updated server list with timestamp.
+		if c := sess.getClient(); c != nil {
+			safeSend(c, newServerListResponse(servers))
+		}
 	}
 }

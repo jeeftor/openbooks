@@ -14,7 +14,7 @@ import EmptyState from "../components/search/EmptyState.vue";
 
 const appStore = useAppStore();
 const historyStore = useHistoryStore();
-const { servers, refresh: refreshServers } = useServers();
+const { servers, isFresh, refresh: refreshServers } = useServers();
 const isMobile = useMediaQuery("(max-width: 767px)");
 
 const query = ref("");
@@ -233,9 +233,12 @@ function handleSearch(e: Event) {
           <span class="tabular-nums">{{ resultCount.toLocaleString() }} results</span>
           <span
             v-if="onlineCount > 0"
-            class="flex items-center gap-1 text-green-600 dark:text-green-500">
+            class="flex items-center gap-1"
+            :class="isFresh ? 'text-green-600 dark:text-green-500' : 'text-amber-600 dark:text-amber-500'"
+            :title="isFresh ? 'Server list is current' : 'Server list may be stale — refresh to update'">
             <Wifi :size="11" />
             {{ onlineCount }} online
+            <span v-if="!isFresh" class="text-[10px] opacity-70">(stale)</span>
           </span>
           <span v-if="hasErrors" class="text-amber-500">
             · {{ appStore.activeItem.errors?.length }} parse errors

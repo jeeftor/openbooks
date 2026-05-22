@@ -39,6 +39,12 @@ type searchJob struct {
 	query string
 }
 
+// serverListSnapshot holds the IRC server list with freshness timestamp.
+type serverListSnapshot struct {
+	servers   core.IrcServers
+	timestamp time.Time
+}
+
 // session represents a long-lived IRC session that persists beyond WebSocket connections.
 // One session is created per browser UUID (persisted via cookie). Downloads continue
 // in the background even when the browser tab is closed.
@@ -81,6 +87,13 @@ type session struct {
 
 	// query is the most recently dispatched IRC search term.
 	query string
+
+	// serverMu protects serverSnapshot.
+	serverMu sync.RWMutex
+
+	// serverSnapshot holds the last received IRC server list with timestamp.
+	// This is per-session to avoid race conditions between multiple users.
+	serverSnapshot serverListSnapshot
 }
 
 // newSession creates a new IRC session with its own connection and download queue.
@@ -130,6 +143,26 @@ func (sess *session) getClient() *Client {
 	sess.mu.RLock()
 	defer sess.mu.RUnlock()
 	return sess.client
+}
+
+// setServerList updates the session's server list snapshot with the current time.
+func (sess *session) setServerList(servers core.IrcServers) {
+	sess.serverMu.Lock()
+	defer sess.serverMu.Unlock()
+	sess.serverSnapshot = serverListSnapshot{
+		servers:   servers,
+		timestamp: time.Now(),
+	}
+}
+
+// getServerList returns the session's server list and the timestamp it was last updated.
+// If the list is older than maxAge, the second return value is false (stale data).
+func (sess *session) getServerList(maxAge time.Duration) (core.IrcServers, time.Time, bool) {
+	sess.serverMu.RLock()
+	defer sess.serverMu.RUnlock()
+	snapshot := sess.serverSnapshot
+	fresh := time.Since(snapshot.timestamp) < maxAge
+	return snapshot.servers, snapshot.timestamp, fresh
 }
 
 // processSearchQueue drains searchQueue one at a time, enforcing a cooldown between

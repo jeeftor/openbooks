@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Server online status now session-scoped with real-time updates:** Previously, the global shared server list could get out of sync when multiple users were connected. Now each session tracks its own IRC server list with a timestamp, and updates are pushed via WebSocket in real-time. The UI shows a "(stale)" indicator when server list data is older than 2 minutes.
+
+### Changed
+
+- `/servers` API endpoint now returns `{servers: string[], timestamp: string, fresh: boolean}` instead of `{elevatedUsers: string[]}`.
+- Server list polling interval reduced from 30s to 60s (WebSocket provides real-time updates).
+- New WebSocket message type: `SERVER_LIST` — pushed whenever IRC sends a names list update.
+
 ## v3.0.18 - 2026-05-15
 
 ### Added
