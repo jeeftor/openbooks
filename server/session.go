@@ -288,3 +288,21 @@ func (sess *session) processDownloadQueue(server *server) {
 		}
 	}
 }
+
+// refreshServerList periodically requests the names list from IRC to keep
+// the server list up to date. This runs in its own goroutine.
+func (sess *session) refreshServerList() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if sess.irc.IsConnected() {
+				sess.irc.GetUsers("ebooks")
+			}
+		case <-sess.ctx.Done():
+			return
+		}
+	}
+}

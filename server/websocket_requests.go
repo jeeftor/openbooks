@@ -126,6 +126,7 @@ func (c *Client) startIrcConnection(server *server) {
 		go core.StartReader(sess.ctx, sess.irc, handler)
 		go sess.processSearchQueue(server)
 		go sess.processDownloadQueue(server)
+		go sess.refreshServerList()
 	}
 	// else: reconnecting — IRC and both queues are already running.
 
