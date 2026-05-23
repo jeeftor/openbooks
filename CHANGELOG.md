@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v3.0.29 - 2026-05-23
+
+### Fixed
+
+- **Server list now auto-refreshes every 30 seconds:** The online server count wasn't updating regularly because IRC only sends NAMES list when joining the channel or when users join/quit. Added a background goroutine that requests fresh NAMES from IRC every 30 seconds, ensuring the server list stays current.
+
+### Changed
+
+- New `refreshServerList()` goroutine started with each IRC connection.
+
 ## v3.0.26 - 2026-05-22
 
 ### Fixed
