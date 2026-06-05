@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v3.0.32 - 2026-06-05
+
+### Changed
+
+- **Staged Books: delete button always visible:** The trash icon on staged book rows is now always visible instead of appearing only on hover, making it easier to dismiss books you don't want to save.
+
 ## v3.0.29 - 2026-05-23
 
 ### Fixed

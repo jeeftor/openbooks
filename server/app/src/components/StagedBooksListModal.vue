@@ -137,7 +137,7 @@ function formatDate(iso: string): string {
             <template v-else>
               <button
                 @click.stop="requestDelete(book.id)"
-                class="flex-shrink-0 p-1.5 rounded text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                class="flex-shrink-0 p-1.5 rounded text-slate-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 title="Delete"
               >
                 <Trash2 :size="14" />
