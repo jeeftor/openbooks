@@ -55,6 +55,13 @@ function selectTab(tab: Tab) {
         <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-slate-50">OpenBooks ABS</span>
         <div class="flex items-center gap-1">
           <button
+            class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
+            title="Collapse sidebar"
+            @click="appStore.toggleSidebar()"
+          >
+            <PanelLeftClose :size="16" />
+          </button>
+          <button
             v-if="appStore.stagedBooksCount > 0"
             class="relative p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600 dark:text-amber-400 transition-colors"
             :title="`${appStore.stagedBooksCount} staged book${appStore.stagedBooksCount === 1 ? '' : 's'} — click to process`"

@@ -70,7 +70,7 @@ const serverDropdownOpen = ref(false);
 const authorFilter = ref("");
 const titleFilter = ref("");
 const formatFilter = ref<string[]>([...prefStore.preferredFormats]);
-const excludeNoSize = ref(false);
+const excludeNoSize = ref(true);
 const groupBooks = ref(false);
 const expandedGroups = ref<Set<string>>(new Set());
 
@@ -304,7 +304,7 @@ watch(
     authorFilter.value = "";
     titleFilter.value = "";
     formatFilter.value = [...prefStore.preferredFormats];
-    excludeNoSize.value = false;
+    excludeNoSize.value = true;
   }
 );
 
