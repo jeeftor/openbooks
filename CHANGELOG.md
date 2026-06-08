@@ -109,6 +109,10 @@
 - Clicking a pending (already-queued) history item no longer re-queues the search — it just switches the view to that item.
 - Search results now route to the correct history item even if the user navigated to a different item while waiting for results.
 
+### Changed
+
+- Show non-release builds with their branch or channel name, such as `master 15b38e1`, instead of the generic `dev` label.
+
 ## v2.0.2 - 2026-05-08
 
 ### Added
