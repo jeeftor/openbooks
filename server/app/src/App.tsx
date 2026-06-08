@@ -95,7 +95,7 @@ export default function App() {
             }
           }
         }}>
-        <NotificationsProvider position="top-center">
+        <NotificationsProvider position="bottom-right">
           <AppShell
             navbar={isMobile ? undefined : <Sidebar />}
             padding={0}

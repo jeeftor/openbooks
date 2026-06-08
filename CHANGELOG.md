@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v3.0.36 - 2026-06-07
+
+### Fixed
+
+- **Book modal no longer dismisses on backdrop click:** Clicking outside the rename/save dialog no longer accidentally saves the book with the original IRC filename. The modal must now be explicitly dismissed via one of the action buttons.
+
+### Changed
+
+- **Notifications moved to bottom-right:** Download notifications now appear in the bottom-right corner instead of top-center, so they no longer obscure the book you are currently editing.
+
 ## v3.0.32 - 2026-06-05
 
 ### Changed
