@@ -11,6 +11,7 @@
 ### Changed
 
 - **Notifications moved to bottom-right:** Download notifications now appear in the bottom-right corner instead of top-center, so they no longer obscure the book you are currently editing.
+- **Download banner stays visible during file transfer:** The "waiting for bot" banner no longer disappears when the DCC transfer starts. It transitions to a "Transferring…" state with a shimmer progress bar and spinning indicator until the download completes.
 
 ## v3.0.32 - 2026-06-05
 
