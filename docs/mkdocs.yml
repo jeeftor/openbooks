@@ -62,6 +62,7 @@ nav:
       # - Modes:/
       # - Server: modes/server.md
       - IRC Notes: irc-notes.md
+      - MCP Server: mcp.md
   - Changelog: changelog.md
   - Developers:
       - Home: developers/index.md

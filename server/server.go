@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/evan-buss/openbooks/mcp"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -77,6 +80,8 @@ type Config struct {
 	ReplaceSpace      string
 	PostProcessCmd    []string // command + args; file path appended automatically
 	DevMode           bool
+	EnableMCP         bool     // mount MCP server at /mcp
+	MCPFormats        []string // file format filter for MCP searches (default: epub)
 }
 
 func New(config Config) *server {
@@ -164,29 +169,57 @@ func Start(config Config) {
 	}
 	router.Use(cors.New(corsConfig).Handler)
 
-	server := New(config)
-	server.initStores()
-	routes := server.registerRoutes()
+	srv := New(config)
+	srv.initStores()
+	routes := srv.registerRoutes()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go server.startClientHub(ctx)
-	server.registerGracefulShutdown(cancel)
+	go srv.startClientHub(ctx)
+	srv.registerGracefulShutdown(cancel)
 	router.Mount(config.Basepath, routes)
 
-	server.log.Printf("Version: %s (commit: %s, built: %s)\n", config.Version, config.CommitSHA, config.BuildDate)
-	server.log.Printf("Listening on port:      %v", config.Port)
-	server.log.Printf("Base path:              %s", config.Basepath)
-	server.log.Printf("Download directory:     %s", config.DownloadDir)
-	server.log.Printf("Organize downloads:     %v", config.OrganizeDownloads)
-	server.log.Printf("Dev mode:               %v", config.DevMode)
-	server.log.Printf("IRC server:             %s (TLS: %v)", config.Server, config.EnableTLS)
-	server.log.Printf("Username:               %s", config.UserName)
-	server.log.Printf("Search bot:             %s", config.SearchBot)
-	if len(config.PostProcessCmd) > 0 {
-		server.log.Printf("Post-process command:   %v", config.PostProcessCmd)
-		validatePostProcessCmd(config.PostProcessCmd, server.log)
+	if config.EnableMCP {
+		mcpSession, err := mcp.Connect(ctx, mcp.Config{
+			UserName:    config.UserName + "_mcp",
+			UserAgent:   config.UserAgent,
+			Server:      config.Server,
+			EnableTLS:   config.EnableTLS,
+			SearchBot:   config.SearchBot,
+			DownloadDir: config.DownloadDir,
+			Formats:     config.MCPFormats,
+			Log:         slog.New(slog.NewTextHandler(os.Stderr, nil)),
+			ActivityLog: func(level, msg string) {
+				switch level {
+				case "error":
+					srv.logBuf.error(msg)
+				default:
+					srv.logBuf.info(msg)
+				}
+			},
+		})
+		if err != nil {
+			srv.log.Printf("MCP IRC connect failed: %v — MCP endpoint disabled", err)
+		} else {
+			baseURL := fmt.Sprintf("http://127.0.0.1:%s%smcp", config.Port, config.Basepath)
+			router.Mount("/mcp", mcp.NewMCPHandler(mcpSession, baseURL))
+			srv.log.Printf("MCP endpoint:           %s", baseURL)
+		}
 	}
-	server.log.Fatal(http.ListenAndServe(":"+config.Port, router))
+
+	srv.log.Printf("Version: %s (commit: %s, built: %s)\n", config.Version, config.CommitSHA, config.BuildDate)
+	srv.log.Printf("Listening on port:      %v", config.Port)
+	srv.log.Printf("Base path:              %s", config.Basepath)
+	srv.log.Printf("Download directory:     %s", config.DownloadDir)
+	srv.log.Printf("Organize downloads:     %v", config.OrganizeDownloads)
+	srv.log.Printf("Dev mode:               %v", config.DevMode)
+	srv.log.Printf("IRC server:             %s (TLS: %v)", config.Server, config.EnableTLS)
+	srv.log.Printf("Username:               %s", config.UserName)
+	srv.log.Printf("Search bot:             %s", config.SearchBot)
+	if len(config.PostProcessCmd) > 0 {
+		srv.log.Printf("Post-process command:   %v", config.PostProcessCmd)
+		validatePostProcessCmd(config.PostProcessCmd, srv.log)
+	}
+	srv.log.Fatal(http.ListenAndServe(":"+config.Port, router))
 }
 
 // The client hub is to be run in a goroutine and handles management of

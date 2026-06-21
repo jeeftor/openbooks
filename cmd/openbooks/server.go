@@ -27,6 +27,8 @@ func init() {
 	serverCmd.Flags().BoolVar(&serverConfig.DevMode, "dev", false, "Keep a raw .orig copy beside each saved download for local testing.")
 	serverCmd.Flags().StringVar(&replaceSpace, "replace-space", "", "Replace spaces in author/title directory names with this character (e.g. '.', '-', '_').")
 	serverCmd.Flags().StringSliceVar(&serverConfig.PostProcessCmd, "post-process-cmd", nil, "Command to run after each book download. File path is appended as last argument. Example: --post-process-cmd 'calibre-polish,--embed-fonts,--smarten-punctuation'")
+	serverCmd.Flags().BoolVar(&serverConfig.EnableMCP, "mcp", false, "Mount an MCP server at /mcp for AI agent access.")
+	serverCmd.Flags().StringSliceVar(&serverConfig.MCPFormats, "mcp-formats", []string{"epub"}, "File formats the MCP server will return in search results.")
 }
 
 var serverCmd = &cobra.Command{
@@ -45,6 +47,12 @@ var serverCmd = &cobra.Command{
 			}
 		}
 		serverConfig.Basepath = sanitizePath(serverConfig.Basepath)
+
+		if !serverConfig.EnableMCP {
+			if _, present := os.LookupEnv("ENABLE_MCP"); present {
+				serverConfig.EnableMCP = true
+			}
+		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		serverConfig.ReplaceSpace = replaceSpace
