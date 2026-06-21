@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## v3.0.38 - 2026-06-21
+
+### Changed
+
+- **`moveFile` delegates to `copyFile`** for the cross-device fallback — eliminates duplicated copy logic.
+- **`filterByFormat` passthrough removed** — callers use `FilterResults` directly.
+- **Dead V1 search parser removed** — `ParseSearch` and `parseLine` deleted from `core/search_parser.go` (unused since V2 was introduced).
+- **`keepRunes` helper extracted** — `normalizeAuthor` and `normalizeTitle` in `mcp/tools.go` now share a single rune-filter helper.
+- **`fileSizeMB` uses `formatBytes`** — consistent human-readable size output across the codebase.
+- **`MockSession.isTrustedServer` no longer allocates** — iterates the package-level `mockServers` var directly instead of calling `Servers()`.
+- **Stale `trusted[]` removed from MCP tool description** — `search_books` description no longer documents the removed field.
+- **Leaked child contexts removed from client hub** — `startClientHub` no longer creates throwaway `context.WithCancel` children; closing the send channel is sufficient.
+
 ## v3.0.37 - 2026-06-21
 
 ### Changed

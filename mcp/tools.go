@@ -47,18 +47,24 @@ type bookResult struct {
 // reVariants strips parenthetical/bracketed segments: "(retail)", "[epub]", "(v1.2)", etc.
 var reVariants = regexp.MustCompile(`\s*[\(\[][^\)\]]*[\)\]]`)
 
+// keepRunes returns s filtered to only the runes for which allow returns true.
+func keepRunes(s string, allow func(rune) bool) string {
+	var b strings.Builder
+	for _, r := range s {
+		if allow(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // normalizeAuthor handles "Last, First" vs "First Last" by stripping punctuation,
 // splitting into words, sorting alphabetically, then joining. Both forms produce
 // the same key.
 func normalizeAuthor(s string) string {
 	s = strings.ToLower(s)
-	var b strings.Builder
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || r == ' ' {
-			b.WriteRune(r)
-		}
-	}
-	words := strings.Fields(b.String())
+	s = keepRunes(s, func(r rune) bool { return (r >= 'a' && r <= 'z') || r == ' ' })
+	words := strings.Fields(s)
 	sort.Strings(words)
 	return strings.Join(words, "")
 }
@@ -72,14 +78,7 @@ func normalizeTitle(s string) string {
 	// Strip leading " - " left behind after series bracket removal.
 	s = strings.TrimPrefix(strings.TrimSpace(s), "- ")
 	s = strings.TrimSpace(s)
-	// Remove all non-alphanumeric characters.
-	var b strings.Builder
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
+	return keepRunes(s, func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') })
 }
 
 // parseSizeBytes converts IRC size strings to a float64 for comparison.
@@ -190,9 +189,8 @@ func registerTools(s *server.MCPServer, src bookSource) {
 		mcp.NewTool("search_books",
 			mcp.WithDescription(`Search for ebooks on IRC. Synchronous — may take up to 60 seconds.
 
-Returns only epub results from trusted servers, deduplicated by title. Response fields:
-- servers[]: server names used as representatives
-- trusted[]: indexes into servers[] that are trusted/elevated (all entries here, since untrusted are filtered out)
+Returns only epub results from online servers, deduplicated by title. Response fields:
+- servers[]: server names (representatives for each returned book)
 - books[]: one entry per unique title with fields: s (index into servers[]), author, title, size, dl (pass to download_book), copies (sources found, omitted if 1)`),
 			mcp.WithString("query",
 				mcp.Required(),

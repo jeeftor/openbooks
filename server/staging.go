@@ -167,24 +167,9 @@ func moveFile(src, dst string) error {
 		return nil
 	}
 	// Cross-device fallback
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open source: %w", err)
+	if err := copyFile(src, dst); err != nil {
+		return err
 	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("create target: %w", err)
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		os.Remove(dst)
-		return fmt.Errorf("copy: %w", err)
-	}
-	out.Close()
-	in.Close()
 	return os.Remove(src)
 }
 

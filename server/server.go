@@ -238,9 +238,7 @@ func (server *server) startClientHub(ctx context.Context) {
 			// Use pointer equality: if a new client replaced this one, skip the delete
 			// so we don't evict the replacement from the map.
 			if existing, ok := server.clients[client.uuid]; ok && existing == client {
-				_, cancel := context.WithCancel(client.ctx)
 				close(client.send)
-				cancel()
 				delete(server.clients, client.uuid)
 			}
 		case msg := <-server.broadcastCh:
@@ -249,9 +247,7 @@ func (server *server) startClientHub(ctx context.Context) {
 			}
 		case <-ctx.Done():
 			for _, client := range server.clients {
-				_, cancel := context.WithCancel(client.ctx)
 				close(client.send)
-				cancel()
 				delete(server.clients, client.uuid)
 			}
 			return

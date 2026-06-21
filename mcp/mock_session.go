@@ -54,8 +54,12 @@ func (m *MockSession) DownloadBook(_ context.Context, downloadString string) (st
 	return m.downloadDir + "/mock-download.epub", nil
 }
 
+var mockServers = []string{"ThrawnBot", "EpubWorld", "Alexandria", "MirrorBot"}
+
 func (m *MockSession) Servers() []string {
-	return []string{"ThrawnBot", "EpubWorld", "Alexandria", "MirrorBot"}
+	out := make([]string, len(mockServers))
+	copy(out, mockServers)
+	return out
 }
 
 func (m *MockSession) ListLibrary() ([]LibraryBook, error) {
@@ -76,7 +80,7 @@ func (m *MockSession) ListLibrary() ([]LibraryBook, error) {
 }
 
 func (m *MockSession) isTrustedServer(server string) bool {
-	for _, s := range m.Servers() {
+	for _, s := range mockServers {
 		if s == server {
 			return true
 		}

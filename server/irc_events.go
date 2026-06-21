@@ -18,8 +18,7 @@ func fileSizeMB(path string) string {
 	if err != nil {
 		return "? MB"
 	}
-	mb := float64(info.Size()) / 1024 / 1024
-	return fmt.Sprintf("%.1f MB", mb)
+	return formatBytes(info.Size())
 }
 
 // NewIrcEventHandler builds the event handler map for a session's IRC connection.

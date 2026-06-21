@@ -125,7 +125,7 @@ func (s *Session) SearchBooks(ctx context.Context, query string) ([]core.BookDet
 			s.logActivity("error", fmt.Sprintf("🤖 MCP search failed: %v", outcome.err))
 			return nil, nil, outcome.err
 		}
-		filtered := filterByFormat(outcome.books, s.formats)
+		filtered := FilterResults(outcome.books, s.formats)
 		s.logActivity("info", fmt.Sprintf("🤖 MCP search results: %d found for %q", len(filtered), query))
 		return filtered, outcome.errors, nil
 	case <-time.After(90 * time.Second):
@@ -229,10 +229,6 @@ func FilterResults(books []core.BookDetail, formats []string) []core.BookDetail 
 		out = append(out, b)
 	}
 	return out
-}
-
-func filterByFormat(books []core.BookDetail, formats []string) []core.BookDetail {
-	return FilterResults(books, formats)
 }
 
 // formatMatches returns true if the book format is in the allowed list.
