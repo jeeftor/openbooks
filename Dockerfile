@@ -35,6 +35,8 @@ COPY --from=build /go/src/openbooks .
 EXPOSE 80
 VOLUME ["/books"]
 ENV BASE_PATH=/
+# Set ENABLE_MCP=true to mount the MCP server at /mcp for AI agent access.
+ENV ENABLE_MCP=
 
 ENTRYPOINT ["./openbooks"]
 CMD ["server", "--dir", "/books", "--port", "80"]
