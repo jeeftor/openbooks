@@ -34,7 +34,9 @@ type searchResult struct {
 func registerTools(s *server.MCPServer, src bookSource) {
 	s.AddTool(
 		mcp.NewTool("search_books",
-			mcp.WithDescription("Search for ebooks on IRC. Returns a list of results with server trust, file size, and download strings so you can rank and choose the best one."),
+			mcp.WithDescription(`Search for ebooks on IRC. This call is synchronous and may take up to 60 seconds while waiting for the IRC bot to respond — this is normal, please wait for the result.
+
+Returns a list of results filtered to epub format (zero-size entries excluded). Each result includes server name, trusted_server flag, author, title, format, size, and a download_string. Use these signals to rank results: prefer trusted servers, reasonable file sizes, and the closest title match. Pass the chosen download_string to download_book.`),
 			mcp.WithString("query",
 				mcp.Required(),
 				mcp.Description("The search query, e.g. 'Dune Frank Herbert' or 'Foundation Asimov'"),

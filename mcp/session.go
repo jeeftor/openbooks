@@ -215,20 +215,48 @@ func (s *Session) logActivity(level, msg string) {
 	}
 }
 
-func filterByFormat(books []core.BookDetail, formats []string) []core.BookDetail {
-	if len(formats) == 0 {
-		return books
-	}
+// FilterResults removes books that don't match the format list and drops
+// entries with a zero or missing file size (corrupt/empty listings).
+func FilterResults(books []core.BookDetail, formats []string) []core.BookDetail {
 	out := make([]core.BookDetail, 0, len(books))
 	for _, b := range books {
-		for _, f := range formats {
-			if strings.EqualFold(b.Format, f) {
-				out = append(out, b)
-				break
-			}
+		if isZeroSize(b.Size) {
+			continue
 		}
+		if len(formats) > 0 && !formatMatches(b.Format, formats) {
+			continue
+		}
+		out = append(out, b)
 	}
 	return out
+}
+
+func filterByFormat(books []core.BookDetail, formats []string) []core.BookDetail {
+	return FilterResults(books, formats)
+}
+
+// formatMatches returns true if the book format is in the allowed list.
+func formatMatches(format string, formats []string) bool {
+	for _, f := range formats {
+		if strings.EqualFold(format, f) {
+			return true
+		}
+	}
+	return false
+}
+
+// isZeroSize returns true for entries that have no meaningful file size.
+// IRC result sizes are strings like "1.2 MB", "500 KB", "N/A", "0", "".
+func isZeroSize(size string) bool {
+	size = strings.TrimSpace(size)
+	if size == "" || size == "N/A" || size == "0" || size == "0 B" || size == "0.0 B" {
+		return true
+	}
+	// catch "0 KB", "0.0 MB", etc.
+	if strings.HasPrefix(size, "0 ") || strings.HasPrefix(size, "0.0 ") {
+		return true
+	}
+	return false
 }
 
 // isTrustedServer returns true if the server name appears in the elevated list.
