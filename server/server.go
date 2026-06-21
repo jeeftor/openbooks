@@ -82,6 +82,7 @@ type Config struct {
 	DevMode           bool
 	EnableMCP         bool     // mount MCP server at /mcp
 	MCPFormats        []string // file format filter for MCP searches (default: epub)
+	MCPBaseURL        string   // external base URL for MCP SSE (e.g. http://myhost:5228)
 }
 
 func New(config Config) *server {
@@ -200,9 +201,12 @@ func Start(config Config) {
 		if err != nil {
 			srv.log.Printf("MCP IRC connect failed: %v — MCP endpoint disabled", err)
 		} else {
-			baseURL := fmt.Sprintf("http://127.0.0.1:%s%smcp", config.Port, config.Basepath)
+			baseURL := config.MCPBaseURL
+			if baseURL == "" {
+				baseURL = fmt.Sprintf("http://127.0.0.1:%s%smcp", config.Port, config.Basepath)
+			}
 			router.Mount("/mcp", mcp.NewMCPHandler(mcpSession, baseURL))
-			srv.log.Printf("MCP endpoint:           %s", baseURL)
+			srv.log.Printf("MCP endpoint:           %s/sse", baseURL)
 		}
 	}
 

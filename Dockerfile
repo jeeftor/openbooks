@@ -37,6 +37,9 @@ VOLUME ["/books"]
 ENV BASE_PATH=/
 # Set ENABLE_MCP=true to mount the MCP server at /mcp for AI agent access.
 ENV ENABLE_MCP=
+# Set MCP_BASE_URL to the external URL MCP clients should use (e.g. http://myserver:8080).
+# Defaults to http://127.0.0.1:<port> which only works for local clients.
+ENV MCP_BASE_URL=
 
 ENTRYPOINT ["./openbooks"]
 CMD ["server", "--dir", "/books", "--port", "80"]
