@@ -23,6 +23,7 @@ type Session struct {
 	downloadDir string
 	formats     []string // file formats to accept, e.g. ["epub"]
 	log         *slog.Logger
+	activityLog func(level, msg string) // optional hook into host log buffer
 
 	mu           sync.Mutex // serialises search AND download calls
 	searchDone   chan searchOutcome
@@ -53,6 +54,10 @@ type Config struct {
 	DownloadDir string
 	Formats     []string // filter; nil or empty means accept all
 	Log         *slog.Logger
+	// ActivityLog is called for key events (search, download) so callers can
+	// route them into a shared log buffer (e.g. the web UI's log panel).
+	// Optional — if nil, only slog output is produced.
+	ActivityLog func(level, msg string)
 }
 
 // Connect creates a new Session and connects to IRC.
@@ -78,6 +83,7 @@ func Connect(ctx context.Context, cfg Config) (*Session, error) {
 		downloadDir:  cfg.DownloadDir,
 		formats:      formats,
 		log:          logger,
+		activityLog:  cfg.ActivityLog,
 		searchDone:   make(chan searchOutcome, 1),
 		downloadDone: make(chan downloadOutcome, 1),
 	}
@@ -111,15 +117,19 @@ func (s *Session) SearchBooks(ctx context.Context, query string) ([]core.BookDet
 
 	core.SearchBook(s.irc, s.searchBot, query)
 	s.log.Info("search sent", "query", query)
+	s.logActivity("info", fmt.Sprintf("🤖 MCP search: %q", query))
 
 	select {
 	case outcome := <-s.searchDone:
 		if outcome.err != nil {
+			s.logActivity("error", fmt.Sprintf("🤖 MCP search failed: %v", outcome.err))
 			return nil, nil, outcome.err
 		}
 		filtered := filterByFormat(outcome.books, s.formats)
+		s.logActivity("info", fmt.Sprintf("🤖 MCP search results: %d found for %q", len(filtered), query))
 		return filtered, outcome.errors, nil
 	case <-time.After(90 * time.Second):
+		s.logActivity("error", fmt.Sprintf("🤖 MCP search timed out: %q", query))
 		return nil, nil, fmt.Errorf("search timed out after 90s")
 	case <-ctx.Done():
 		return nil, nil, ctx.Err()
@@ -133,11 +143,18 @@ func (s *Session) DownloadBook(ctx context.Context, downloadString string) (stri
 
 	core.DownloadBook(s.irc, downloadString)
 	s.log.Info("download sent", "string", downloadString)
+	s.logActivity("info", fmt.Sprintf("🤖 MCP download: %s", downloadString))
 
 	select {
 	case outcome := <-s.downloadDone:
+		if outcome.err != nil {
+			s.logActivity("error", fmt.Sprintf("🤖 MCP download failed: %v", outcome.err))
+		} else {
+			s.logActivity("info", fmt.Sprintf("🤖 MCP download complete: %s", outcome.path))
+		}
 		return outcome.path, outcome.err
 	case <-time.After(3 * time.Minute):
+		s.logActivity("error", "🤖 MCP download timed out")
 		return "", fmt.Errorf("download timed out after 3m")
 	case <-ctx.Done():
 		return "", ctx.Err()
@@ -189,6 +206,13 @@ func (s *Session) buildHandler() core.EventHandler {
 	}
 
 	return handler
+}
+
+// logActivity emits to the activity log callback if set.
+func (s *Session) logActivity(level, msg string) {
+	if s.activityLog != nil {
+		s.activityLog(level, msg)
+	}
 }
 
 func filterByFormat(books []core.BookDetail, formats []string) []core.BookDetail {

@@ -188,6 +188,14 @@ func Start(config Config) {
 			DownloadDir: config.DownloadDir,
 			Formats:     config.MCPFormats,
 			Log:         slog.New(slog.NewTextHandler(os.Stderr, nil)),
+			ActivityLog: func(level, msg string) {
+				switch level {
+				case "error":
+					srv.logBuf.error(msg)
+				default:
+					srv.logBuf.info(msg)
+				}
+			},
 		})
 		if err != nil {
 			srv.log.Printf("MCP IRC connect failed: %v — MCP endpoint disabled", err)
