@@ -20,23 +20,22 @@ type ServerConfig struct {
 
 	// Transport
 	Mock bool   // use fake data, no IRC connection
-	Port int    // if > 0, serve HTTP+SSE on this port; otherwise use stdio
+	Port int    // if > 0, serve HTTP (StreamableHTTP) on this port; otherwise use stdio
 	Host string // host to bind to (default "127.0.0.1")
 }
 
-// NewMCPHandler builds the MCP SSE http.Handler for mounting into an existing
-// HTTP server (e.g. the OpenBooks web server at /mcp). The caller is
-// responsible for starting the IRC session via Connect and passing it as src,
-// or passing a MockSession for testing.
+// NewMCPHandler builds the MCP StreamableHTTP http.Handler for mounting into
+// an existing HTTP server (e.g. the OpenBooks web server at /mcp). The caller
+// is responsible for starting the IRC session via Connect and passing it as
+// src, or passing a MockSession for testing.
 //
 // Mount the returned handler at a path, e.g.:
 //
-//	router.Mount("/mcp", mcp.NewMCPHandler(sess, baseURL))
-func NewMCPHandler(src bookSource, baseURL string) http.Handler {
+//	router.Mount("/mcp", mcp.NewMCPHandler(sess))
+func NewMCPHandler(src bookSource) http.Handler {
 	s := mcpserver.NewMCPServer(serverName, serverVersion, mcpserver.WithToolCapabilities(false))
 	registerTools(s, src)
-	sse := mcpserver.NewSSEServer(s, mcpserver.WithBaseURL(baseURL))
-	return sse
+	return mcpserver.NewStreamableHTTPServer(s)
 }
 
 // Start connects to IRC (or creates a mock session) and then starts the MCP
@@ -61,9 +60,9 @@ func Start(ctx context.Context, cfg ServerConfig) error {
 
 	if cfg.Port > 0 {
 		addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
-		cfg.IRC.Log.Info("starting MCP HTTP/SSE server", "addr", addr)
-		sseServer := mcpserver.NewSSEServer(s, mcpserver.WithBaseURL(fmt.Sprintf("http://%s", addr)))
-		return sseServer.Start(addr)
+		cfg.IRC.Log.Info("starting MCP HTTP/StreamableHTTP server", "addr", addr)
+		httpServer := mcpserver.NewStreamableHTTPServer(s)
+		return httpServer.Start(addr)
 	}
 
 	cfg.IRC.Log.Info("starting MCP stdio server")

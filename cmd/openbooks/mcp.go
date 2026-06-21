@@ -21,8 +21,8 @@ func init() {
 	desktopCmd.AddCommand(mcpCmd)
 
 	mcpCmd.Flags().BoolVar(&mcpMock, "mock", false, "Use fake data instead of a real IRC connection (for testing).")
-	mcpCmd.Flags().IntVarP(&mcpPort, "port", "p", 0, "Port to serve MCP over HTTP/SSE. If 0, uses stdio transport.")
-	mcpCmd.Flags().StringVar(&mcpHost, "host", "127.0.0.1", "Host to bind HTTP/SSE server to.")
+	mcpCmd.Flags().IntVarP(&mcpPort, "port", "p", 0, "Port to serve MCP over HTTP/StreamableHTTP. If 0, uses stdio transport.")
+	mcpCmd.Flags().StringVar(&mcpHost, "host", "127.0.0.1", "Host to bind the HTTP/StreamableHTTP server to.")
 	mcpCmd.Flags().StringVarP(&mcpDir, "dir", "d", os.TempDir(), "Directory where downloaded books are saved.")
 	mcpCmd.Flags().StringSliceVar(&mcpFormats, "formats", []string{"epub"}, "Comma-separated list of accepted file formats.")
 }
@@ -36,8 +36,8 @@ var mcpCmd = &cobra.Command{
   - list_servers   List available IRC download servers
   - list_library   List books already on disk
 
-Use --port to expose via HTTP/SSE (e.g. for Claude Desktop).
-Without --port the server speaks MCP over stdio.
+Use --port to expose via HTTP/StreamableHTTP (compatible with Hermes and other MCP clients).
+Without --port the server speaks MCP over stdio (compatible with Claude Desktop).
 Use --mock to test without a real IRC connection.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		logger := obsmcp.DefaultLogger()

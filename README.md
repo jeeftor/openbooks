@@ -29,6 +29,11 @@ OpenBooks ABS is not affiliated with Audiobookshelf.
   - [Running Beside Audiobookshelf](#running-beside-audiobookshelf)
 - [Important Flags](#important-flags)
 - [Post-Processing](#post-processing)
+- [MCP Server](#mcp-server)
+  - [Running the MCP Server](#running-the-mcp-server)
+  - [MCP Tools](#mcp-tools)
+  - [Claude Desktop Configuration](#claude-desktop-configuration)
+  - [Docker MCP Setup](#docker-mcp-setup)
 - [Reverse Proxy Base Path](#reverse-proxy-base-path)
 - [Local Development](#local-development)
 - [Technology](#technology)
@@ -276,6 +281,100 @@ services:
     # Custom tools should be baked into a derived image, then referenced here.
     # OpenBooks ABS appends the downloaded file path:
     # --post-process-cmd "cleanup-epub,--strict"
+```
+
+## MCP Server
+
+OpenBooks ABS includes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that lets AI agents search for and download ebooks directly from IRC. This enables workflows like asking Claude to find and download a book without opening the browser UI.
+
+### Running the MCP Server
+
+The MCP server is a subcommand of the main binary. It requires `--name` (your IRC username) and `--dir` (where books are saved).
+
+**stdio transport** (for Claude Desktop and most MCP clients):
+
+```bash
+./openbooks mcp --name myuser --dir ./books
+```
+
+**HTTP/StreamableHTTP transport** (for remote or Docker-hosted use):
+
+```bash
+./openbooks mcp --name myuser --dir ./books --port 8081
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | required | IRC username (unless `--mock`) |
+| `--dir` | system temp | Directory where downloaded books are saved |
+| `--port` | 0 (stdio) | Port for HTTP/StreamableHTTP transport. If 0, uses stdio. |
+| `--host` | `127.0.0.1` | Host to bind the HTTP/StreamableHTTP server to |
+| `--formats` | `epub` | Accepted file formats (comma-separated) |
+| `--mock` | false | Use fake data instead of a real IRC connection (for testing) |
+
+The MCP server also inherits the global IRC flags: `--server`, `--searchbot`, `--tls`.
+
+### MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `search_books` | Search IRC for ebooks. Returns deduplicated epub results from online/trusted servers only, grouped by title. Response includes `servers[]` (server name index) and `books[]` with `s` (server index), `author`, `title`, `size`, `dl` (download string), and `copies` (sources collapsed, omitted when 1). |
+| `download_book` | Download a book using the `dl` string from `search_books`. |
+| `list_servers` | List currently available IRC download servers. |
+| `list_library` | List ebooks already on disk. Accepts an optional `query` parameter to filter by filename substring. |
+
+### Claude Desktop Configuration
+
+Add the following to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "openbooks": {
+      "command": "/path/to/openbooks",
+      "args": ["mcp", "--name", "myuser", "--dir", "/path/to/books"]
+    }
+  }
+}
+```
+
+### Docker MCP Setup
+
+The MCP endpoint is served at `/mcp` on the **same port as the web UI** — no separate container or port needed. Enable it with the `ENABLE_MCP=true` environment variable:
+
+```yaml
+services:
+  openbooks:
+    image: ghcr.io/jeeftor/openbooks-abs:latest-calibre
+    environment:
+      - ENABLE_MCP=true
+    command: server --name myuser --dir /books --port 80
+    volumes:
+      - ./books:/books
+    ports:
+      - "8080:80"
+```
+
+Point your MCP client at:
+
+```
+http://localhost:8080/mcp
+```
+
+If openbooks is behind a reverse proxy (e.g. exposed at `https://openbooks.example.com`), the MCP URL is simply:
+
+```
+https://openbooks.example.com/mcp
+```
+
+**Standalone MCP-only container** (HTTP/StreamableHTTP, no web UI):
+
+```bash
+docker run \
+  -p 8081:8081 \
+  -v ./books:/books \
+  ghcr.io/jeeftor/openbooks-abs:latest \
+  mcp --name myuser --dir /books --port 8081 --host 0.0.0.0
 ```
 
 ## Reverse Proxy Base Path

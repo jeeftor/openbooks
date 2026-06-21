@@ -29,7 +29,6 @@ func init() {
 	serverCmd.Flags().StringSliceVar(&serverConfig.PostProcessCmd, "post-process-cmd", nil, "Command to run after each book download. File path is appended as last argument. Example: --post-process-cmd 'calibre-polish,--embed-fonts,--smarten-punctuation'")
 	serverCmd.Flags().BoolVar(&serverConfig.EnableMCP, "mcp", false, "Mount an MCP server at /mcp for AI agent access.")
 	serverCmd.Flags().StringSliceVar(&serverConfig.MCPFormats, "mcp-formats", []string{"epub"}, "File formats the MCP server will return in search results.")
-	serverCmd.Flags().StringVar(&serverConfig.MCPBaseURL, "mcp-base-url", "", "External base URL for the MCP SSE endpoint (e.g. http://myserver:5228). Defaults to http://127.0.0.1:<port>.")
 }
 
 var serverCmd = &cobra.Command{
@@ -52,11 +51,6 @@ var serverCmd = &cobra.Command{
 		if !serverConfig.EnableMCP {
 			if _, present := os.LookupEnv("ENABLE_MCP"); present {
 				serverConfig.EnableMCP = true
-			}
-		}
-		if serverConfig.MCPBaseURL == "" {
-			if v, present := os.LookupEnv("MCP_BASE_URL"); present {
-				serverConfig.MCPBaseURL = v
 			}
 		}
 	},

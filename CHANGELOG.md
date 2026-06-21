@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v3.0.37 - 2026-06-21
+
+### Changed
+
+- **MCP transport switched from SSE to StreamableHTTP:** The MCP server now uses the StreamableHTTP transport (`mcp-go v0.55.0`) instead of the older SSE transport. This is compatible with Hermes and other modern MCP clients. The endpoint remains `/mcp` on the same port as the web UI — no separate port or container needed.
+- **MCP search results deduplicated and token-optimised:** `search_books` now filters to EPUB format and online (trusted) servers only, then groups results by normalised author+title. Each unique title returns one representative entry (largest file). Server names are hoisted to a top-level `servers[]` array; each book carries an integer index `s` instead of repeating the full server name. This reduces response size dramatically for large IRC result sets.
+- **MCP `list_library` now accepts a `query` filter:** Pass a `query` string to `list_library` to filter results by filename substring, avoiding the large responses that occur with full library listings.
+- **`MCP_BASE_URL` env var removed:** No longer needed — StreamableHTTP does not require a base URL hint. Remove it from any Docker Compose files.
+- **README updated with full MCP documentation:** Added MCP server section covering stdio and HTTP transports, all flags, tool descriptions, Claude Desktop config, Docker setup, and reverse proxy URL pattern.
+
 ## v3.0.36 - 2026-06-07
 
 ### Fixed
