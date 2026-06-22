@@ -1,5 +1,17 @@
 # Agent Instructions
 
+## CRITICAL: Module Path
+
+**The Go module path is `github.com/jeeftor/openbooks`.**
+
+This is our own fork. The upstream `github.com/evan-buss/openbooks` must NEVER appear in:
+- Go import paths
+- `go.mod`
+- Documentation links, config URLs, or any other config
+- New code, refactors, or generated code
+
+The `README.md` is the ONLY file that may mention `evan-buss` (to credit the fork origin). No other file should reference it. If you are creating a new file, adding imports, or writing docs, always use `github.com/jeeftor/openbooks`.
+
 ## GitHub Workflow
 
 - Track all code and documentation changes with a GitHub issue before editing files.
@@ -24,7 +36,6 @@
 ## Existing Project Rules
 
 - Default branch: `master`.
-- **Module path:** `github.com/jeeftor/openbooks` — this is our own fork, not the upstream `evan-buss/openbooks`. Never reference `evan-buss` in code, imports, or config. The README may mention the fork origin.
 - Prefer small, verifiable changes that match the existing project style.
 - Use `rg` for content searches and `fd` or `find` for file discovery.
 - Run the relevant repo-native checks before committing. If a check cannot be run or has known unrelated failures, document that clearly.
