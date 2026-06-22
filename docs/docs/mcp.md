@@ -144,7 +144,9 @@ claude mcp add --transport sse openbooks http://myserver:5228/mcp/sse
 
 - Only one search can be in-flight at a time — concurrent agent calls are serialised automatically.
 - `search_books` has a 90-second timeout; `download_book` has a 3-minute timeout.
-- `search_books` returns the top 10 results by relevance; call `list_search_results` for the full set. The full set is cached server-side from the last search.
+- `search_books` returns the top 20 results by relevance; call `list_search_results` with an `offset` to page through the rest. The full set is cached server-side from the last search.
+- `list_search_results` accepts `offset` (default 0) and `limit` (default 20, max 50) for pagination. The response includes `total`, `offset`, `limit`, and `has_more`.
+- IRC file annotations (e.g. `(retail)`, `(epub)`, `(illus)`, `(v5)`) are stripped from displayed titles for readability. Edition years and series info are preserved. The `dl` string is never affected.
 - Results are filtered to `epub` by default and zero-size entries are always excluded.
 - `download_book` does **not** save to the library — it stages the file and returns metadata for the agent to confirm with the user. Use `confirm_book` to save, or `discard_staged` to cancel.
 - When embedded in the web server, MCP search and download activity appears in the web UI log panel prefixed with `🤖 MCP`.
