@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Improved
+
+- **MCP response token efficiency:** Removed redundant summary text from `search_books`, `list_search_results`, and `download_book` responses — the JSON is self-describing (includes `total`, `truncated`, `has_more`, `staged_id`), so the prepended natural-language summaries were duplicating information and wasting ~150 tokens per call. Responses are now pure JSON.
+- **MCP tool descriptions tightened:** The `download_book` CRITICAL block is now ~70 tokens (down from ~150) with the same behavioral instructions.
+- **EPUBMetadata JSON fields:** Added `omitempty` tags to `Series` and `SeriesIndex` so empty fields are no longer serialized as `"series":"","series_index":""`. Changed JSON field names from PascalCase (`Author`, `Title`, `Series`, `SeriesIndex`) to lowercase (`author`, `title`, `series`, `series_index`) for consistency with the rest of the MCP API. Web UI TypeScript types and Vue components updated to match.
+- **Option `isOrganized` field:** Added `omitempty` so `"isOrganized":false` is no longer serialized on non-organized options.
+- **MCP `stagedBookResponse`:** Dropped `replace_space` from the agent-facing response — it's internal config the agent never uses.
+
 ### Added
 
 - **MCP `confirm_book` clear metadata fields:** `confirm_book` now accepts `clear_series` and `clear_series_index` boolean params. When true, the field is removed from both the filename path and (with `rewrite_metadata=true`) the EPUB's internal OPF — the `calibre:series` / `calibre:series_index` meta tags are stripped entirely. Use when extracted metadata is wrong (e.g. "The Hobbit" tagged as "The Lord of the Rings" series index 0) and the user wants it removed, not just changed. Previously, omitting a field fell back to the extracted value with no way to clear it.

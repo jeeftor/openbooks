@@ -90,24 +90,22 @@ type bookResult struct {
 }
 
 // stagedBookResponse is the agent-facing view of a staged book. It deliberately
-// omits the absolute on-disk path and the base64 cover (which would bloat the
-// response and is not useful to a text agent). The agent presents `metadata`
+// omits the absolute on-disk path, the base64 cover, and the replace_space
+// config (internal, not useful to a text agent). The agent presents `metadata`
 // and `options` to the user, then calls confirm_book with `staged_id`.
 type stagedBookResponse struct {
-	StagedID     string             `json:"staged_id"`
-	IRCFilename  string             `json:"irc_filename"`
-	Metadata     *core.EPUBMetadata `json:"metadata,omitempty"`
-	Options      []staging.Option   `json:"options"`
-	ReplaceSpace string             `json:"replace_space,omitempty"`
+	StagedID    string             `json:"staged_id"`
+	IRCFilename string             `json:"irc_filename"`
+	Metadata    *core.EPUBMetadata `json:"metadata,omitempty"`
+	Options     []staging.Option   `json:"options"`
 }
 
 func newStagedBookResponse(b *staging.StagedBook) stagedBookResponse {
 	return stagedBookResponse{
-		StagedID:     b.ID,
-		IRCFilename:  b.IRCFilename,
-		Metadata:     b.Metadata,
-		Options:      b.Options,
-		ReplaceSpace: b.ReplaceSpace,
+		StagedID:    b.ID,
+		IRCFilename: b.IRCFilename,
+		Metadata:    b.Metadata,
+		Options:     b.Options,
 	}
 }
 
@@ -399,12 +397,7 @@ This is the FIRST step of a two-step flow. The book is downloaded, post-processe
 
 The server sends progress notifications during the download (DCC transfer started, post-processing, metadata extraction). These are informational — the tool call blocks until the full flow completes.
 
-CRITICAL — You MUST present the metadata to the user and explicitly ask about EACH field before saving:
-1. Show the extracted author, title, series, and series_index.
-2. Ask the user: "Is the author correct? Is the title correct? Is the series correct? Is the series index correct?"
-3. If the user says a field is WRONG, pass the corrected value to confirm_book.
-4. If the user says a field should be REMOVED (e.g. the series is wrong and the book isn't part of any series), pass clear_series=true (or clear_series_index=true) to confirm_book. Do NOT just omit the field — omitting it falls back to the extracted value.
-5. Only after the user has confirmed or corrected every field, choose an option id from options[] (or "custom") and call confirm_book.
+CRITICAL: Before saving, present metadata to user and ask if each field (author, title, series, series_index) is correct. If wrong, pass corrected value to confirm_book. If a field should be removed, pass clear_series=true or clear_series_index=true — omitting a field falls back to the extracted value, it does NOT clear it. Only call confirm_book after user confirms/corrects all fields.
 
 If the user does not want the book, call discard_staged.`),
 			mcp.WithString("download_string",
@@ -545,14 +538,8 @@ func searchBooksHandler(src bookSource) server.ToolHandlerFunc {
 		top.Total = len(full.Books)
 
 		data, _ := json.Marshal(top)
-		summary := fmt.Sprintf("Found %d unique title(s) from trusted servers (%d raw results). Showing top %d by relevance:\n%s",
-			top.Total, len(books), len(top.Books), string(data))
-		if top.Truncated {
-			summary += "\nMore results available — call list_search_results to see all."
-		}
-
 		toolLogDone(src, "search_books", start, "query", query, "total", top.Total, "shown", len(top.Books), "truncated", top.Truncated, "raw", len(books))
-		return mcp.NewToolResultText(summary), nil
+		return mcp.NewToolResultText(string(data)), nil
 	}
 }
 
@@ -595,9 +582,8 @@ func listSearchResultsHandler(src bookSource) server.ToolHandlerFunc {
 				HasMore: false,
 			}
 			data, _ := json.Marshal(page)
-			summary := fmt.Sprintf("No more results for %q (offset %d >= total %d).\n%s", query, offset, total, string(data))
 			toolLogDone(src, "list_search_results", start, "query", query, "total", total, "shown", 0, "offset", offset)
-			return mcp.NewToolResultText(summary), nil
+			return mcp.NewToolResultText(string(data)), nil
 		}
 
 		end := offset + limit
@@ -613,13 +599,8 @@ func listSearchResultsHandler(src bookSource) server.ToolHandlerFunc {
 			HasMore: end < total,
 		}
 		data, _ := json.Marshal(page)
-		summary := fmt.Sprintf("Results for %q (showing %d-%d of %d unique titles):\n%s",
-			query, offset+1, end, total, string(data))
-		if page.HasMore {
-			summary += fmt.Sprintf("\nMore available — call list_search_results with offset=%d for the next page.", end)
-		}
 		toolLogDone(src, "list_search_results", start, "query", query, "total", total, "shown", len(page.Books), "offset", offset, "has_more", page.HasMore)
-		return mcp.NewToolResultText(summary), nil
+		return mcp.NewToolResultText(string(data)), nil
 	}
 }
 
@@ -669,13 +650,8 @@ func downloadBookHandler(s *server.MCPServer, src bookSource) server.ToolHandler
 
 		resp := newStagedBookResponse(book)
 		data, _ := json.Marshal(resp)
-		summary := fmt.Sprintf(
-			"Downloaded and staged. Present the metadata to the user and confirm author/title/series before saving.\n"+
-				"Call confirm_book with staged_id=%q (or discard_staged to cancel).\n%s",
-			book.ID, string(data),
-		)
 		toolLogDone(src, "download_book", start, "staged_id", book.ID, "irc_filename", book.IRCFilename)
-		return mcp.NewToolResultText(summary), nil
+		return mcp.NewToolResultText(string(data)), nil
 	}
 }
 

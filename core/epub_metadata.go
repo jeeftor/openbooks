@@ -10,10 +10,10 @@ import (
 
 // EPUBMetadata holds the author, title, and optional series extracted from an EPUB's OPF file.
 type EPUBMetadata struct {
-	Author      string
-	Title       string
-	Series      string
-	SeriesIndex string // e.g. "1", "2.5" — calibre:series_index
+	Author      string `json:"author,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Series      string `json:"series,omitempty"`
+	SeriesIndex string `json:"series_index,omitempty"` // e.g. "1", "2.5" — calibre:series_index
 }
 
 type containerXML struct {

@@ -117,10 +117,10 @@ export interface HistoryItem {
 }
 
 export interface EPUBMetadata {
-  Author: string;
-  Title: string;
-  Series: string;
-  SeriesIndex: string;
+  author: string;
+  title: string;
+  series: string;
+  series_index: string;
 }
 
 export interface RenameOption {

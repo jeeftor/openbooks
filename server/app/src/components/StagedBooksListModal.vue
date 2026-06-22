@@ -32,11 +32,11 @@ function close() {
 }
 
 function displayTitle(book: StagedBookSummary): string {
-  return book.metadata?.Title || book.ircFilename;
+  return book.metadata?.title || book.ircFilename;
 }
 
 function displayAuthor(book: StagedBookSummary): string {
-  return book.metadata?.Author || "";
+  return book.metadata?.author || "";
 }
 
 function formatDate(iso: string): string {
