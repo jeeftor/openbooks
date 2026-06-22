@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/jeeftor/openbooks/staging"
 )
 
 // SeriesRegistry tracks series names seen during book saves for autocomplete suggestions.
@@ -18,10 +20,10 @@ type SeriesRegistry struct {
 
 // newSeriesRegistry creates the registry and loads any existing names from disk.
 func newSeriesRegistry(downloadDir string) *SeriesRegistry {
-	ensureStagingDir(downloadDir) //nolint:errcheck
+	staging.EnsureStagingDir(downloadDir) //nolint:errcheck
 	r := &SeriesRegistry{
 		names:    make(map[string]struct{}),
-		filePath: filepath.Join(stagingDir(downloadDir), "series_names.json"),
+		filePath: filepath.Join(staging.StagingDir(downloadDir), "series_names.json"),
 	}
 	r.load()
 	return r

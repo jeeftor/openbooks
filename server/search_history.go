@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/jeeftor/openbooks/staging"
 )
 
 const maxHistoryEntries = 50
@@ -25,11 +27,11 @@ type SearchHistoryStore struct {
 }
 
 func newSearchHistoryStore(downloadDir string) (*SearchHistoryStore, error) {
-	if err := os.MkdirAll(stagingDir(downloadDir), 0755); err != nil {
+	if err := os.MkdirAll(staging.StagingDir(downloadDir), 0755); err != nil {
 		return nil, err
 	}
 	s := &SearchHistoryStore{
-		filePath: filepath.Join(stagingDir(downloadDir), "search_history.json"),
+		filePath: filepath.Join(staging.StagingDir(downloadDir), "search_history.json"),
 	}
 	s.load()
 	return s, nil

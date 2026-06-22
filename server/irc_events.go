@@ -92,14 +92,14 @@ func (sess *session) bookResultHandler(
 		default:
 		}
 
-		if err := ensureStagingDir(dir); err != nil {
+		if err := staging.EnsureStagingDir(dir); err != nil {
 			lb.error("Failed to create staging directory.")
 			if handle != nil {
 				handle.release()
 			}
 			return
 		}
-		stage := stagingDir(dir)
+		stage := staging.StagingDir(dir)
 
 		// DCC offer received — clear the "waiting for bot" UI state and signal transfer start.
 		broadcastToClients(sess.getClients(), newDownloadWaitingClear())
@@ -142,8 +142,8 @@ func (sess *session) bookResultHandler(
 
 		var stagedOriginalPath string
 		if config.DevMode {
-			stagedOriginalPath = originalCopyPath(extractedPath)
-			if err := copyFile(extractedPath, stagedOriginalPath); err != nil {
+			stagedOriginalPath = staging.OriginalCopyPath(extractedPath)
+			if err := staging.CopyFile(extractedPath, stagedOriginalPath); err != nil {
 				sess_lb.warn(fmt.Sprintf("Could not preserve original download: %v", err))
 				stagedOriginalPath = ""
 			}
@@ -169,7 +169,7 @@ func (sess *session) bookResultHandler(
 		}
 
 		// 4. Build rename options.
-		options := buildRenameOptions(ircFilename, meta, config.ReplaceSpace)
+		options := staging.BuildOptions(ircFilename, meta, config.ReplaceSpace)
 
 		// saveToStaged saves the book to the staged store and cleans up.
 		saveToStaged := func() {
@@ -252,15 +252,15 @@ func (sess *session) bookResultHandler(
 				break
 			}
 		}
-		finalPath := resolveFinalPath(dir, choice, ircFilename, meta, config.ReplaceSpace)
+		finalPath := staging.ResolveFinalPath(dir, choice, ircFilename, meta, config.ReplaceSpace)
 
-		if err := moveFile(extractedPath, finalPath); err != nil {
+		if err := staging.MoveFile(extractedPath, finalPath); err != nil {
 			sess_lb.error(fmt.Sprintf("Failed to move file: %v", err))
 			finalPath = extractedPath
 		}
 		if stagedOriginalPath != "" {
-			originalFinalPath := originalCopyPath(finalPath)
-			if err := moveFile(stagedOriginalPath, originalFinalPath); err != nil {
+			originalFinalPath := staging.OriginalCopyPath(finalPath)
+			if err := staging.MoveFile(stagedOriginalPath, originalFinalPath); err != nil {
 				sess_lb.warn(fmt.Sprintf("Failed to save original copy: %v", err))
 			} else {
 				relOrig, _ := filepath.Rel(dir, originalFinalPath)

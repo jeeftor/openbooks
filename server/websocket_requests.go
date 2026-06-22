@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -10,6 +11,11 @@ import (
 	"github.com/jeeftor/openbooks/staging"
 	"github.com/jeeftor/openbooks/util"
 )
+
+// errQueueLater is a sentinel returned by processStagedBookChoice when the user
+// chose to defer the book ("queue_later"). The caller should return/continue
+// without broadcasting — no file was moved.
+var errQueueLater = errors.New("queued for later")
 
 // RequestHandler defines a generic handle() method that is called when a specific request type is made
 type RequestHandler interface {
@@ -257,6 +263,38 @@ func (c *Client) handleGetStagedList(server *server) {
 	})
 }
 
+// processStagedBookChoice moves a staged book to its final path based on the
+// user's rename choice, optionally rewrites EPUB metadata, and removes the
+// book from the staged store. Returns nil on success, an error if the move
+// fails. If choice.OptionID is "queue_later", sends a status message and
+// returns errQueueLater so the caller can return/continue without broadcasting.
+func (c *Client) processStagedBookChoice(server *server, staged *StagedBook, choice RenameChoice) error {
+	if choice.OptionID == "queue_later" {
+		safeSend(c, newStatusResponse(NOTIFY, "Book saved for later."))
+		return errQueueLater
+	}
+
+	finalPath := staging.ResolveFinalPath(server.config.DownloadDir, choice, staged.IRCFilename, staged.Metadata, staged.ReplaceSpace)
+	if err := staging.MoveFile(staged.StagedPath, finalPath); err != nil {
+		safeSend(c, newErrorResponse(fmt.Sprintf("Move failed: %v", err)))
+		return err
+	}
+
+	if choice.RewriteMetadata {
+		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
+			c.log.Printf("RewriteEPUBMetadata: %v", err)
+		}
+	}
+
+	if choice.Series != "" {
+		server.seriesRegistry.AddIfNew(choice.Series)
+	}
+
+	server.stagedBooks.Remove(staged.ID)
+	safeSend(c, newDownloadResponse(finalPath, server.config.DownloadDir))
+	return nil
+}
+
 // handleProcessOneStaged sends a STAGED_BOOK_RESUME for a single specific book,
 // then waits for the user's rename decision and processes it.
 func (c *Client) handleProcessOneStaged(req *ProcessOneStagedRequest, server *server) {
@@ -292,29 +330,11 @@ func (c *Client) handleProcessOneStaged(req *ProcessOneStagedRequest, server *se
 		return
 	}
 
-	if choice.OptionID == "queue_later" {
-		safeSend(c, newStatusResponse(NOTIFY, "Book saved for later."))
+	if err := c.processStagedBookChoice(server, staged, choice); err == errQueueLater {
+		return
+	} else if err != nil {
 		return
 	}
-
-	finalPath := resolveFinalPath(server.config.DownloadDir, choice, staged.IRCFilename, staged.Metadata, staged.ReplaceSpace)
-	if err := moveFile(staged.StagedPath, finalPath); err != nil {
-		safeSend(c, newErrorResponse(fmt.Sprintf("Move failed: %v", err)))
-		return
-	}
-
-	if choice.RewriteMetadata {
-		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
-			c.log.Printf("RewriteEPUBMetadata: %v", err)
-		}
-	}
-
-	if choice.Series != "" {
-		server.seriesRegistry.AddIfNew(choice.Series)
-	}
-
-	server.stagedBooks.Remove(staged.ID)
-	safeSend(c, newDownloadResponse(finalPath, server.config.DownloadDir))
 	server.broadcastStagedCount()
 }
 
@@ -388,31 +408,11 @@ func (c *Client) handleProcessStagedBooks(server *server) {
 			return
 		}
 
-		if choice.OptionID == "queue_later" {
-			// User deferred this one — move on to the next.
-			safeSend(c, newStatusResponse(NOTIFY, "Book saved for later."))
+		if err := c.processStagedBookChoice(server, staged, choice); err == errQueueLater {
+			continue
+		} else if err != nil {
 			continue
 		}
-
-		// Move the staged book to its final path.
-		finalPath := resolveFinalPath(server.config.DownloadDir, choice, staged.IRCFilename, staged.Metadata, staged.ReplaceSpace)
-		if err := moveFile(staged.StagedPath, finalPath); err != nil {
-			safeSend(c, newErrorResponse(fmt.Sprintf("Move failed: %v", err)))
-			continue
-		}
-
-		if choice.RewriteMetadata {
-			if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
-				c.log.Printf("RewriteEPUBMetadata: %v", err)
-			}
-		}
-
-		if choice.Series != "" {
-			server.seriesRegistry.AddIfNew(choice.Series)
-		}
-
-		server.stagedBooks.Remove(staged.ID)
-		safeSend(c, newDownloadResponse(finalPath, server.config.DownloadDir))
 	}
 
 	server.broadcastStagedCount()
@@ -438,29 +438,11 @@ func (c *Client) handleStagedRenameConfirm(req *RenameConfirmRequest, server *se
 		SeriesIndex:     req.SeriesIndex,
 	}
 
-	if choice.OptionID == "queue_later" {
-		safeSend(c, newStatusResponse(NOTIFY, "Book saved for later."))
+	if err := c.processStagedBookChoice(server, staged, choice); err == errQueueLater {
+		return
+	} else if err != nil {
 		return
 	}
-
-	finalPath := resolveFinalPath(server.config.DownloadDir, choice, staged.IRCFilename, staged.Metadata, staged.ReplaceSpace)
-	if err := moveFile(staged.StagedPath, finalPath); err != nil {
-		safeSend(c, newErrorResponse(fmt.Sprintf("Move failed: %v", err)))
-		return
-	}
-
-	if choice.RewriteMetadata {
-		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
-			c.log.Printf("RewriteEPUBMetadata: %v", err)
-		}
-	}
-
-	if choice.Series != "" {
-		server.seriesRegistry.AddIfNew(choice.Series)
-	}
-
-	server.stagedBooks.Remove(req.StagedID)
-	safeSend(c, newDownloadResponse(finalPath, server.config.DownloadDir))
 	server.broadcastStagedCount()
 }
 
