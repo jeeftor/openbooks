@@ -21,8 +21,8 @@ import (
 type Option struct {
 	ID          string `json:"id"`
 	Label       string `json:"label"`
-	Preview     string `json:"preview"`     // path relative to downloadDir, forward slashes
-	IsOrganized bool   `json:"isOrganized"` // true if it creates subdirectories
+	Preview     string `json:"preview"`               // path relative to downloadDir, forward slashes
+	IsOrganized bool   `json:"isOrganized,omitempty"` // true if it creates subdirectories
 }
 
 // Choice is the user/agent's rename decision. Metadata fields may differ from

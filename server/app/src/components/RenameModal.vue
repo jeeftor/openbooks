@@ -22,10 +22,10 @@ watch(
   () => appStore.pendingRename,
   (prompt) => {
     if (!prompt) return;
-    editAuthor.value = prompt.metadata?.Author ?? "";
-    editTitle.value = prompt.metadata?.Title ?? "";
-    editSeries.value = prompt.metadata?.Series ?? "";
-    editSeriesIndex.value = prompt.metadata?.SeriesIndex ?? "";
+    editAuthor.value = prompt.metadata?.author ?? "";
+    editTitle.value = prompt.metadata?.title ?? "";
+    editSeries.value = prompt.metadata?.series ?? "";
+    editSeriesIndex.value = prompt.metadata?.series_index ?? "";
     fileNameEdited.value = false;
     editFileName.value = defaultFileName(prompt.ircFilename, editTitle.value, prompt.replaceSpace);
     // Default to the best organized option available.
@@ -138,7 +138,7 @@ watch(editTitle, () => {
 });
 
 const hasMetadata = computed(
-  () => !!(prompt.value?.metadata?.Title || prompt.value?.metadata?.Author)
+  () => !!(prompt.value?.metadata?.title || prompt.value?.metadata?.author)
 );
 
 // True if the metadata fields were populated from the EPUB (not just empty defaults).
@@ -146,10 +146,10 @@ const hasEmbeddedMetadata = computed(() => !!prompt.value?.metadata);
 
 const metadataEdited = computed(
   () =>
-    editAuthor.value !== (prompt.value?.metadata?.Author ?? "") ||
-    editTitle.value !== (prompt.value?.metadata?.Title ?? "") ||
-    editSeries.value !== (prompt.value?.metadata?.Series ?? "") ||
-    editSeriesIndex.value !== (prompt.value?.metadata?.SeriesIndex ?? "")
+    editAuthor.value !== (prompt.value?.metadata?.author ?? "") ||
+    editTitle.value !== (prompt.value?.metadata?.title ?? "") ||
+    editSeries.value !== (prompt.value?.metadata?.series ?? "") ||
+    editSeriesIndex.value !== (prompt.value?.metadata?.series_index ?? "")
 );
 
 // Auto-enable rewrite when the user edits any metadata field.

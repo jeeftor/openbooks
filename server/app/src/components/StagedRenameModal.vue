@@ -20,10 +20,10 @@ watch(
   () => appStore.pendingStagedBook,
   (book) => {
     if (!book) return;
-    editAuthor.value = book.metadata?.Author ?? "";
-    editTitle.value = book.metadata?.Title ?? "";
-    editSeries.value = book.metadata?.Series ?? "";
-    editSeriesIndex.value = book.metadata?.SeriesIndex ?? "";
+    editAuthor.value = book.metadata?.author ?? "";
+    editTitle.value = book.metadata?.title ?? "";
+    editSeries.value = book.metadata?.series ?? "";
+    editSeriesIndex.value = book.metadata?.series_index ?? "";
     fileNameEdited.value = false;
     editFileName.value = defaultFileName(book.ircFilename, editTitle.value, book.replaceSpace);
     const ids = book.options.map((o) => o.id);
@@ -131,17 +131,17 @@ watch(editTitle, () => {
 });
 
 const hasMetadata = computed(
-  () => !!(book.value?.metadata?.Title || book.value?.metadata?.Author)
+  () => !!(book.value?.metadata?.title || book.value?.metadata?.author)
 );
 
 const hasEmbeddedMetadata = computed(() => !!book.value?.metadata);
 
 const metadataEdited = computed(
   () =>
-    editAuthor.value !== (book.value?.metadata?.Author ?? "") ||
-    editTitle.value !== (book.value?.metadata?.Title ?? "") ||
-    editSeries.value !== (book.value?.metadata?.Series ?? "") ||
-    editSeriesIndex.value !== (book.value?.metadata?.SeriesIndex ?? "")
+    editAuthor.value !== (book.value?.metadata?.author ?? "") ||
+    editTitle.value !== (book.value?.metadata?.title ?? "") ||
+    editSeries.value !== (book.value?.metadata?.series ?? "") ||
+    editSeriesIndex.value !== (book.value?.metadata?.series_index ?? "")
 );
 
 watch(metadataEdited, (edited) => {
