@@ -189,15 +189,34 @@ func parseSizeBytes(s string) float64 {
 // buildSearchResponse filters to trusted-server epub results, groups by
 // normalized author+title, picks the best representative per group, and
 // builds the token-efficient response structure.
+//
+// As a safety net, when no trusted servers are known (the IRC names list is
+// empty or stale), the trusted-server filter is skipped and all epub results
+// are returned. This prevents a transient empty server list from making every
+// search report zero results.
 func buildSearchResponse(books []core.BookDetail, isTrusted func(string) bool) searchResponse {
-	// Filter: epub format from trusted servers only.
-	filtered := books[:0]
+	original := books
+
+	// First pass: epub format from trusted servers only.
+	filtered := make([]core.BookDetail, 0, len(books))
 	for _, b := range books {
 		if strings.EqualFold(b.Format, "epub") && isTrusted(b.Server) {
 			filtered = append(filtered, b)
 		}
 	}
 	books = filtered
+
+	// Fallback: if the trusted-server filter dropped everything (e.g. the
+	// IRC server list is empty/stale), keep all epub results so the agent
+	// still has something to show the user.
+	if len(books) == 0 {
+		for _, b := range original {
+			if strings.EqualFold(b.Format, "epub") {
+				filtered = append(filtered, b)
+			}
+		}
+		books = filtered
+	}
 
 	if len(books) == 0 {
 		return searchResponse{Servers: []string{}, Books: []bookResult{}}

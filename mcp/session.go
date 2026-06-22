@@ -344,6 +344,15 @@ func (s *Session) buildHandler() core.EventHandler {
 	handler[core.ServerList] = func(text string) {
 		servers := core.ParseServers(text)
 		s.serversMu.Lock()
+		// Don't clobber a known-good server list with an empty update.
+		// IRC can send a transient empty names reply (netsplit, re-join,
+		// bots momentarily de-opped). Keep the last known list and warn.
+		if len(servers.ElevatedUsers) == 0 && len(s.serverList) > 0 {
+			s.serversMu.Unlock()
+			s.log.Warn("ignoring empty server list update; keeping previous list",
+				"previous_count", len(s.serverList))
+			return
+		}
 		s.serverList = servers.ElevatedUsers
 		s.serversMu.Unlock()
 		s.log.Info("server list updated", "count", len(servers.ElevatedUsers))

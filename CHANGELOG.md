@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **MCP search returning zero results when IRC server list is empty:** Three compounding bugs caused `search_books` to report "No epub results from trusted servers found" (with `results=0 raw=23` in logs) even though the IRC search found real hits. (1) `core/reader.go` now separates multi-line IRC names replies (`353`) with a space so nicks at line boundaries don't merge and lose their elevated prefix. (2) `mcp/session.go` no longer overwrites a known-good server list with a transient empty update (e.g. netsplit, re-join, bots momentarily de-opped) — it keeps the previous list and logs a warning. (3) `mcp/tools.go` `buildSearchResponse` now falls back to returning all epub results when no trusted servers are known, so the agent always has something to show the user instead of silently discarding every result.
+
 ### Added
 
 - **MCP add missing series during confirm_book:** When extracted EPUB metadata has no series, the "series" naming option is now always generated (with a `[series]` placeholder preview) so the user can see it's available and provide a series name. The `download_book` description now explicitly instructs the agent to ask "is this book part of a series?" when series is missing. The `confirm_book` description clarifies that `option_id="series"` is always valid when author+title are available — pass the user-provided series name and index, and the server builds `Author/Series/Title/` and writes the series to the EPUB's OPF.
