@@ -2,9 +2,11 @@ package mcp
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -12,25 +14,36 @@ import (
 
 	"github.com/evan-buss/openbooks/core"
 	"github.com/evan-buss/openbooks/irc"
+	"github.com/evan-buss/openbooks/staging"
+	"github.com/google/uuid"
 )
 
 // Session holds a persistent IRC connection and bridges async IRC events
 // to synchronous MCP tool calls. Only one search and one download may be
 // in-flight at a time.
 type Session struct {
-	irc         *irc.Conn
-	searchBot   string
-	downloadDir string
-	formats     []string // file formats to accept, e.g. ["epub"]
-	log         *slog.Logger
-	activityLog func(level, msg string) // optional hook into host log buffer
+	irc            *irc.Conn
+	searchBot      string
+	downloadDir    string
+	formats        []string // file formats to accept, e.g. ["epub"]
+	postProcessCmd []string // command + args; file path appended automatically
+	replaceSpace   string
+	log            *slog.Logger
+	activityLog    func(level, msg string) // optional hook into host log buffer
+	staged         *staging.StagedBookStore
 
-	mu           sync.Mutex // serialises search AND download calls
-	searchDone   chan searchOutcome
-	downloadDone chan downloadOutcome
+	mu              sync.Mutex // serialises search AND download calls
+	searchDone      chan searchOutcome
+	downloadDone    chan downloadOutcome
+	downloadStarted chan struct{} // signaled when DCC offer arrives
 
 	serversMu  sync.RWMutex
 	serverList []string
+
+	searchCacheMu    sync.RWMutex
+	lastSearchQuery  string
+	lastSearchResp   searchResponse
+	lastSearchValid  bool
 }
 
 type searchOutcome struct {
@@ -46,14 +59,16 @@ type downloadOutcome struct {
 
 // Config holds the parameters needed to start an MCP session.
 type Config struct {
-	UserName    string
-	UserAgent   string
-	Server      string
-	EnableTLS   bool
-	SearchBot   string
-	DownloadDir string
-	Formats     []string // filter; nil or empty means accept all
-	Log         *slog.Logger
+	UserName       string
+	UserAgent      string
+	Server         string
+	EnableTLS      bool
+	SearchBot      string
+	DownloadDir    string
+	Formats        []string // filter; nil or empty means accept all
+	PostProcessCmd []string // command + args; file path appended automatically
+	ReplaceSpace   string   // optional character used to replace spaces in filenames
+	Log            *slog.Logger
 	// ActivityLog is called for key events (search, download) so callers can
 	// route them into a shared log buffer (e.g. the web UI's log panel).
 	// Optional — if nil, only slog output is produced.
@@ -77,15 +92,24 @@ func Connect(ctx context.Context, cfg Config) (*Session, error) {
 		return nil, fmt.Errorf("irc connect: %w", err)
 	}
 
+	stagedStore, err := staging.NewStagedBookStore(cfg.DownloadDir)
+	if err != nil {
+		return nil, fmt.Errorf("staged store: %w", err)
+	}
+
 	sess := &Session{
-		irc:          conn,
-		searchBot:    cfg.SearchBot,
-		downloadDir:  cfg.DownloadDir,
-		formats:      formats,
-		log:          logger,
-		activityLog:  cfg.ActivityLog,
-		searchDone:   make(chan searchOutcome, 1),
-		downloadDone: make(chan downloadOutcome, 1),
+		irc:            conn,
+		searchBot:      cfg.SearchBot,
+		downloadDir:    cfg.DownloadDir,
+		formats:        formats,
+		postProcessCmd: cfg.PostProcessCmd,
+		replaceSpace:   cfg.ReplaceSpace,
+		log:            logger,
+		activityLog:    cfg.ActivityLog,
+		staged:         stagedStore,
+		searchDone:     make(chan searchOutcome, 1),
+		downloadDone:   make(chan downloadOutcome, 1),
+		downloadStarted: make(chan struct{}, 1),
 	}
 
 	handler := sess.buildHandler()
@@ -107,6 +131,24 @@ func (s *Session) Servers() []string {
 	out := make([]string, len(s.serverList))
 	copy(out, s.serverList)
 	return out
+}
+
+// SetLastSearch caches the full deduplicated response from the most recent
+// search_books call so list_search_results can return it without re-querying.
+func (s *Session) SetLastSearch(query string, resp searchResponse) {
+	s.searchCacheMu.Lock()
+	defer s.searchCacheMu.Unlock()
+	s.lastSearchQuery = query
+	s.lastSearchResp = resp
+	s.lastSearchValid = true
+}
+
+// LastSearch returns the cached query and full response from the most recent
+// search_books call. ok is false if no search has been performed.
+func (s *Session) LastSearch() (string, searchResponse, bool) {
+	s.searchCacheMu.RLock()
+	defer s.searchCacheMu.RUnlock()
+	return s.lastSearchQuery, s.lastSearchResp, s.lastSearchValid
 }
 
 // SearchBooks sends a search query and waits for results, serialising
@@ -136,29 +178,152 @@ func (s *Session) SearchBooks(ctx context.Context, query string) ([]core.BookDet
 	}
 }
 
-// DownloadBook sends a DCC download request and waits for the file to land on disk.
-func (s *Session) DownloadBook(ctx context.Context, downloadString string) (string, error) {
+// DownloadStarted returns a channel signaled when the DCC file transfer begins.
+func (s *Session) DownloadStarted() <-chan struct{} {
+	return s.downloadStarted
+}
+
+// DownloadBook sends a DCC download request, waits for the file to land in the
+// staging directory, runs the post-processor (if configured), reads EPUB
+// metadata, builds rename options, registers the result as a staged book, and
+// returns the staged book descriptor. The caller (AI agent) is expected to
+// present the metadata to the user for confirmation and then call ConfirmBook.
+//
+// The returned *staging.StagedBook exposes absolute StagedPath; MCP tool
+// handlers must not leak that to agents — use the staged ID instead.
+func (s *Session) DownloadBook(ctx context.Context, downloadString string) (*staging.StagedBook, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := staging.EnsureStagingDir(s.downloadDir); err != nil {
+		return nil, fmt.Errorf("staging dir: %w", err)
+	}
 
 	core.DownloadBook(s.irc, downloadString)
 	s.log.Info("download sent", "string", downloadString)
 	s.logActivity("info", fmt.Sprintf("🤖 MCP download: %s", downloadString))
 
+	var outcome downloadOutcome
 	select {
-	case outcome := <-s.downloadDone:
-		if outcome.err != nil {
-			s.logActivity("error", fmt.Sprintf("🤖 MCP download failed: %v", outcome.err))
-		} else {
-			s.logActivity("info", fmt.Sprintf("🤖 MCP download complete: %s", outcome.path))
-		}
-		return outcome.path, outcome.err
+	case outcome = <-s.downloadDone:
 	case <-time.After(3 * time.Minute):
 		s.logActivity("error", "🤖 MCP download timed out")
-		return "", fmt.Errorf("download timed out after 3m")
+		return nil, fmt.Errorf("download timed out after 3m")
 	case <-ctx.Done():
-		return "", ctx.Err()
+		return nil, ctx.Err()
 	}
+
+	if outcome.err != nil {
+		s.logActivity("error", fmt.Sprintf("🤖 MCP download failed: %v", outcome.err))
+		return nil, outcome.err
+	}
+
+	extractedPath := outcome.path
+	ircFilename := filepath.Base(extractedPath)
+	s.logActivity("info", fmt.Sprintf("🤖 MCP download complete: %s", ircFilename))
+
+	// 1. Run post-processor (clean).
+	if len(s.postProcessCmd) > 0 {
+		if err := runPostProcess(s.postProcessCmd, extractedPath); err != nil {
+			s.logActivity("error", fmt.Sprintf("🤖 MCP post-process failed: %v", err))
+		} else {
+			s.logActivity("info", fmt.Sprintf("🤖 MCP post-process complete: %s", s.postProcessCmd[0]))
+		}
+	}
+
+	// 2. Read EPUB metadata + cover.
+	var meta *core.EPUBMetadata
+	var coverBase64, coverMime string
+	if strings.EqualFold(filepath.Ext(extractedPath), ".epub") {
+		if m, err := core.ReadEPUBMetadata(extractedPath); err == nil {
+			meta = m
+		}
+		if imgBytes, mime, err := core.ExtractCoverImage(extractedPath); err == nil && imgBytes != nil {
+			coverBase64 = base64.StdEncoding.EncodeToString(imgBytes)
+			coverMime = mime
+		}
+	}
+
+	// 3. Build rename options and register as a staged book.
+	options := staging.BuildOptions(ircFilename, meta, s.replaceSpace)
+	staged := &staging.StagedBook{
+		ID:           uuid.New().String(),
+		StagedPath:   extractedPath,
+		IRCFilename:  ircFilename,
+		Metadata:     meta,
+		Options:      options,
+		ReplaceSpace: s.replaceSpace,
+		CoverBase64:  coverBase64,
+		CoverMime:    coverMime,
+		StagedAt:     time.Now(),
+	}
+	if err := s.staged.Add(staged); err != nil {
+		os.Remove(extractedPath)
+		return nil, fmt.Errorf("staging failed: %w", err)
+	}
+
+	s.logActivity("info", fmt.Sprintf("🤖 MCP staged: %s (awaiting confirmation)", staged.ID))
+	return staged, nil
+}
+
+// ConfirmBook applies the caller's rename decision to a staged book: resolves
+// the final organised path, moves the file out of staging, optionally rewrites
+// the EPUB internal metadata, and removes the book from the staged store.
+// Returns the final path relative to the download directory.
+func (s *Session) ConfirmBook(stagedID string, choice staging.Choice) (string, error) {
+	book, ok := s.staged.Get(stagedID)
+	if !ok {
+		return "", fmt.Errorf("no staged book with id %q", stagedID)
+	}
+
+	finalPath := staging.ResolveFinalPath(s.downloadDir, choice, book.IRCFilename, book.Metadata, book.ReplaceSpace)
+	if err := staging.MoveFile(book.StagedPath, finalPath); err != nil {
+		return "", fmt.Errorf("move failed: %w", err)
+	}
+
+	if choice.RewriteMetadata && strings.EqualFold(filepath.Ext(finalPath), ".epub") {
+		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+			s.logActivity("error", fmt.Sprintf("🤖 MCP metadata rewrite failed: %v", err))
+		}
+	}
+
+	if err := s.staged.Remove(stagedID); err != nil {
+		s.log.Info("staged remove after confirm", "err", err)
+	}
+
+	rel, _ := filepath.Rel(s.downloadDir, finalPath)
+	s.logActivity("info", fmt.Sprintf("🤖 MCP saved: %s", filepath.ToSlash(rel)))
+	return filepath.ToSlash(rel), nil
+}
+
+// ListStaged returns all books downloaded via MCP that are awaiting confirmation.
+func (s *Session) ListStaged() []*staging.StagedBook {
+	return s.staged.All()
+}
+
+// DiscardStaged deletes a staged book's file and removes it from the registry.
+func (s *Session) DiscardStaged(stagedID string) error {
+	book, ok := s.staged.Get(stagedID)
+	if !ok {
+		return fmt.Errorf("no staged book with id %q", stagedID)
+	}
+	os.Remove(book.StagedPath)
+	return s.staged.Remove(stagedID)
+}
+
+// runPostProcess executes the configured post-process command with filePath
+// appended as the final argument. Errors are returned but non-fatal to the
+// caller — the download still succeeds.
+func runPostProcess(cmd []string, filePath string) error {
+	if len(cmd) == 0 {
+		return nil
+	}
+	args := append(append([]string{}, cmd[1:]...), filePath)
+	out, err := exec.Command(cmd[0], args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %w (%s)", cmd[0], err, string(out))
+	}
+	return nil
 }
 
 // buildHandler wires IRC events to the session's result channels.
@@ -193,7 +358,13 @@ func (s *Session) buildHandler() core.EventHandler {
 	}
 
 	handler[core.BookResult] = func(text string) {
-		path, err := core.DownloadExtractDCCString(s.downloadDir, text, nil)
+		// Signal that the DCC transfer has started (non-blocking — the tool
+		// handler may or may not be listening).
+		select {
+		case s.downloadStarted <- struct{}{}:
+		default:
+		}
+		path, err := core.DownloadExtractDCCString(staging.StagingDir(s.downloadDir), text, nil)
 		s.downloadDone <- downloadOutcome{path: path, err: err}
 	}
 

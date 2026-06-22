@@ -179,14 +179,16 @@ func Start(config Config) {
 
 	if config.EnableMCP {
 		mcpSession, err := mcp.Connect(ctx, mcp.Config{
-			UserName:    config.UserName + "_mcp",
-			UserAgent:   config.UserAgent,
-			Server:      config.Server,
-			EnableTLS:   config.EnableTLS,
-			SearchBot:   config.SearchBot,
-			DownloadDir: config.DownloadDir,
-			Formats:     config.MCPFormats,
-			Log:         slog.New(slog.NewTextHandler(os.Stderr, nil)),
+			UserName:       config.UserName + "_mcp",
+			UserAgent:      config.UserAgent,
+			Server:         config.Server,
+			EnableTLS:      config.EnableTLS,
+			SearchBot:      config.SearchBot,
+			DownloadDir:    config.DownloadDir,
+			Formats:        config.MCPFormats,
+			PostProcessCmd: config.PostProcessCmd,
+			ReplaceSpace:   config.ReplaceSpace,
+			Log:            slog.New(slog.NewTextHandler(os.Stderr, nil)),
 			ActivityLog: func(level, msg string) {
 				switch level {
 				case "error":

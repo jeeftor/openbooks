@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/evan-buss/openbooks/core"
+	"github.com/evan-buss/openbooks/staging"
 	"github.com/evan-buss/openbooks/util"
 )
 
@@ -209,18 +209,6 @@ func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 	}
 }
 
-// sanitizePathComponent trims whitespace, replaces path separators with dashes,
-// and optionally replaces spaces with the given character.
-func sanitizePathComponent(s, replaceSpace string) string {
-	s = strings.TrimSpace(s)
-	s = strings.ReplaceAll(s, "/", "-")
-	s = strings.ReplaceAll(s, "\\", "-")
-	if replaceSpace != "" {
-		s = strings.ReplaceAll(s, " ", replaceSpace)
-	}
-	return s
-}
-
 // handleRenameConfirm forwards the user's rename decision to the waiting bookResultHandler,
 // or processes a staged book if StagedID is set.
 func (c *Client) handleRenameConfirm(req *RenameConfirmRequest, server *server) {
@@ -316,7 +304,7 @@ func (c *Client) handleProcessOneStaged(req *ProcessOneStagedRequest, server *se
 	}
 
 	if choice.RewriteMetadata {
-		if err := RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
 			c.log.Printf("RewriteEPUBMetadata: %v", err)
 		}
 	}
@@ -414,7 +402,7 @@ func (c *Client) handleProcessStagedBooks(server *server) {
 		}
 
 		if choice.RewriteMetadata {
-			if err := RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+			if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
 				c.log.Printf("RewriteEPUBMetadata: %v", err)
 			}
 		}
@@ -462,7 +450,7 @@ func (c *Client) handleStagedRenameConfirm(req *RenameConfirmRequest, server *se
 	}
 
 	if choice.RewriteMetadata {
-		if err := RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
 			c.log.Printf("RewriteEPUBMetadata: %v", err)
 		}
 	}

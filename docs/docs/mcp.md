@@ -6,12 +6,34 @@ OpenBooks can expose its search and download functionality as an [MCP (Model Con
 
 | Tool | Description |
 |------|-------------|
-| `search_books` | Search IRC for ebooks. Returns structured results filtered to epub (zero-size entries excluded) with server trust, file size, and a download string so the agent can rank and choose the best result. Searches are synchronous and may take up to 60 seconds. |
-| `download_book` | Download a specific book using the `download_string` from a search result. |
+| `search_books` | Search IRC for ebooks. Returns the top 10 results ranked by relevance (query word matches in author/title, source count, file size), filtered to epub from trusted servers, deduplicated by title. Response includes `total` and `truncated` so the agent knows if more are available. Synchronous — may take up to 60 seconds. |
+| `list_search_results` | Return the full result set from the most recent `search_books` call. Use when `search_books` returned a truncated list and the user wants to see all matches. |
+| `download_book` | Download a book using the `dl` string from `search_books`. Downloads to a staging area, runs the post-processor, reads EPUB metadata (author/title/series/series_index), and builds rename `options[]`. Returns `staged_id`, `irc_filename`, `metadata`, and `options` — the file is **not** saved to the library yet. The agent must present the metadata to the user for confirmation. Sends progress notifications (`notifications/message`) during the download: "DCC transfer started" when the file transfer begins, and "Download complete" when post-processing finishes. |
+| `confirm_book` | Save a staged book to the library. Pass the `staged_id` from `download_book`, the chosen `option_id` from `options[]`, and the confirmed/edited `author`/`title`/`series`/`series_index`. Set `rewrite_metadata=true` to patch the EPUB's internal OPF metadata to match. Returns the final relative path. |
+| `list_staged` | List books downloaded via `download_book` that are still awaiting confirmation. |
+| `discard_staged` | Permanently delete a staged book without saving it to the library. |
 | `list_servers` | List currently available IRC download servers. |
-| `list_library` | List ebooks already downloaded to the local library. |
+| `list_library` | List ebooks already downloaded to the local library. Accepts an optional `query` to filter by filename substring. |
 
-The agent receives raw structured results and ranks them itself — signals include `trusted_server`, `size`, and title match quality.
+### Search → download → confirm flow
+
+```
+search_books "dune frank herbert"
+  → top 10 ranked results (total=25, truncated=true)
+  → agent presents to user; user picks one
+
+download_book dl="!ThrawnBot Frank Herbert - Dune.epub"
+  → downloads, cleans, extracts metadata
+  → returns staged_id, metadata {author, title, series, series_index}, options[]
+  → agent asks user: "Is the author correct? Series?"
+
+confirm_book staged_id=... option_id="organized" author="Frank Herbert" title="Dune"
+  → moves file to final organized path
+  → optionally rewrites EPUB internal metadata
+  → returns "Frank Herbert/Dune.epub"
+```
+
+If the user doesn't want the book, call `discard_staged` with the `staged_id`.
 
 ## Modes
 
@@ -122,6 +144,8 @@ claude mcp add --transport sse openbooks http://myserver:5228/mcp/sse
 
 - Only one search can be in-flight at a time — concurrent agent calls are serialised automatically.
 - `search_books` has a 90-second timeout; `download_book` has a 3-minute timeout.
+- `search_books` returns the top 10 results by relevance; call `list_search_results` for the full set. The full set is cached server-side from the last search.
 - Results are filtered to `epub` by default and zero-size entries are always excluded.
+- `download_book` does **not** save to the library — it stages the file and returns metadata for the agent to confirm with the user. Use `confirm_book` to save, or `discard_staged` to cancel.
 - When embedded in the web server, MCP search and download activity appears in the web UI log panel prefixed with `🤖 MCP`.
 - The MCP agent uses a separate IRC connection from browser users (username `<name>_mcp`).
