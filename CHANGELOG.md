@@ -2,9 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- **`list_library` pagination:** The `list_library` tool now accepts `offset` (default 0) and `limit` (default 50, max 200) parameters. The response includes `total`, `offset`, `limit`, and `has_more` so the agent can page through large libraries.
+
 ### Fixed
 
 - **Fixed TOCTOU race in `confirm_book`:** `StagedBookStore.GetAndRemove` now atomically retrieves and removes a staged book under a single lock, preventing concurrent `ConfirmBook` calls from racing on the same staged ID.
+
+### Improved
+
+- **MCP docs fixed:** Updated stale "top 10" references to "top 20" in `docs/docs/mcp.md`. Documented the JSON naming convention (MCP API = snake_case, WebSocket API = camelCase).
 
 ### Changed
 

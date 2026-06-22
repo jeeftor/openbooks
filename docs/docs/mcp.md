@@ -6,20 +6,26 @@ OpenBooks can expose its search and download functionality as an [MCP (Model Con
 
 | Tool | Description |
 |------|-------------|
-| `search_books` | Search IRC for ebooks. Returns the top 10 results ranked by relevance (query word matches in author/title, source count, file size), filtered to epub from trusted servers, deduplicated by title. Response includes `total` and `truncated` so the agent knows if more are available. Synchronous — may take up to 60 seconds. |
+| `search_books` | Search IRC for ebooks. Returns the top 20 results ranked by relevance (query word matches in author/title, source count, file size), filtered to epub from trusted servers, deduplicated by title. Response includes `total` and `truncated` so the agent knows if more are available. Synchronous — may take up to 60 seconds. |
 | `list_search_results` | Return the full result set from the most recent `search_books` call. Use when `search_books` returned a truncated list and the user wants to see all matches. |
 | `download_book` | Download a book using the `dl` string from `search_books`. Downloads to a staging area, runs the post-processor, reads EPUB metadata (author/title/series/series_index), and builds rename `options[]`. Returns `staged_id`, `irc_filename`, `metadata`, and `options` — the file is **not** saved to the library yet. The agent must present the metadata to the user for confirmation. Sends progress notifications (`notifications/message`) during the download: "DCC transfer started" when the file transfer begins, and "Download complete" when post-processing finishes. |
 | `confirm_book` | Save a staged book to the library. Pass the `staged_id` from `download_book`, the chosen `option_id` from `options[]`, and the confirmed/edited `author`/`title`/`series`/`series_index`. Set `rewrite_metadata=true` to patch the EPUB's internal OPF metadata to match. Returns the final relative path. |
 | `list_staged` | List books downloaded via `download_book` that are still awaiting confirmation. |
 | `discard_staged` | Permanently delete a staged book without saving it to the library. |
 | `list_servers` | List currently available IRC download servers. |
-| `list_library` | List ebooks already downloaded to the local library. Accepts an optional `query` to filter by filename substring. |
+| `list_library` | List ebooks already downloaded to the local library. Accepts an optional `query` to filter by filename substring, plus `offset` (default 0) and `limit` (default 50, max 200) for pagination. Response includes `total`, `offset`, `limit`, and `has_more`. |
+
+
+## JSON Naming Convention
+
+The OpenBooks MCP API uses **snake_case** for JSON field names (e.g. `staged_id`, `irc_filename`, `series_index`) following JSON API conventions. The internal WebSocket API (between the Go server and Vue frontend) uses **camelCase** (e.g. `stagedId`, `ircFilename`, `seriesIndex`) following JavaScript conventions. These are intentionally different — do not change one to match the other.
 
 ### Search → download → confirm flow
 
+
 ```
 search_books "dune frank herbert"
-  → top 10 ranked results (total=25, truncated=true)
+  → top 20 ranked results (total=25, truncated=true)
   → agent presents to user; user picks one
 
 download_book dl="!ThrawnBot Frank Herbert - Dune.epub"
