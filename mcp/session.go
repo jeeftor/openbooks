@@ -124,6 +124,9 @@ func (s *Session) Close() {
 	s.irc.Disconnect()
 }
 
+// Logger returns the session's slog logger.
+func (s *Session) Logger() *slog.Logger { return s.log }
+
 // Servers returns the current list of known download servers.
 func (s *Session) Servers() []string {
 	s.serversMu.RLock()
@@ -379,10 +382,17 @@ func (s *Session) buildHandler() core.EventHandler {
 	return handler
 }
 
-// logActivity emits to the activity log callback if set.
+// logActivity emits to the activity log callback if set, and mirrors the
+// message to stderr via slog so `docker logs` shows the full MCP narrative.
 func (s *Session) logActivity(level, msg string) {
 	if s.activityLog != nil {
 		s.activityLog(level, msg)
+	}
+	switch level {
+	case "error":
+		s.log.Error(msg)
+	default:
+		s.log.Info(msg)
 	}
 }
 

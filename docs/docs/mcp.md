@@ -148,4 +148,5 @@ claude mcp add --transport sse openbooks http://myserver:5228/mcp/sse
 - Results are filtered to `epub` by default and zero-size entries are always excluded.
 - `download_book` does **not** save to the library — it stages the file and returns metadata for the agent to confirm with the user. Use `confirm_book` to save, or `discard_staged` to cancel.
 - When embedded in the web server, MCP search and download activity appears in the web UI log panel prefixed with `🤖 MCP`.
+- Every MCP tool call is logged to stderr (`slog`) with the tool name, key arguments, duration, and outcome — visible in `docker logs` as `mcp tool call` / `mcp tool ok` / `mcp tool error` lines. The `🤖 MCP` activity lines are also mirrored to stderr.
 - The MCP agent uses a separate IRC connection from browser users (username `<name>_mcp`).
