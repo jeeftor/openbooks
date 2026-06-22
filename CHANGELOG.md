@@ -4,6 +4,10 @@
 
 ### Improved
 
+- **MCP search shows 20 results inline:** `search_books` now returns the top 20 ranked results (up from 10), so broad queries like "Hobbit" show more variants without needing a second call.
+- **MCP `list_search_results` pagination:** `list_search_results` now accepts `offset` (default 0) and `limit` (default 20, max 50) parameters instead of dumping the full result set. The response includes `total`, `offset`, `limit`, and `has_more` so the agent can page through results naturally.
+- **MCP search titles cleaned:** IRC file annotations (e.g. `(retail)`, `(epub)`, `(illus)`, `(v5)`, `(kepub)`, `(unabridged)`) and trailing file extensions are now stripped from displayed titles for readability. "The Hobbit (illus) (retail) (epub)" displays as "The Hobbit". Edition years like `(2011)` and series info like `[Series 01]` are preserved. The `dl` download string is never affected.
+- **MCP search ranking boosts clean titles:** Titles with no IRC annotations get a +3 relevance bonus, so "The Hobbit" ranks above "The Hobbit (illus) (retail) (epub)" when all else is equal.
 - **MCP tool call logging:** Every MCP tool call (`search_books`, `download_book`, `confirm_book`, `discard_staged`, `list_staged`, `list_servers`, `list_library`, `list_search_results`) now logs an entry and exit line to stderr via `slog`, with the tool name, key arguments, duration, and outcome (result count, staged ID, saved path, or error). Tool-layer errors are now logged server-side at `ERROR` level instead of only being returned to the agent.
 - **MCP activity log mirrored to stderr:** The `🤖 MCP` activity lines (search results count, download status, post-processing, staged ID, saved path) are now written to stderr in addition to the web UI activity feed, so `docker logs` shows the full MCP narrative.
 

@@ -57,9 +57,21 @@ type searchResponse struct {
 	Truncated bool         `json:"truncated,omitempty"`
 }
 
+// paginatedSearchResponse is returned by list_search_results. It wraps the
+// search response with pagination metadata so the agent knows if more pages
+// exist.
+type paginatedSearchResponse struct {
+	Servers []string     `json:"servers"`
+	Books   []bookResult `json:"books"`
+	Total   int          `json:"total"`
+	Offset  int          `json:"offset"`
+	Limit   int          `json:"limit"`
+	HasMore bool         `json:"has_more"`
+}
+
 // topNSearchResults is the maximum number of ranked results search_books
-// returns inline. The full set is available via list_search_results.
-const topNSearchResults = 10
+// returns inline. The full set is available via list_search_results (paginated).
+const topNSearchResults = 20
 
 // bookResult is a single deduplicated book entry.
 // s    = index into searchResponse.Servers
@@ -72,6 +84,9 @@ type bookResult struct {
 	Size      string `json:"size"`
 	DL        string `json:"dl"`
 	Copies    int    `json:"copies,omitempty"`
+	// cleanBonus is set when the original title had no IRC annotations stripped.
+	// Used by rankBooks for a relevance boost; not serialized to JSON.
+	cleanBonus bool `json:"-"`
 }
 
 // stagedBookResponse is the agent-facing view of a staged book. It deliberately
@@ -98,6 +113,27 @@ func newStagedBookResponse(b *staging.StagedBook) stagedBookResponse {
 
 // reVariants strips parenthetical/bracketed segments: "(retail)", "[epub]", "(v1.2)", etc.
 var reVariants = regexp.MustCompile(`\s*[\(\[][^\)\]]*[\)\]]`)
+
+// reIRCAnnotations matches common IRC file annotation suffixes in parentheses
+// or brackets that describe the file, not the book. These are stripped from
+// displayed titles for readability. Edition years like "(2011)" and series
+// info like "[Series 01]" are intentionally NOT matched here.
+var reIRCAnnotations = regexp.MustCompile(`(?i)\s*[\(\[](?:(?:retail|epub|kepub|mobi|pdf|lrf|azw3?|illus(?:trated)?|fixed|enhanced|converted|unabridged|abridged|reissue|revised|proof|advance|uncorrected)(?:\s+v[\d.]+)?|v[\d.]+)\s*[\)\]]`)
+
+// reTrailingExt matches a trailing file extension preceded by a separator.
+var reTrailingExt = regexp.MustCompile(`(?i)[\s._-]+(?:epub|mobi|pdf|kepub|azw3?|lrf)$`)
+
+// cleanDisplayTitle strips common IRC file annotations (e.g. "(retail)",
+// "(epub)", "(illus)", "(v5)") and trailing file extensions from a book title
+// for display. Edition years and series info are preserved. The dl string and
+// original IRC filename are never affected — only the displayed title.
+func cleanDisplayTitle(s string) string {
+	s = reIRCAnnotations.ReplaceAllString(s, "")
+	s = reTrailingExt.ReplaceAllString(s, "")
+	// Collapse multiple spaces left by removals.
+	s = strings.Join(strings.Fields(s), " ")
+	return strings.TrimSpace(s)
+}
 
 // keepRunes returns s filtered to only the runes for which allow returns true.
 func keepRunes(s string, allow func(rune) bool) string {
@@ -220,13 +256,15 @@ func buildSearchResponse(books []core.BookDetail, isTrusted func(string) bool) s
 		if g.copies > 1 {
 			copies = g.copies
 		}
+		cleaned := cleanDisplayTitle(g.rep.Title)
 		bookResults[i] = bookResult{
-			ServerIdx: serverIdx[g.rep.Server],
-			Author:    g.rep.Author,
-			Title:     g.rep.Title,
-			Size:      g.rep.Size,
-			DL:        g.rep.Full,
-			Copies:    copies,
+			ServerIdx:  serverIdx[g.rep.Server],
+			Author:     g.rep.Author,
+			Title:      cleaned,
+			Size:       g.rep.Size,
+			DL:         g.rep.Full,
+			Copies:     copies,
+			cleanBonus: cleaned == g.rep.Title,
 		}
 	}
 
@@ -245,6 +283,7 @@ func buildSearchResponse(books []core.BookDetail, isTrusted func(string) bool) s
 //   - Any query word appears in author: +3 (only if not all)
 //   - Each additional copy (source):    +2
 //   - File size in MB:                  +1 per MB
+//   - Clean title (no IRC annotations): +3 bonus
 func rankBooks(books []bookResult, query string) []bookResult {
 	if len(books) <= 1 {
 		return books
@@ -306,6 +345,9 @@ func scoreBook(b bookResult, queryWords []string) float64 {
 	if b.Copies > 1 {
 		score += float64(b.Copies-1) * 2
 	}
+	if b.cleanBonus {
+		score += 3
+	}
 	score += parseSizeBytes(b.Size) / (1024 * 1024) // MB
 	return score
 }
@@ -315,13 +357,13 @@ func registerTools(s *server.MCPServer, src bookSource) {
 		mcp.NewTool("search_books",
 			mcp.WithDescription(`Search for ebooks on IRC. Synchronous — may take up to 60 seconds.
 
-Returns only epub results from online servers, deduplicated by title, ranked by relevance to the query. Response fields:
+Returns only epub results from online servers, deduplicated by title, ranked by relevance to the query. IRC file annotations (e.g. "(retail)", "(epub)", "(illus)") are stripped from displayed titles for readability. Response fields:
 - servers[]: server names (representatives for each returned book)
-- books[]: top matches, each with fields: s (index into servers[]), author, title, size, dl (pass to download_book), copies (sources found, omitted if 1)
+- books[]: top 20 matches, each with fields: s (index into servers[]), author, title, size, dl (pass to download_book), copies (sources found, omitted if 1)
 - total: total number of unique titles found
 - truncated: true if books[] was truncated (more available via list_search_results)
 
-Present the top results to the user. If none are what they want and truncated is true, call list_search_results to retrieve the full set.`),
+Present the top results to the user. If none are what they want and truncated is true, call list_search_results with an offset to page through the rest.`),
 			mcp.WithString("query",
 				mcp.Required(),
 				mcp.Description("Search query, e.g. 'Dune Frank Herbert' or 'Foundation Asimov'"),
@@ -332,9 +374,15 @@ Present the top results to the user. If none are what they want and truncated is
 
 	s.AddTool(
 		mcp.NewTool("list_search_results",
-			mcp.WithDescription(`Return the full result set from the most recent search_books call.
+			mcp.WithDescription(`Return a paginated slice of the full result set from the most recent search_books call.
 
-Use this when search_books returned a truncated list (truncated=true) and the user wants to see all matches. Returns the same servers[]/books[] structure but with every deduplicated result, sorted by relevance.`),
+Use this when search_books returned a truncated list (truncated=true) and the user wants to see more. Returns the same servers[]/books[] structure, paginated by offset/limit (default limit 20). Response includes total, offset, limit, and has_more so you know if another page exists.`),
+			mcp.WithNumber("offset",
+				mcp.Description("Number of results to skip from the start (default 0). Pass 20 for the second page, 40 for the third, etc."),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Maximum number of results to return (default 20, max 50)."),
+			),
 		),
 		listSearchResultsHandler(src),
 	)
@@ -494,16 +542,68 @@ func searchBooksHandler(src bookSource) server.ToolHandlerFunc {
 }
 
 func listSearchResultsHandler(src bookSource) server.ToolHandlerFunc {
-	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		_, start := toolLog(src, "list_search_results")
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := toolArgs(req)
+		offset := 0
+		limit := topNSearchResults
+		if n, ok := args["offset"]; ok && n != "" {
+			if v, _ := fmt.Sscanf(n, "%d", &offset); v == 1 && offset < 0 {
+				offset = 0
+			}
+		}
+		if n, ok := args["limit"]; ok && n != "" {
+			if v, _ := fmt.Sscanf(n, "%d", &limit); v == 1 {
+				if limit <= 0 {
+					limit = topNSearchResults
+				}
+				if limit > 50 {
+					limit = 50
+				}
+			}
+		}
+		_, start := toolLog(src, "list_search_results", "offset", offset, "limit", limit)
+
 		query, resp, ok := src.LastSearch()
 		if !ok {
 			toolLogDone(src, "list_search_results", start, "cached", false)
 			return mcp.NewToolResultText("No search has been performed yet. Call search_books first."), nil
 		}
-		data, _ := json.Marshal(resp)
-		summary := fmt.Sprintf("Full results for %q (%d unique titles):\n%s", query, resp.Total, string(data))
-		toolLogDone(src, "list_search_results", start, "query", query, "total", resp.Total)
+
+		total := len(resp.Books)
+		if offset >= total {
+			page := paginatedSearchResponse{
+				Servers: resp.Servers,
+				Books:   []bookResult{},
+				Total:   total,
+				Offset:  offset,
+				Limit:   limit,
+				HasMore: false,
+			}
+			data, _ := json.Marshal(page)
+			summary := fmt.Sprintf("No more results for %q (offset %d >= total %d).\n%s", query, offset, total, string(data))
+			toolLogDone(src, "list_search_results", start, "query", query, "total", total, "shown", 0, "offset", offset)
+			return mcp.NewToolResultText(summary), nil
+		}
+
+		end := offset + limit
+		if end > total {
+			end = total
+		}
+		page := paginatedSearchResponse{
+			Servers: resp.Servers,
+			Books:   append([]bookResult(nil), resp.Books[offset:end]...),
+			Total:   total,
+			Offset:  offset,
+			Limit:   limit,
+			HasMore: end < total,
+		}
+		data, _ := json.Marshal(page)
+		summary := fmt.Sprintf("Results for %q (showing %d-%d of %d unique titles):\n%s",
+			query, offset+1, end, total, string(data))
+		if page.HasMore {
+			summary += fmt.Sprintf("\nMore available — call list_search_results with offset=%d for the next page.", end)
+		}
+		toolLogDone(src, "list_search_results", start, "query", query, "total", total, "shown", len(page.Books), "offset", offset, "has_more", page.HasMore)
 		return mcp.NewToolResultText(summary), nil
 	}
 }

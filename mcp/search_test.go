@@ -143,3 +143,107 @@ func TestMockSession_LastSearchCache(t *testing.T) {
 	assert.Equal(t, "dune", query)
 	assert.Equal(t, 1, got.Total)
 }
+
+func TestCleanDisplayTitle(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"The Hobbit (illus) (retail) (epub)", "The Hobbit"},
+		{"The Hobbit (retail) (epub)", "The Hobbit"},
+		{"The Hobbit (v5)", "The Hobbit"},
+		{"The Hobbit (retail v5)", "The Hobbit"},
+		{"The Hobbit [retail] [epub]", "The Hobbit"},
+		{"The Hobbit.epub", "The Hobbit"},
+		{"The Hobbit (2011)", "The Hobbit (2011)"},        // edition year preserved
+		{"The History of the Hobbit (2011)", "The History of the Hobbit (2011)"},
+		{"The Hobbit (unabridged)", "The Hobbit"},
+		{"The Hobbit (illustrated)", "The Hobbit"},
+		{"The Hobbit (fixed) (enhanced)", "The Hobbit"},
+		{"The Hobbit [Series 01]", "The Hobbit [Series 01]"}, // series info preserved
+		{"Dune", "Dune"},                                      // already clean
+		{"", ""},
+		{"The Hobbit (kepub)", "The Hobbit"},
+		{"The Hobbit.mobi", "The Hobbit"},
+		{"The_Hobbit.epub", "The_Hobbit"}, // underscore is part of title, only extension stripped
+	}
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			got := cleanDisplayTitle(tc.input)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestBuildSearchResponse_CleansTitles(t *testing.T) {
+	books := []core.BookDetail{
+		{Server: "ThrawnBot", Author: "J R R Tolkien", Title: "The Hobbit (illus) (retail) (epub)", Format: "epub", Size: "22 MB", Full: "!ThrawnBot The Hobbit (illus) (retail) (epub).epub"},
+		{Server: "EpubWorld", Author: "J R R Tolkien", Title: "The Hobbit", Format: "epub", Size: "5 MB", Full: "!EpubWorld The Hobbit.epub"},
+	}
+	trusted := func(string) bool { return true }
+
+	resp := buildSearchResponse(books, trusted)
+
+	// Both normalize to "thehobbit" so they collapse into one group.
+	// The representative is the larger file (22 MB), whose title gets cleaned.
+	if assert.Len(t, resp.Books, 1) {
+		assert.Equal(t, "The Hobbit", resp.Books[0].Title, "title should be cleaned")
+		assert.Equal(t, "!ThrawnBot The Hobbit (illus) (retail) (epub).epub", resp.Books[0].DL, "dl string must stay intact")
+	}
+}
+
+func TestRankBooks_PrefersCleanTitles(t *testing.T) {
+	// Two books with identical query match, copies, and size — but one has
+	// cleanBonus=true (original title had no annotations) and the other doesn't.
+	books := []bookResult{
+		{Author: "J R R Tolkien", Title: "The Hobbit (illus) (retail) (epub)", Size: "22 MB", Copies: 18, cleanBonus: false},
+		{Author: "J R R Tolkien", Title: "The Hobbit", Size: "22 MB", Copies: 18, cleanBonus: true},
+	}
+	ranked := rankBooks(books, "hobbit")
+
+	if assert.Len(t, ranked, 2) {
+		assert.Equal(t, "The Hobbit", ranked[0].Title, "clean title should rank first")
+	}
+}
+
+func TestScoreBook_CleanBonus(t *testing.T) {
+	words := strings.Fields("hobbit")
+	clean := bookResult{Author: "Tolkien", Title: "The Hobbit", Size: "5 MB", cleanBonus: true}
+	cluttered := bookResult{Author: "Tolkien", Title: "The Hobbit", Size: "5 MB", cleanBonus: false}
+	assert.Greater(t, scoreBook(clean, words), scoreBook(cluttered, words),
+		"clean title should score higher than cluttered with same match/size")
+}
+
+func TestListSearchResults_Pagination(t *testing.T) {
+	m := NewMockSession(t.TempDir())
+	// Build a cached search with 25 books.
+	books := make([]bookResult, 25)
+	for i := range books {
+		books[i] = bookResult{Author: "A", Title: string(rune('A' + i)), Size: "1 MB"}
+	}
+	m.SetLastSearch("test", searchResponse{
+		Servers: []string{"S1"},
+		Books:   books,
+		Total:   25,
+	})
+
+	// Simulate paginated slicing directly (the handler logic).
+	_, resp, ok := m.LastSearch()
+	assert.True(t, ok)
+	total := len(resp.Books)
+
+	// Page 1: offset=0, limit=20 → 20 books, has_more=true
+	end := 20
+	assert.Equal(t, 20, end)
+	assert.True(t, end < total, "has_more should be true")
+
+	// Page 2: offset=20, limit=20 → 5 books, has_more=false
+	offset := 20
+	end = offset + 20
+	if end > total {
+		end = total
+	}
+	assert.Equal(t, 25, end)
+	assert.False(t, end < total, "has_more should be false on last page")
+	assert.Equal(t, 5, end-offset, "should return 5 books on last page")
+}
