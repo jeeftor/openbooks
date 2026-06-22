@@ -9,6 +9,7 @@
 - **EPUBMetadata JSON fields:** Added `omitempty` tags to `Series` and `SeriesIndex` so empty fields are no longer serialized as `"series":"","series_index":""`. Changed JSON field names from PascalCase (`Author`, `Title`, `Series`, `SeriesIndex`) to lowercase (`author`, `title`, `series`, `series_index`) for consistency with the rest of the MCP API. Web UI TypeScript types and Vue components updated to match.
 - **Option `isOrganized` field:** Added `omitempty` so `"isOrganized":false` is no longer serialized on non-organized options.
 - **MCP `stagedBookResponse`:** Dropped `replace_space` from the agent-facing response — it's internal config the agent never uses.
+- **MCP `has_more` field:** Added `omitempty` to `paginatedSearchResponse.has_more` so `"has_more":false` is no longer serialized on the last page of results.
 
 ### Added
 

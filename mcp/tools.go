@@ -66,7 +66,7 @@ type paginatedSearchResponse struct {
 	Total   int          `json:"total"`
 	Offset  int          `json:"offset"`
 	Limit   int          `json:"limit"`
-	HasMore bool         `json:"has_more"`
+	HasMore bool         `json:"has_more,omitempty"`
 }
 
 // topNSearchResults is the maximum number of ranked results search_books
