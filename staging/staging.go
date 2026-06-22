@@ -258,5 +258,18 @@ func SanitizePathComponent(s, replaceSpace string) string {
 	if replaceSpace != "" {
 		s = strings.ReplaceAll(s, " ", replaceSpace)
 	}
+	// Collapse consecutive dashes.
+	for strings.Contains(s, "--") {
+		s = strings.ReplaceAll(s, "--", "-")
+	}
+	// Trim leading/trailing dots and dashes after dash collapsing.
+	s = strings.Trim(s, ".-")
+	// Remove control characters.
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 {
+			return -1
+		}
+		return r
+	}, s)
 	return s
 }

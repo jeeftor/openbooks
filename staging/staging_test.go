@@ -375,3 +375,33 @@ func equalStringSlices(a, b []string) bool {
 	}
 	return true
 }
+
+func TestSanitizePathComponent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		input        string
+		replaceSpace string
+		want         string
+	}{
+		{"normal", "Frank Herbert", "", "Frank Herbert"},
+		{"replace space", "Frank Herbert", "_", "Frank_Herbert"},
+		{"slashes", "foo/bar", "", "foo-bar"},
+		{"backslashes", "foo\\bar", "", "foo-bar"},
+		{"leading trailing dots", ".Hidden.", "", "Hidden"},
+		{"consecutive dashes", "foo--bar", "", "foo-bar"},
+		{"control chars", "foo\x00bar", "", "foobar"},
+		{"empty string", "", "", ""},
+		{"only dots", "...", "", ""},
+		{"mixed", "..foo//bar..", "", "foo-bar"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := SanitizePathComponent(tc.input, tc.replaceSpace)
+			if got != tc.want {
+				t.Errorf("SanitizePathComponent(%q, %q) = %q, want %q", tc.input, tc.replaceSpace, got, tc.want)
+			}
+		})
+	}
+}
