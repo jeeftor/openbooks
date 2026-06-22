@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **MCP add missing series during confirm_book:** When extracted EPUB metadata has no series, the "series" naming option is now always generated (with a `[series]` placeholder preview) so the user can see it's available and provide a series name. The `download_book` description now explicitly instructs the agent to ask "is this book part of a series?" when series is missing. The `confirm_book` description clarifies that `option_id="series"` is always valid when author+title are available — pass the user-provided series name and index, and the server builds `Author/Series/Title/` and writes the series to the EPUB's OPF.
+
 ### Improved
 
 - **MCP response token efficiency:** Removed redundant summary text from `search_books`, `list_search_results`, and `download_book` responses — the JSON is self-describing (includes `total`, `truncated`, `has_more`, `staged_id`), so the prepended natural-language summaries were duplicating information and wasting ~150 tokens per call. Responses are now pure JSON.
