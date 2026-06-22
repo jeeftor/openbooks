@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/evan-buss/openbooks/core"
-	"github.com/evan-buss/openbooks/irc"
+	"github.com/jeeftor/openbooks/core"
+	"github.com/jeeftor/openbooks/irc"
 )
 
 // concurrentDownloads is the maximum number of simultaneous IRC DCC transfers per session.

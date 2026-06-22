@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/evan-buss/openbooks/dcc"
-	"github.com/evan-buss/openbooks/util"
+	"github.com/jeeftor/openbooks/dcc"
+	"github.com/jeeftor/openbooks/util"
 )
 
 func DownloadExtractDCCString(baseDir, dccStr string, progress io.Writer) (string, error) {

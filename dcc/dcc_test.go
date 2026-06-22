@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"testing"
 
-	"github.com/evan-buss/openbooks/mock"
+	"github.com/jeeftor/openbooks/mock"
 )
 
 // TestStringParsing makes sure that data is properly extracted from the DCC

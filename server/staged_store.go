@@ -1,6 +1,6 @@
 package server
 
-import "github.com/evan-buss/openbooks/staging"
+import "github.com/jeeftor/openbooks/staging"
 
 // StagedBook is a book that has been downloaded and post-processed but not yet
 // renamed and moved to the final library location.

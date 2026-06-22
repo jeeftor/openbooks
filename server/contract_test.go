@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/evan-buss/openbooks/core"
+	"github.com/jeeftor/openbooks/core"
 )
 
 // TestEPUBMetadataJSONContract verifies that the Go EPUBMetadata struct

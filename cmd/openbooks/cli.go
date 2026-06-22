@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/evan-buss/openbooks/cli"
+	"github.com/jeeftor/openbooks/cli"
 	"github.com/spf13/cobra"
 )
 

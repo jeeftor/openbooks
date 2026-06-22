@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/evan-buss/openbooks/mcp"
+	"github.com/jeeftor/openbooks/mcp"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"

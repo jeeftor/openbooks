@@ -25,4 +25,4 @@ We have put in place the following measures to deter abuse:
    IRC Highway sends a [VERSION](https://en.wikipedia.org/wiki/Client-to-client_protocol#VERSION) request to each client connection.
    The version number OpenBooks sends back must be on the allow-list or the connection is blocked.
 
-These mitigations are ongoing and if the IRC admins have any issues or ideas to prevent bad actors, they can reach out via the [GitHub issue tracker](https://github.com/evan-buss/openbooks/issues).
+These mitigations are ongoing and if the IRC admins have any issues or ideas to prevent bad actors, they can reach out via the [GitHub issue tracker](https://github.com/jeeftor/openbooks/issues).

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evan-buss/openbooks/irc"
+	"github.com/jeeftor/openbooks/irc"
 )
 
 // Specific irc.irchighway.net commands

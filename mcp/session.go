@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/evan-buss/openbooks/core"
-	"github.com/evan-buss/openbooks/irc"
-	"github.com/evan-buss/openbooks/staging"
+	"github.com/jeeftor/openbooks/core"
+	"github.com/jeeftor/openbooks/irc"
+	"github.com/jeeftor/openbooks/staging"
 	"github.com/google/uuid"
 )
 

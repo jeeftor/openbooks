@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/evan-buss/openbooks/core"
+	"github.com/jeeftor/openbooks/core"
 )
 
 // Option is one naming choice presented to the user/agent.

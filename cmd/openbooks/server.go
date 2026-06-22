@@ -5,8 +5,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/evan-buss/openbooks/server"
-	"github.com/evan-buss/openbooks/util"
+	"github.com/jeeftor/openbooks/server"
+	"github.com/jeeftor/openbooks/util"
 
 	"github.com/spf13/cobra"
 )

@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/evan-buss/openbooks/core"
-	"github.com/evan-buss/openbooks/irc"
-	"github.com/evan-buss/openbooks/util"
+	"github.com/jeeftor/openbooks/core"
+	"github.com/jeeftor/openbooks/irc"
+	"github.com/jeeftor/openbooks/util"
 )
 
 var servers []string

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/evan-buss/openbooks/core"
+	"github.com/jeeftor/openbooks/core"
 	"github.com/stretchr/testify/assert"
 )
 

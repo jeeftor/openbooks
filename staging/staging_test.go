@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/evan-buss/openbooks/core"
+	"github.com/jeeftor/openbooks/core"
 )
 
 func TestOriginalCopyPath(t *testing.T) {
