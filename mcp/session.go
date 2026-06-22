@@ -285,7 +285,7 @@ func (s *Session) ConfirmBook(stagedID string, choice staging.Choice) (string, e
 	}
 
 	if choice.RewriteMetadata && strings.EqualFold(filepath.Ext(finalPath), ".epub") {
-		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
 			s.logActivity("error", fmt.Sprintf("🤖 MCP metadata rewrite failed: %v", err))
 		}
 	}

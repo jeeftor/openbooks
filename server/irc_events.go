@@ -273,7 +273,7 @@ func (sess *session) bookResultHandler(
 
 		// 7. Optionally rewrite EPUB internal metadata.
 		if choice.RewriteMetadata && strings.EqualFold(filepath.Ext(finalPath), ".epub") {
-			if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+			if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
 				sess_lb.warn(fmt.Sprintf("Metadata rewrite failed: %v", err))
 			} else {
 				sess_lb.infoDetail("✏️  Metadata rewritten",

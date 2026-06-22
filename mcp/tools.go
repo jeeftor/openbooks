@@ -399,7 +399,14 @@ This is the FIRST step of a two-step flow. The book is downloaded, post-processe
 
 The server sends progress notifications during the download (DCC transfer started, post-processing, metadata extraction). These are informational — the tool call blocks until the full flow completes.
 
-You MUST present the metadata to the user and ask whether the author/title/series are correct before saving. Collect any corrections, choose an option id from options[] (or "custom"), then call confirm_book with the staged_id and the (possibly edited) metadata. If the user does not want the book, call discard_staged.`),
+CRITICAL — You MUST present the metadata to the user and explicitly ask about EACH field before saving:
+1. Show the extracted author, title, series, and series_index.
+2. Ask the user: "Is the author correct? Is the title correct? Is the series correct? Is the series index correct?"
+3. If the user says a field is WRONG, pass the corrected value to confirm_book.
+4. If the user says a field should be REMOVED (e.g. the series is wrong and the book isn't part of any series), pass clear_series=true (or clear_series_index=true) to confirm_book. Do NOT just omit the field — omitting it falls back to the extracted value.
+5. Only after the user has confirmed or corrected every field, choose an option id from options[] (or "custom") and call confirm_book.
+
+If the user does not want the book, call discard_staged.`),
 			mcp.WithString("download_string",
 				mcp.Required(),
 				mcp.Description("The dl field from a search_books result"),
@@ -413,6 +420,8 @@ You MUST present the metadata to the user and ask whether the author/title/serie
 			mcp.WithDescription(`Save a staged book to the library. This is the SECOND step after download_book.
 
 Pass the staged_id from download_book, the chosen option_id from the options[] list (e.g. "keep", "title", "author-title-flat", "organized", "series"), and the metadata fields the user confirmed or corrected. Set rewrite_metadata=true to also patch the EPUB's internal OPF metadata (dc:title, dc:creator, calibre:series, calibre:series_index) to match.
+
+If the user said a series or series_index is wrong and should be REMOVED (not just changed), pass clear_series=true or clear_series_index=true. This removes the field from both the filename path and the EPUB's internal OPF (when rewrite_metadata=true). Do NOT just omit the field — omitting it falls back to the extracted value.
 
 If option_id is "custom", provide custom_name (a relative path/filename under the download dir). file_name overrides just the leaf filename for the structured options.
 
@@ -445,6 +454,12 @@ Returns the final path relative to the download directory.`),
 			),
 			mcp.WithBoolean("rewrite_metadata",
 				mcp.Description("If true, patch the EPUB's internal OPF metadata to match the confirmed fields."),
+			),
+			mcp.WithBoolean("clear_series",
+				mcp.Description("If true, remove the series from the filename path and strip calibre:series from the EPUB's OPF (when rewrite_metadata=true). Use when the extracted series is wrong and the book isn't part of any series."),
+			),
+			mcp.WithBoolean("clear_series_index",
+				mcp.Description("If true, remove the series index from the EPUB's OPF (when rewrite_metadata=true). Use when the series name is correct but the index is wrong and should be removed."),
 			),
 		),
 		confirmBookHandler(src),
@@ -680,14 +695,16 @@ func confirmBookHandler(src bookSource) server.ToolHandlerFunc {
 
 		args := toolArgs(req)
 		choice := staging.Choice{
-			OptionID:        optionID,
-			CustomName:      args["custom_name"],
-			FileName:        args["file_name"],
-			Author:          args["author"],
-			Title:           args["title"],
-			Series:          args["series"],
-			SeriesIndex:     args["series_index"],
-			RewriteMetadata: args["rewrite_metadata"] == "true",
+			OptionID:         optionID,
+			CustomName:       args["custom_name"],
+			FileName:         args["file_name"],
+			Author:           args["author"],
+			Title:            args["title"],
+			Series:           args["series"],
+			SeriesIndex:      args["series_index"],
+			RewriteMetadata:  args["rewrite_metadata"] == "true",
+			ClearSeries:      args["clear_series"] == "true",
+			ClearSeriesIndex: args["clear_series_index"] == "true",
 		}
 
 		relPath, err := src.ConfirmBook(stagedID, choice)
@@ -696,7 +713,7 @@ func confirmBookHandler(src bookSource) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(fmt.Sprintf("confirm failed: %v", err)), nil
 		}
 
-		toolLogDone(src, "confirm_book", start, "staged_id", stagedID, "option", optionID, "path", relPath, "rewrite", choice.RewriteMetadata)
+		toolLogDone(src, "confirm_book", start, "staged_id", stagedID, "option", optionID, "path", relPath, "rewrite", choice.RewriteMetadata, "clear_series", choice.ClearSeries, "clear_series_index", choice.ClearSeriesIndex)
 		return mcp.NewToolResultText(fmt.Sprintf("Saved to library: %s", relPath)), nil
 	}
 }

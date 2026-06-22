@@ -2,8 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- **MCP `confirm_book` clear metadata fields:** `confirm_book` now accepts `clear_series` and `clear_series_index` boolean params. When true, the field is removed from both the filename path and (with `rewrite_metadata=true`) the EPUB's internal OPF — the `calibre:series` / `calibre:series_index` meta tags are stripped entirely. Use when extracted metadata is wrong (e.g. "The Hobbit" tagged as "The Lord of the Rings" series index 0) and the user wants it removed, not just changed. Previously, omitting a field fell back to the extracted value with no way to clear it.
+
 ### Improved
 
+- **MCP `download_book` stronger agent guidance:** The `download_book` tool description now explicitly instructs the agent to ask about each metadata field individually (author, title, series, series_index) and offer to clear wrong fields via `clear_series`/`clear_series_index` rather than just presenting save format options.
 - **MCP search shows 20 results inline:** `search_books` now returns the top 20 ranked results (up from 10), so broad queries like "Hobbit" show more variants without needing a second call.
 - **MCP `list_search_results` pagination:** `list_search_results` now accepts `offset` (default 0) and `limit` (default 20, max 50) parameters instead of dumping the full result set. The response includes `total`, `offset`, `limit`, and `has_more` so the agent can page through results naturally.
 - **MCP search titles cleaned:** IRC file annotations (e.g. `(retail)`, `(epub)`, `(illus)`, `(v5)`, `(kepub)`, `(unabridged)`) and trailing file extensions are now stripped from displayed titles for readability. "The Hobbit (illus) (retail) (epub)" displays as "The Hobbit". Edition years like `(2011)` and series info like `[Series 01]` are preserved. The `dl` download string is never affected.

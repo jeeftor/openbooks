@@ -12,8 +12,10 @@ import (
 
 // RewriteEPUBMetadata patches the OPF metadata inside an EPUB zip file in-place.
 // It updates dc:title, dc:creator (first author), calibre:series, and calibre:series_index meta.
-// Pass an empty string to skip a field. Errors are non-fatal — caller should log them.
-func RewriteEPUBMetadata(epubPath, title, author, series, seriesIndex string) error {
+// Pass an empty string to skip a field (leave it unchanged).
+// When clearSeries/clearSeriesIndex is true, the corresponding calibre: meta tag is
+// removed from the OPF entirely. Errors are non-fatal — caller should log them.
+func RewriteEPUBMetadata(epubPath, title, author, series, seriesIndex string, clearSeries, clearSeriesIndex bool) error {
 	r, err := zip.OpenReader(epubPath)
 	if err != nil {
 		return fmt.Errorf("open epub: %w", err)
@@ -40,7 +42,7 @@ func RewriteEPUBMetadata(epubPath, title, author, series, seriesIndex string) er
 			return fmt.Errorf("read data %s: %w", f.Name, err)
 		}
 		if f.Name == opfPath && opfPath != "" {
-			data = patchOPF(data, title, author, series, seriesIndex)
+			data = patchOPF(data, title, author, series, seriesIndex, clearSeries, clearSeriesIndex)
 		}
 		entries = append(entries, entry{name: f.Name, content: data})
 	}
@@ -109,7 +111,9 @@ var (
 )
 
 // patchOPF applies targeted substitutions to OPF XML bytes.
-func patchOPF(data []byte, title, author, series, seriesIndex string) []byte {
+// When clearSeries/clearSeriesIndex is true, the corresponding meta tag is
+// removed entirely instead of being updated.
+func patchOPF(data []byte, title, author, series, seriesIndex string, clearSeries, clearSeriesIndex bool) []byte {
 	s := string(data)
 
 	if title != "" {
@@ -120,7 +124,9 @@ func patchOPF(data []byte, title, author, series, seriesIndex string) []byte {
 		s = replaceFirstMatch(s, reDCCreator,
 			`<dc:creator opf:role="aut">`+xmlEsc(author)+`</dc:creator>`)
 	}
-	if series != "" {
+	if clearSeries {
+		s = reCalSeries.ReplaceAllString(s, "")
+	} else if series != "" {
 		repl := `<meta name="calibre:series" content="` + xmlEsc(series) + `"/>`
 		if reCalSeries.MatchString(s) {
 			s = reCalSeries.ReplaceAllString(s, repl)
@@ -128,7 +134,9 @@ func patchOPF(data []byte, title, author, series, seriesIndex string) []byte {
 			s = insertBeforeMetadataClose(s, repl)
 		}
 	}
-	if seriesIndex != "" {
+	if clearSeriesIndex {
+		s = reCalSeriesIndex.ReplaceAllString(s, "")
+	} else if seriesIndex != "" {
 		repl := `<meta name="calibre:series_index" content="` + xmlEsc(seriesIndex) + `"/>`
 		if reCalSeriesIndex.MatchString(s) {
 			s = reCalSeriesIndex.ReplaceAllString(s, repl)
