@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v3.0.45 - 2026-06-21
+
 ### Added
 
 - **MCP download→confirm→organize metadata flow:** `download_book` now downloads to a staging area, runs the post-processor, reads EPUB metadata (author/title/series/series_index), and builds rename `options[]` without saving to the library. The agent presents the metadata to the user for confirmation, then calls the new `confirm_book` tool to move the file to its final organized path (with optional EPUB internal metadata rewrite). New `list_staged` and `discard_staged` tools manage pending downloads.
