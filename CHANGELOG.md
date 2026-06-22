@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Parser detects and corrects swapped author/title fields:** IRC ebook search results have mixed field ordering — some entries use `Author - Title.ext`, others use `Title - Author.ext`. The parser previously assumed `Author - Title` always, so swapped entries displayed incorrectly (e.g., "Author: The Hobbit, Title: J. R. R. Tolkien"). A conservative heuristic now detects obvious swaps and corrects them. Signals: "et al" in title field, "Last, First" comma pattern in title, initials pattern in title (e.g., "J. R. R. Tolkien"), leading/trailing articles in author field ("The Hobbit", "Hobbit, The"), single-word author with multi-word name-like title, and large word-count asymmetry. Ambiguous cases are left as-is to avoid introducing new errors. The download string (`Full` field) is never modified.
+
 ### Improved
 
 - **MCP search ranking prioritizes full-word matches:** `search_books` now ranks results with full-word matches (word-boundary) above substring matches. Searching `dan` will rank "Dan Brown" (full word) above "Danielle Steel" (substring) above "Jordan" (substring). New scoring tiers: full-word all-match (+9), full-word any-match (+6), substring all-match (+5), substring any-match (+3), applied independently to title and author. Existing ranking factors (copies, file size, clean-title bonus) are preserved.
