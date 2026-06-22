@@ -235,6 +235,65 @@ func TestScoreBook_CleanBonus(t *testing.T) {
 		"clean title should score higher than cluttered with same match/size")
 }
 
+func TestWordBoundaryMatch(t *testing.T) {
+	tests := []struct {
+		text  string
+		word  string
+		want  bool
+	}{
+		{"dan brown", "dan", true},
+		{"danielle steel", "dan", false},
+		{"jordan", "dan", false},
+		{"the dan", "dan", true},
+		{"dan", "dan", true},
+		{"dancing with wolves", "dan", false},
+		{"brown dan", "dan", true},
+		{"", "dan", false},
+		{"dan", "", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.text+"/"+tc.word, func(t *testing.T) {
+			assert.Equal(t, tc.want, wordBoundaryMatch(tc.text, tc.word))
+		})
+	}
+}
+
+func TestRankBooks_PrefersFullWordOverSubstring(t *testing.T) {
+	// "Dan" as a full word in author should rank above "Danielle" (substring).
+	books := []bookResult{
+		{Author: "Danielle Steel", Title: "Some Book", Size: "1 MB", Copies: 1},
+		{Author: "Dan Brown", Title: "Some Book", Size: "1 MB", Copies: 1},
+	}
+	ranked := rankBooks(books, "dan")
+
+	if assert.Len(t, ranked, 2) {
+		assert.Equal(t, "Dan Brown", ranked[0].Author,
+			"full-word author match should rank above substring match")
+	}
+}
+
+func TestRankBooks_PrefersFullWordInTitleOverSubstring(t *testing.T) {
+	// "Dan" as a full word in title should rank above "Dancing" (substring).
+	books := []bookResult{
+		{Author: "Someone", Title: "Dancing in the Dark", Size: "1 MB", Copies: 1},
+		{Author: "Someone", Title: "Dan and the Light", Size: "1 MB", Copies: 1},
+	}
+	ranked := rankBooks(books, "dan")
+
+	if assert.Len(t, ranked, 2) {
+		assert.Equal(t, "Dan and the Light", ranked[0].Title,
+			"full-word title match should rank above substring match")
+	}
+}
+
+func TestScoreBook_FullWordScoresHigherThanSubstring(t *testing.T) {
+	words := strings.Fields("dan")
+	fullWord := bookResult{Author: "Dan Brown", Title: "Some Book", Size: "1 MB"}
+	substring := bookResult{Author: "Danielle Steel", Title: "Some Book", Size: "1 MB"}
+	assert.Greater(t, scoreBook(fullWord, words), scoreBook(substring, words),
+		"full-word match should score higher than substring-only match")
+}
+
 func TestListSearchResults_Pagination(t *testing.T) {
 	m := NewMockSession(t.TempDir())
 	// Build a cached search with 25 books.

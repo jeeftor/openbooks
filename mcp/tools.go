@@ -304,13 +304,19 @@ func buildSearchResponse(books []core.BookDetail, isTrusted func(string) bool) s
 
 // rankBooks sorts book results by relevance to the query, descending. Ties
 // preserve the original order (stable sort). Scoring:
-//   - All query words appear in title:  +5
-//   - Any query word appears in title:  +3 (only if not all)
-//   - All query words appear in author: +5
-//   - Any query word appears in author: +3 (only if not all)
+//   - All query words match as full words in title:  +9
+//   - All query words appear in title (substring):    +5 (only if not all full-word)
+//   - Any query word matches as a full word in title: +6 (only if not all)
+//   - Any query word appears in title (substring):     +3 (only if not any full-word)
+//   - Same tiers apply to author (9/5/6/3)
 //   - Each additional copy (source):    +2
 //   - File size in MB:                  +1 per MB
 //   - Clean title (no IRC annotations): +3 bonus
+//
+// A "full word" match means the query word appears as a complete word
+// (bounded by word boundaries), not as a substring inside another word.
+// So "dan" matches "Dan Brown" as a full word but "Danielle" only as a
+// substring, letting exact name matches rank above partial ones.
 func rankBooks(books []bookResult, query string) []bookResult {
 	if len(books) <= 1 {
 		return books
@@ -335,40 +341,87 @@ func rankBooks(books []bookResult, query string) []bookResult {
 	return out
 }
 
+// wordBoundaryMatch returns true if word appears as a complete word in text
+// (bounded by word boundaries), not just as a substring of a larger word.
+// Matching is case-insensitive (callers should lower-case both inputs).
+func wordBoundaryMatch(text, word string) bool {
+	if word == "" {
+		return false
+	}
+	// \b in Go regexp is an ASCII word boundary (between \w and \W).
+	// Escape the word in case it contains regex metacharacters.
+	pattern := `\b` + regexp.QuoteMeta(word) + `\b`
+	matched, err := regexp.MatchString(pattern, text)
+	return err == nil && matched
+}
+
 func scoreBook(b bookResult, queryWords []string) float64 {
 	titleLower := strings.ToLower(b.Title)
 	authorLower := strings.ToLower(b.Author)
 
 	var score float64
-	allTitle, anyTitle := true, false
-	allAuthor, anyAuthor := true, false
+	// Track four match levels per field: full-word all/any, substring all/any.
+	allTitleWord, anyTitleWord := true, false
+	allAuthorWord, anyAuthorWord := true, false
+	allTitleSub, anyTitleSub := true, false
+	allAuthorSub, anyAuthorSub := true, false
+
 	for _, w := range queryWords {
-		inTitle := strings.Contains(titleLower, w)
-		inAuthor := strings.Contains(authorLower, w)
-		if !inTitle {
-			allTitle = false
+		inTitleWord := wordBoundaryMatch(titleLower, w)
+		inAuthorWord := wordBoundaryMatch(authorLower, w)
+		inTitleSub := strings.Contains(titleLower, w)
+		inAuthorSub := strings.Contains(authorLower, w)
+
+		if !inTitleWord {
+			allTitleWord = false
 		} else {
-			anyTitle = true
+			anyTitleWord = true
 		}
-		if !inAuthor {
-			allAuthor = false
+		if !inAuthorWord {
+			allAuthorWord = false
 		} else {
-			anyAuthor = true
+			anyAuthorWord = true
+		}
+		if !inTitleSub {
+			allTitleSub = false
+		} else {
+			anyTitleSub = true
+		}
+		if !inAuthorSub {
+			allAuthorSub = false
+		} else {
+			anyAuthorSub = true
 		}
 	}
 	if len(queryWords) == 0 {
-		allTitle, allAuthor = false, false
+		allTitleWord, allAuthorWord = false, false
+		allTitleSub, allAuthorSub = false, false
 	}
-	if allTitle {
+
+	// Title scoring: full-word tiers above substring tiers.
+	switch {
+	case allTitleWord:
+		score += 9
+	case anyTitleWord:
+		score += 6
+	case allTitleSub:
 		score += 5
-	} else if anyTitle {
+	case anyTitleSub:
 		score += 3
 	}
-	if allAuthor {
+
+	// Author scoring: same tier order.
+	switch {
+	case allAuthorWord:
+		score += 9
+	case anyAuthorWord:
+		score += 6
+	case allAuthorSub:
 		score += 5
-	} else if anyAuthor {
+	case anyAuthorSub:
 		score += 3
 	}
+
 	if b.Copies > 1 {
 		score += float64(b.Copies-1) * 2
 	}
