@@ -13,6 +13,7 @@
 ### Improved
 
 - **MCP docs fixed:** Updated stale "top 10" references to "top 20" in `docs/docs/mcp.md`. Documented the JSON naming convention (MCP API = snake_case, WebSocket API = camelCase).
+- **Refactored staged book processing:** Extracted shared `processStagedBookChoice` helper for the three duplicated staged book handlers in `websocket_requests.go`, eliminating ~60 lines of copy-pasted logic. Removed the `server/staging.go` pass-through wrapper layer — callers now use `staging.*` directly.
 
 ### Changed
 
