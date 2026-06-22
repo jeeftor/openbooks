@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/evan-buss/openbooks/desktop"
-	"github.com/evan-buss/openbooks/server"
+	"github.com/jeeftor/openbooks/desktop"
+	"github.com/jeeftor/openbooks/server"
 	"github.com/spf13/cobra"
 )
 

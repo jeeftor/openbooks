@@ -1,4 +1,4 @@
-The latest release can be run from a platform-specific binary. Download the latest releases from the [Github releases](https://github.com/evan-buss/openbooks/releases) page.
+The latest release can be run from a platform-specific binary. Download the latest releases from the [Github releases](https://github.com/jeeftor/openbooks/releases) page.
 
 See [configuration](../configuration.md) for a complete list of configuration options available for both Server and CLI mode.
 

@@ -2,7 +2,7 @@
 
 package desktop
 
-import "github.com/evan-buss/openbooks/util"
+import "github.com/jeeftor/openbooks/util"
 
 func StartWebView(url string, debug bool) {
 	util.OpenBrowser(url)

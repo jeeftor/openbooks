@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	obsmcp "github.com/evan-buss/openbooks/mcp"
+	obsmcp "github.com/jeeftor/openbooks/mcp"
 	"github.com/spf13/cobra"
 )
 

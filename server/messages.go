@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evan-buss/openbooks/core"
-	"github.com/evan-buss/openbooks/staging"
+	"github.com/jeeftor/openbooks/core"
+	"github.com/jeeftor/openbooks/staging"
 )
 
 //go:generate stringer -type=MessageType

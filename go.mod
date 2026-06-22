@@ -1,4 +1,4 @@
-module github.com/evan-buss/openbooks
+module github.com/jeeftor/openbooks
 
 go 1.25.5
 

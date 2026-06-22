@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/evan-buss/openbooks/core"
+	"github.com/jeeftor/openbooks/core"
 )
 
 // StagedBook is a book that has been downloaded and post-processed but not yet

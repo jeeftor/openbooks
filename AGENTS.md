@@ -24,6 +24,7 @@
 ## Existing Project Rules
 
 - Default branch: `master`.
+- **Module path:** `github.com/jeeftor/openbooks` — this is our own fork, not the upstream `evan-buss/openbooks`. Never reference `evan-buss` in code, imports, or config. The README may mention the fork origin.
 - Prefer small, verifiable changes that match the existing project style.
 - Use `rg` for content searches and `fd` or `find` for file discovery.
 - Run the relevant repo-native checks before committing. If a check cannot be run or has known unrelated failures, document that clearly.

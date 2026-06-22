@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/evan-buss/openbooks/core"
-	"github.com/evan-buss/openbooks/staging"
+	"github.com/jeeftor/openbooks/core"
+	"github.com/jeeftor/openbooks/staging"
 )
 
 // stagingDir returns the hidden staging subdirectory inside downloadDir.

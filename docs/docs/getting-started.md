@@ -24,7 +24,7 @@ If you'd prefer to use OpenBooks from your terminal, check out [CLI Mode](./conf
 
 ### Executable
 
-1. Download the latest release for your platform from the [releases page](https://github.com/evan-buss/openbooks/releases).
+1. Download the latest release for your platform from the [releases page](https://github.com/jeeftor/openbooks/releases).
 2. Execute it from your terminal in Server (`./openbooks server`) or CLI (`./openbooks cli`) mode.
 
    - Linux users may have to run `chmod +x [binary name]` to make it executable

@@ -1,6 +1,6 @@
 package server
 
-import "github.com/evan-buss/openbooks/core"
+import "github.com/jeeftor/openbooks/core"
 
 type Repository struct {
 	servers core.IrcServers

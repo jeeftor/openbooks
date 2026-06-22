@@ -4,7 +4,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/evan-buss/openbooks/server"
+	"github.com/jeeftor/openbooks/server"
 )
 
 // Update a server config struct from globalFlags

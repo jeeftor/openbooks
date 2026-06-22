@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/evan-buss/openbooks/core"
-	"github.com/evan-buss/openbooks/staging"
-	"github.com/evan-buss/openbooks/util"
+	"github.com/jeeftor/openbooks/core"
+	"github.com/jeeftor/openbooks/staging"
+	"github.com/jeeftor/openbooks/util"
 )
 
 // RequestHandler defines a generic handle() method that is called when a specific request type is made

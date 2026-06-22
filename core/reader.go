@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/evan-buss/openbooks/irc"
+	"github.com/jeeftor/openbooks/irc"
 )
 
 type event int

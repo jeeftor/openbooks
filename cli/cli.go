@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/evan-buss/openbooks/core"
-	"github.com/evan-buss/openbooks/irc"
+	"github.com/jeeftor/openbooks/core"
+	"github.com/jeeftor/openbooks/irc"
 )
 
 type Config struct {
