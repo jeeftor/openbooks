@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Fixed TOCTOU race in `confirm_book`:** `StagedBookStore.GetAndRemove` now atomically retrieves and removes a staged book under a single lock, preventing concurrent `ConfirmBook` calls from racing on the same staged ID.
+
 ### Changed
 
 - **Module path renamed:** Go module path changed from `github.com/evan-buss/openbooks` to `github.com/jeeftor/openbooks`. All import paths, docs links, and config URLs updated. This is our own fork — no code references the upstream repo anymore (README retains a fork-origin mention).

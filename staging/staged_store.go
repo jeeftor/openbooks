@@ -69,6 +69,20 @@ func (s *StagedBookStore) Get(id string) (*StagedBook, bool) {
 	return b, ok
 }
 
+// GetAndRemove atomically retrieves and removes a staged book by ID.
+// This prevents TOCTOU races where two callers both Get() the same book
+// before either calls Remove().
+func (s *StagedBookStore) GetAndRemove(id string) (*StagedBook, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b, ok := s.books[id]
+	if !ok {
+		return nil, false, nil
+	}
+	delete(s.books, id)
+	return b, true, s.persist()
+}
+
 // All returns a stable copy of all staged books sorted by StagedAt (oldest first).
 func (s *StagedBookStore) All() []*StagedBook {
 	s.mu.RLock()
