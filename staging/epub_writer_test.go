@@ -1,6 +1,9 @@
 package staging
 
 import (
+	"archive/zip"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -121,5 +124,36 @@ func TestPatchOPFClearsSeriesIndexOnly(t *testing.T) {
 	// series should still be present since clearSeries is false
 	if !strings.Contains(got, "calibre:series") {
 		t.Fatalf("series should be preserved when clear_series is false:\n%s", got)
+	}
+}
+
+func TestRewriteEPUBMetadata_NoOPF(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	epubPath := filepath.Join(tmp, "noopf.epub")
+
+	// Create a zip with no .opf file.
+	f, err := os.Create(epubPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := zip.NewWriter(f)
+	ww, err := w.Create("mimetype")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ww.Write([]byte("application/epub+zip"))
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	err = RewriteEPUBMetadata(epubPath, "Title", "Author", "", "", false, false)
+	if err == nil {
+		t.Fatal("RewriteEPUBMetadata() expected error for missing OPF, got nil")
+	}
+	if !strings.Contains(err.Error(), "no OPF file") {
+		t.Fatalf("RewriteEPUBMetadata() error = %q, want it to contain \"no OPF file\"", err.Error())
 	}
 }

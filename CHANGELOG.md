@@ -9,6 +9,8 @@
 ### Fixed
 
 - **Fixed TOCTOU race in `confirm_book`:** `StagedBookStore.GetAndRemove` now atomically retrieves and removes a staged book under a single lock, preventing concurrent `ConfirmBook` calls from racing on the same staged ID.
+- **`SanitizePathComponent` hardened:** Now trims leading/trailing dots (Windows hidden files), collapses consecutive dashes, and filters control characters. Prevents malformed directory names from extracted metadata.
+- **`RewriteEPUBMetadata` errors on missing OPF:** Previously silently skipped metadata rewriting when an EPUB had no OPF file. Now returns an error so callers know the rewrite didn't happen.
 
 ### Improved
 

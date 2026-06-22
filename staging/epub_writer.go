@@ -22,6 +22,10 @@ func RewriteEPUBMetadata(epubPath, title, author, series, seriesIndex string, cl
 	}
 
 	opfPath := findOPFInZip(r)
+	if opfPath == "" {
+		r.Close()
+		return fmt.Errorf("no OPF file found in EPUB archive")
+	}
 
 	// Buffer all zip entries so we can close the reader before rewriting.
 	type entry struct {
@@ -41,7 +45,7 @@ func RewriteEPUBMetadata(epubPath, title, author, series, seriesIndex string, cl
 			r.Close()
 			return fmt.Errorf("read data %s: %w", f.Name, err)
 		}
-		if f.Name == opfPath && opfPath != "" {
+		if f.Name == opfPath {
 			data = patchOPF(data, title, author, series, seriesIndex, clearSeries, clearSeriesIndex)
 		}
 		entries = append(entries, entry{name: f.Name, content: data})
