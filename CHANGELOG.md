@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- **MCP download→confirm→organize metadata flow:** `download_book` now downloads to a staging area, runs the post-processor, reads EPUB metadata (author/title/series/series_index), and builds rename `options[]` without saving to the library. The agent presents the metadata to the user for confirmation, then calls the new `confirm_book` tool to move the file to its final organized path (with optional EPUB internal metadata rewrite). New `list_staged` and `discard_staged` tools manage pending downloads.
+- **MCP search results ranking:** `search_books` now ranks results by relevance (query word matches in author/title, source count, file size) and returns only the top 10 with `total` and `truncated` fields. New `list_search_results` tool returns the full cached result set from the last search.
+- **Shared `staging` package:** download→rename→organize logic extracted from `server/` into a shared `staging/` package imported by both the web server and MCP server — no duplication.
+
+### Changed
+
+- **MCP `search_books` response shape:** now includes `total` (full deduplicated count) and `truncated` (true when more results are available via `list_search_results`).
+
 ## v3.0.38 - 2026-06-21
 
 ### Changed

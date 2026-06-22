@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/evan-buss/openbooks/core"
+	"github.com/evan-buss/openbooks/staging"
 )
 
 //go:generate stringer -type=MessageType
@@ -100,12 +101,9 @@ type DownloadResponse struct {
 }
 
 // RenameOption is one naming choice shown in the rename modal.
-type RenameOption struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	Preview     string `json:"preview"`     // path relative to downloadDir, forward slashes
-	IsOrganized bool   `json:"isOrganized"` // true if it creates subdirectories
-}
+// It is an alias for staging.Option so the shared rename logic can be used by
+// both the web server and the MCP server without duplication.
+type RenameOption = staging.Option
 
 // RenamePromptResponse is sent when a book is staged and ready for the user to name.
 type RenamePromptResponse struct {
@@ -204,16 +202,9 @@ type SeriesAutocompleteResponse struct {
 }
 
 // RenameChoice is the internal representation passed from the WS handler to bookResultHandler.
-type RenameChoice struct {
-	OptionID        string
-	CustomName      string
-	FileName        string
-	RewriteMetadata bool
-	Author          string
-	Title           string
-	Series          string
-	SeriesIndex     string
-}
+// It is an alias for staging.Choice so the shared rename logic can be used by both the web
+// server and the MCP server without duplication.
+type RenameChoice = staging.Choice
 
 func newRateLimitResponse(remainingSeconds float64) StatusResponse {
 	wait := math.Round(remainingSeconds)

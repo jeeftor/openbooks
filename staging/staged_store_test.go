@@ -1,4 +1,4 @@
-package server
+package staging
 
 import (
 	"os"
@@ -20,9 +20,9 @@ func TestStagedBookStoreAddGetRemove(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	store, err := newStagedBookStore(dir)
+	store, err := NewStagedBookStore(dir)
 	if err != nil {
-		t.Fatalf("newStagedBookStore() error = %v", err)
+		t.Fatalf("NewStagedBookStore() error = %v", err)
 	}
 
 	filePath := filepath.Join(dir, "book.epub")
@@ -62,7 +62,7 @@ func TestStagedBookStoreAllSortedByAge(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	store, err := newStagedBookStore(dir)
+	store, err := NewStagedBookStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestStagedBookStorePersistsAndReloads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store1, err := newStagedBookStore(dir)
+	store1, err := NewStagedBookStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestStagedBookStorePersistsAndReloads(t *testing.T) {
 	}
 
 	// Load fresh store from same directory.
-	store2, err := newStagedBookStore(dir)
+	store2, err := NewStagedBookStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestStagedBookStoreDropsMissingFilesOnReload(t *testing.T) {
 		}
 	}
 
-	store1, err := newStagedBookStore(dir)
+	store1, err := NewStagedBookStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestStagedBookStoreDropsMissingFilesOnReload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store2, err := newStagedBookStore(dir)
+	store2, err := NewStagedBookStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-package server
+package staging
 
 import (
 	"archive/zip"
