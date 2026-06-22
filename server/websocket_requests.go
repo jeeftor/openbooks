@@ -304,7 +304,7 @@ func (c *Client) handleProcessOneStaged(req *ProcessOneStagedRequest, server *se
 	}
 
 	if choice.RewriteMetadata {
-		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
 			c.log.Printf("RewriteEPUBMetadata: %v", err)
 		}
 	}
@@ -402,7 +402,7 @@ func (c *Client) handleProcessStagedBooks(server *server) {
 		}
 
 		if choice.RewriteMetadata {
-			if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+			if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
 				c.log.Printf("RewriteEPUBMetadata: %v", err)
 			}
 		}
@@ -450,7 +450,7 @@ func (c *Client) handleStagedRenameConfirm(req *RenameConfirmRequest, server *se
 	}
 
 	if choice.RewriteMetadata {
-		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex); err != nil {
+		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
 			c.log.Printf("RewriteEPUBMetadata: %v", err)
 		}
 	}

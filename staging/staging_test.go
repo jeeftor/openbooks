@@ -282,6 +282,47 @@ func TestResolveFinalPathSeriesNoSeriesField(t *testing.T) {
 	}
 }
 
+func TestResolveFinalPathClearSeries(t *testing.T) {
+	t.Parallel()
+
+	// Extracted metadata has a wrong series, but ClearSeries=true should
+	// prevent the fallback and produce a path without the series directory.
+	meta := &core.EPUBMetadata{
+		Author:      "J R R Tolkien",
+		Title:       "The Hobbit",
+		Series:      "The Lord of the Rings",
+		SeriesIndex: "0",
+	}
+	got := ResolveFinalPath("books", Choice{
+		OptionID:     "series",
+		ClearSeries:  true,
+	}, "Hobbit.epub", meta, "")
+	want := filepath.Join("books", "J R R Tolkien", "The Hobbit", "The Hobbit.epub")
+	if got != want {
+		t.Fatalf("clear-series: got %q, want %q", got, want)
+	}
+}
+
+func TestResolveFinalPathClearSeriesFallsBackWithoutFlag(t *testing.T) {
+	t.Parallel()
+
+	// Without ClearSeries, empty Series should fall back to extracted metadata.
+	meta := &core.EPUBMetadata{
+		Author: "J R R Tolkien",
+		Title:  "The Hobbit",
+		Series: "The Lord of the Rings",
+	}
+	got := ResolveFinalPath("books", Choice{
+		OptionID:    "series",
+		Series:      "", // empty — should fall back
+		ClearSeries: false,
+	}, "Hobbit.epub", meta, "")
+	want := filepath.Join("books", "J R R Tolkien", "The Lord of the Rings", "The Hobbit", "The Hobbit.epub")
+	if got != want {
+		t.Fatalf("no-clear-series-fallback: got %q, want %q", got, want)
+	}
+}
+
 // helpers
 
 func optionIDs(opts []Option) []string {

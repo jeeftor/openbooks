@@ -27,15 +27,19 @@ type Option struct {
 
 // Choice is the user/agent's rename decision. Metadata fields may differ from
 // the extracted EPUBMetadata when the caller edited them before confirming.
+// ClearSeries/ClearSeriesIndex explicitly remove a field instead of falling
+// back to the extracted value.
 type Choice struct {
-	OptionID        string
-	CustomName      string
-	FileName        string
-	RewriteMetadata bool
-	Author          string
-	Title           string
-	Series          string
-	SeriesIndex     string
+	OptionID          string
+	CustomName        string
+	FileName          string
+	RewriteMetadata   bool
+	Author            string
+	Title             string
+	Series            string
+	SeriesIndex       string
+	ClearSeries       bool
+	ClearSeriesIndex  bool
 }
 
 // StagingDir returns the hidden staging subdirectory inside downloadDir.
@@ -118,15 +122,19 @@ func ResolveFinalPath(
 	author := SanitizePathComponent(choice.Author, rs)
 	title := SanitizePathComponent(choice.Title, rs)
 	series := SanitizePathComponent(choice.Series, rs)
+	if choice.ClearSeries {
+		series = ""
+	}
 
 	// Fall back to extracted metadata when the caller didn't supply edited values
+	// and didn't explicitly clear the field.
 	if title == "" && meta != nil {
 		title = SanitizePathComponent(meta.Title, rs)
 	}
 	if author == "" && meta != nil {
 		author = SanitizePathComponent(meta.Author, rs)
 	}
-	if series == "" && meta != nil {
+	if series == "" && meta != nil && !choice.ClearSeries {
 		series = SanitizePathComponent(meta.Series, rs)
 	}
 	fileName := resolveChoiceFileName(choice, title, ext, rs)

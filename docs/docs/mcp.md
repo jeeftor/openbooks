@@ -149,6 +149,7 @@ claude mcp add --transport sse openbooks http://myserver:5228/mcp/sse
 - IRC file annotations (e.g. `(retail)`, `(epub)`, `(illus)`, `(v5)`) are stripped from displayed titles for readability. Edition years and series info are preserved. The `dl` string is never affected.
 - Results are filtered to `epub` by default and zero-size entries are always excluded.
 - `download_book` does **not** save to the library — it stages the file and returns metadata for the agent to confirm with the user. Use `confirm_book` to save, or `discard_staged` to cancel.
+- `confirm_book` accepts `clear_series` and `clear_series_index` boolean params to remove wrong metadata fields entirely (from both the filename path and the EPUB's internal OPF when `rewrite_metadata=true`). Use these when the extracted series/index is wrong and should be removed, not just changed. Omitting a field falls back to the extracted value — use the clear flags to override that.
 - When embedded in the web server, MCP search and download activity appears in the web UI log panel prefixed with `🤖 MCP`.
 - Every MCP tool call is logged to stderr (`slog`) with the tool name, key arguments, duration, and outcome — visible in `docker logs` as `mcp tool call` / `mcp tool ok` / `mcp tool error` lines. The `🤖 MCP` activity lines are also mirrored to stderr.
 - The MCP agent uses a separate IRC connection from browser users (username `<name>_mcp`).
