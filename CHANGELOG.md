@@ -6,6 +6,7 @@
 
 - **MCP download→confirm→organize metadata flow:** `download_book` now downloads to a staging area, runs the post-processor, reads EPUB metadata (author/title/series/series_index), and builds rename `options[]` without saving to the library. The agent presents the metadata to the user for confirmation, then calls the new `confirm_book` tool to move the file to its final organized path (with optional EPUB internal metadata rewrite). New `list_staged` and `discard_staged` tools manage pending downloads.
 - **MCP search results ranking:** `search_books` now ranks results by relevance (query word matches in author/title, source count, file size) and returns only the top 10 with `total` and `truncated` fields. New `list_search_results` tool returns the full cached result set from the last search.
+- **MCP download progress notifications:** `download_book` now sends `notifications/message` SSE events to the client during the download — "DCC transfer started" when the IRC file transfer begins, and "Download complete" when post-processing and metadata extraction finish. This gives the agent real-time feedback instead of a silent blocking call.
 - **Shared `staging` package:** download→rename→organize logic extracted from `server/` into a shared `staging/` package imported by both the web server and MCP server — no duplication.
 
 ### Changed

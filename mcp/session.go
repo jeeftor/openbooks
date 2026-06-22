@@ -32,9 +32,10 @@ type Session struct {
 	activityLog    func(level, msg string) // optional hook into host log buffer
 	staged         *staging.StagedBookStore
 
-	mu           sync.Mutex // serialises search AND download calls
-	searchDone   chan searchOutcome
-	downloadDone chan downloadOutcome
+	mu              sync.Mutex // serialises search AND download calls
+	searchDone      chan searchOutcome
+	downloadDone    chan downloadOutcome
+	downloadStarted chan struct{} // signaled when DCC offer arrives
 
 	serversMu  sync.RWMutex
 	serverList []string
@@ -108,6 +109,7 @@ func Connect(ctx context.Context, cfg Config) (*Session, error) {
 		staged:         stagedStore,
 		searchDone:     make(chan searchOutcome, 1),
 		downloadDone:   make(chan downloadOutcome, 1),
+		downloadStarted: make(chan struct{}, 1),
 	}
 
 	handler := sess.buildHandler()
@@ -174,6 +176,11 @@ func (s *Session) SearchBooks(ctx context.Context, query string) ([]core.BookDet
 	case <-ctx.Done():
 		return nil, nil, ctx.Err()
 	}
+}
+
+// DownloadStarted returns a channel signaled when the DCC file transfer begins.
+func (s *Session) DownloadStarted() <-chan struct{} {
+	return s.downloadStarted
 }
 
 // DownloadBook sends a DCC download request, waits for the file to land in the
@@ -351,6 +358,12 @@ func (s *Session) buildHandler() core.EventHandler {
 	}
 
 	handler[core.BookResult] = func(text string) {
+		// Signal that the DCC transfer has started (non-blocking — the tool
+		// handler may or may not be listening).
+		select {
+		case s.downloadStarted <- struct{}{}:
+		default:
+		}
 		path, err := core.DownloadExtractDCCString(staging.StagingDir(s.downloadDir), text, nil)
 		s.downloadDone <- downloadOutcome{path: path, err: err}
 	}

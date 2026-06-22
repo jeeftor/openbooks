@@ -18,6 +18,11 @@ import (
 type bookSource interface {
 	SearchBooks(ctx context.Context, query string) ([]core.BookDetail, []core.ParseError, error)
 	DownloadBook(ctx context.Context, downloadString string) (*staging.StagedBook, error)
+	// DownloadStarted returns a channel that is signaled when the DCC file
+	// transfer begins. It is non-blocking on the receive side — the caller
+	// should select on it with a default or timeout. The channel is buffered
+	// (capacity 1) and reused across downloads; drain before each download.
+	DownloadStarted() <-chan struct{}
 	ConfirmBook(stagedID string, choice staging.Choice) (string, error)
 	ListStaged() []*staging.StagedBook
 	DiscardStaged(stagedID string) error
@@ -340,13 +345,15 @@ This is the FIRST step of a two-step flow. The book is downloaded, post-processe
 - metadata: extracted Author/Title/Series/SeriesIndex (may be empty/missing)
 - options[]: naming choices, each with id, label, preview, isOrganized
 
+The server sends progress notifications during the download (DCC transfer started, post-processing, metadata extraction). These are informational — the tool call blocks until the full flow completes.
+
 You MUST present the metadata to the user and ask whether the author/title/series are correct before saving. Collect any corrections, choose an option id from options[] (or "custom"), then call confirm_book with the staged_id and the (possibly edited) metadata. If the user does not want the book, call discard_staged.`),
 			mcp.WithString("download_string",
 				mcp.Required(),
 				mcp.Description("The dl field from a search_books result"),
 			),
 		),
-		downloadBookHandler(src),
+		downloadBookHandler(s, src),
 	)
 
 	s.AddTool(
@@ -488,17 +495,46 @@ func listSearchResultsHandler(src bookSource) server.ToolHandlerFunc {
 	}
 }
 
-func downloadBookHandler(src bookSource) server.ToolHandlerFunc {
+func downloadBookHandler(s *server.MCPServer, src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		dlStr, err := req.RequireString("download_string")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		// Drain any stale signal from a previous download.
+		select {
+		case <-src.DownloadStarted():
+		default:
+		}
+
+		// Spawn a goroutine that waits for the DCC transfer to start, then
+		// sends a progress notification to the client. The notification is
+		// best-effort — if the client doesn't support it or the channel is
+		// blocked, we silently move on.
+		go func() {
+			select {
+			case <-src.DownloadStarted():
+				_ = s.SendNotificationToClient(ctx, "notifications/message", map[string]any{
+					"level":  "info",
+					"logger": "download",
+					"data":   "DCC transfer started — downloading book from IRC server...",
+				})
+			case <-ctx.Done():
+			}
+		}()
+
 		book, err := src.DownloadBook(ctx, dlStr)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("download failed: %v", err)), nil
 		}
+
+		// Notify that post-processing and metadata extraction are complete.
+		_ = s.SendNotificationToClient(ctx, "notifications/message", map[string]any{
+			"level":  "info",
+			"logger": "download",
+			"data":   "Download complete. Post-processed and metadata extracted — awaiting user confirmation.",
+		})
 
 		resp := newStagedBookResponse(book)
 		data, _ := json.Marshal(resp)

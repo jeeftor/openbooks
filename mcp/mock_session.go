@@ -26,13 +26,20 @@ type MockSession struct {
 	lastQuery      string
 	lastResp       searchResponse
 	lastSearchOk   bool
+
+	downloadStarted chan struct{}
 }
 
 func NewMockSession(downloadDir string) *MockSession {
 	return &MockSession{
-		downloadDir:  downloadDir,
-		staged:       make(map[string]*staging.StagedBook),
+		downloadDir:     downloadDir,
+		staged:          make(map[string]*staging.StagedBook),
+		downloadStarted: make(chan struct{}, 1),
 	}
+}
+
+func (m *MockSession) DownloadStarted() <-chan struct{} {
+	return m.downloadStarted
 }
 
 func (m *MockSession) SearchBooks(_ context.Context, query string) ([]core.BookDetail, []core.ParseError, error) {
@@ -67,6 +74,11 @@ func (m *MockSession) SearchBooks(_ context.Context, query string) ([]core.BookD
 }
 
 func (m *MockSession) DownloadBook(_ context.Context, downloadString string) (*staging.StagedBook, error) {
+	// Signal that the "DCC transfer" has started.
+	select {
+	case m.downloadStarted <- struct{}{}:
+	default:
+	}
 	time.Sleep(300 * time.Millisecond)
 
 	if err := staging.EnsureStagingDir(m.downloadDir); err != nil {
