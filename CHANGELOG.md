@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Fixed TOCTOU race in `confirm_book`:** `StagedBookStore.GetAndRemove` now atomically retrieves and removes a staged book under a single lock, preventing concurrent `ConfirmBook` calls from racing on the same staged ID.
+
 ## v3.1.0 - 2026-06-22
 
 ### Added

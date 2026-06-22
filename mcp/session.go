@@ -274,7 +274,10 @@ func (s *Session) DownloadBook(ctx context.Context, downloadString string) (*sta
 // the EPUB internal metadata, and removes the book from the staged store.
 // Returns the final path relative to the download directory.
 func (s *Session) ConfirmBook(stagedID string, choice staging.Choice) (string, error) {
-	book, ok := s.staged.Get(stagedID)
+	book, ok, err := s.staged.GetAndRemove(stagedID)
+	if err != nil {
+		return "", fmt.Errorf("staged store error: %w", err)
+	}
 	if !ok {
 		return "", fmt.Errorf("no staged book with id %q", stagedID)
 	}
@@ -288,10 +291,6 @@ func (s *Session) ConfirmBook(stagedID string, choice staging.Choice) (string, e
 		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
 			s.logActivity("error", fmt.Sprintf("🤖 MCP metadata rewrite failed: %v", err))
 		}
-	}
-
-	if err := s.staged.Remove(stagedID); err != nil {
-		s.log.Info("staged remove after confirm", "err", err)
 	}
 
 	rel, _ := filepath.Rel(s.downloadDir, finalPath)

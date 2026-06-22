@@ -167,3 +167,51 @@ func TestStagedBookStoreDropsMissingFilesOnReload(t *testing.T) {
 		t.Fatal("Get(\"exists\") = false, want true")
 	}
 }
+
+func TestStagedBookStoreGetAndRemove(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	store, err := NewStagedBookStore(dir)
+	if err != nil {
+		t.Fatalf("NewStagedBookStore() error = %v", err)
+	}
+
+	filePath := filepath.Join(dir, "book.epub")
+	if err := os.WriteFile(filePath, []byte("epub"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.Add(newTestStagedBook("xyz-789", filePath)); err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	// GetAndRemove should return the book and remove it atomically.
+	got, ok, err := store.GetAndRemove("xyz-789")
+	if err != nil {
+		t.Fatalf("GetAndRemove() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("GetAndRemove() returned ok=false, want true")
+	}
+	if got.ID != "xyz-789" {
+		t.Fatalf("GetAndRemove() ID = %q, want %q", got.ID, "xyz-789")
+	}
+
+	// Book should be gone from the store.
+	if store.Count() != 0 {
+		t.Fatalf("Count() after GetAndRemove = %d, want 0", store.Count())
+	}
+	if _, ok := store.Get("xyz-789"); ok {
+		t.Fatal("Get() after GetAndRemove returned true, want false")
+	}
+
+	// GetAndRemove on a non-existent ID should return ok=false, no error.
+	_, ok, err = store.GetAndRemove("nonexistent")
+	if err != nil {
+		t.Fatalf("GetAndRemove() non-existent error = %v", err)
+	}
+	if ok {
+		t.Fatal("GetAndRemove() non-existent returned ok=true, want false")
+	}
+}
