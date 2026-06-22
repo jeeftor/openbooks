@@ -91,15 +91,20 @@ func BuildOptions(ircFilename string, meta *core.EPUBMetadata, replaceSpace stri
 			IsOrganized: true,
 		})
 
-		if meta.Series != "" {
-			series := SanitizePathComponent(meta.Series, rs)
-			opts = append(opts, Option{
-				ID:          "series",
-				Label:       "Organized: Author / Series / Title /",
-				Preview:     fmt.Sprintf("%s/%s/%s/%s%s", author, series, title, title, ext),
-				IsOrganized: true,
-			})
+		// Always offer the series option when we have author + title.
+		// If the extracted series is empty, show a placeholder so the user
+		// knows they can provide one at confirm time.
+		seriesLabel := meta.Series
+		if seriesLabel == "" {
+			seriesLabel = "[series]"
 		}
+		series := SanitizePathComponent(seriesLabel, rs)
+		opts = append(opts, Option{
+			ID:          "series",
+			Label:       "Organized: Author / Series / Title /",
+			Preview:     fmt.Sprintf("%s/%s/%s/%s%s", author, series, title, title, ext),
+			IsOrganized: true,
+		})
 	}
 
 	return opts

@@ -397,7 +397,11 @@ This is the FIRST step of a two-step flow. The book is downloaded, post-processe
 
 The server sends progress notifications during the download (DCC transfer started, post-processing, metadata extraction). These are informational — the tool call blocks until the full flow completes.
 
-CRITICAL: Before saving, present metadata to user and ask if each field (author, title, series, series_index) is correct. If wrong, pass corrected value to confirm_book. If a field should be removed, pass clear_series=true or clear_series_index=true — omitting a field falls back to the extracted value, it does NOT clear it. Only call confirm_book after user confirms/corrects all fields.
+CRITICAL: Before saving, present metadata to user and ask about each field:
+- If author/title/series/series_index are present, ask if they're correct. If wrong, pass corrected value to confirm_book.
+- If series or series_index is MISSING (empty), ask the user: "Is this book part of a series?" If yes, pass the series name and index to confirm_book and choose option_id="series".
+- If a field should be REMOVED, pass clear_series=true or clear_series_index=true — omitting a field falls back to the extracted value, it does NOT clear it.
+Only call confirm_book after user confirms/corrects all fields.
 
 If the user does not want the book, call discard_staged.`),
 			mcp.WithString("download_string",
@@ -413,6 +417,8 @@ If the user does not want the book, call discard_staged.`),
 			mcp.WithDescription(`Save a staged book to the library. This is the SECOND step after download_book.
 
 Pass the staged_id from download_book, the chosen option_id from the options[] list (e.g. "keep", "title", "author-title-flat", "organized", "series"), and the metadata fields the user confirmed or corrected. Set rewrite_metadata=true to also patch the EPUB's internal OPF metadata (dc:title, dc:creator, calibre:series, calibre:series_index) to match.
+
+option_id="series" is always valid when author+title are available, even if the "series" option showed a "[series]" placeholder in options[]. Pass the user-provided series name and series_index alongside it — the server will build the path Author/Series/Title/ and write the series to the EPUB's OPF.
 
 If the user said a series or series_index is wrong and should be REMOVED (not just changed), pass clear_series=true or clear_series_index=true. This removes the field from both the filename path and the EPUB's internal OPF (when rewrite_metadata=true). Do NOT just omit the field — omitting it falls back to the extracted value.
 

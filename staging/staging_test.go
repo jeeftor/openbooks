@@ -163,14 +163,14 @@ func TestBuildRenameOptionsTitleOnly(t *testing.T) {
 	}
 }
 
-// TestBuildRenameOptionsAuthorAndTitle verifies author+title gives keep, title, flat, organized.
+// TestBuildRenameOptionsAuthorAndTitle verifies author+title gives keep, title, flat, organized, series.
 func TestBuildRenameOptionsAuthorAndTitle(t *testing.T) {
 	t.Parallel()
 
 	meta := &core.EPUBMetadata{Author: "Frank Herbert", Title: "Dune"}
 	opts := BuildOptions("irc-file.epub", meta, "")
 	ids := optionIDs(opts)
-	wantIDs := []string{"keep", "title", "author-title-flat", "organized"}
+	wantIDs := []string{"keep", "title", "author-title-flat", "organized", "series"}
 	if !equalStringSlices(ids, wantIDs) {
 		t.Fatalf("author+title: got %v, want %v", ids, wantIDs)
 	}
@@ -182,6 +182,13 @@ func TestBuildRenameOptionsAuthorAndTitle(t *testing.T) {
 	}
 	if !opts[3].IsOrganized {
 		t.Fatal("organized option should have IsOrganized=true")
+	}
+	// Series option with placeholder when no series extracted.
+	if opts[4].Preview != "Frank Herbert/[series]/Dune/Dune.epub" {
+		t.Fatalf("series placeholder preview = %q, want %q", opts[4].Preview, "Frank Herbert/[series]/Dune/Dune.epub")
+	}
+	if !opts[4].IsOrganized {
+		t.Fatal("series option should have IsOrganized=true")
 	}
 }
 
@@ -279,6 +286,30 @@ func TestResolveFinalPathSeriesNoSeriesField(t *testing.T) {
 	want := filepath.Join("books", "Frank Herbert", "Dune", "Dune.epub")
 	if got != want {
 		t.Fatalf("series-no-series: got %q, want %q", got, want)
+	}
+}
+
+// TestResolveFinalPathAddMissingSeries verifies that a user can add a series
+// that wasn't in the extracted metadata by passing option_id="series" with
+// a series value.
+func TestResolveFinalPathAddMissingSeries(t *testing.T) {
+	t.Parallel()
+
+	// Extracted metadata has no series.
+	meta := &core.EPUBMetadata{
+		Author: "Frank Herbert",
+		Title:  "Dune",
+	}
+	got := ResolveFinalPath("books", Choice{
+		OptionID:    "series",
+		Author:      "Frank Herbert",
+		Title:       "Dune",
+		Series:      "Dune Chronicles", // user-provided
+		SeriesIndex: "1",
+	}, "irc.epub", meta, "")
+	want := filepath.Join("books", "Frank Herbert", "Dune Chronicles", "Dune", "Dune.epub")
+	if got != want {
+		t.Fatalf("add-missing-series: got %q, want %q", got, want)
 	}
 }
 
