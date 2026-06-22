@@ -180,6 +180,77 @@ func TestSpecialCases(t *testing.T) {
 	}
 }
 
+func TestDetectAuthorTitleSwap(t *testing.T) {
+	tests := []struct {
+		name   string
+		author string
+		title  string
+		want   bool
+	}{
+		// Should swap (swapped entries from live IRC data)
+		{"et al in title", "The History of the Hobbit (2011)", "J R R Tolkien et al", true},
+		{"Last, First comma in title", "Dune", "Herbert,Frank [FR]", true},
+		{"initials in title", "El Hobbit", "J. R. R. Tolkien", true},
+		{"initials in title no periods", "Bilbo le Hobbit", "J R R Tolkien [FR]", true},
+		{"author starts with The", "The Hobbit", "J. R. R. Tolkien", true},
+		{"author starts with A", "A Canticle for Leibowitz", "Walter Miller", true},
+		{"author ends with , The", "Hobbit (Enhanced Edition), The", "J. R. R. Tolkien", true},
+		{"author ends with , A", "Carrion Comfort, A", "Dan Simmons", true},
+		{"single word author", "Dune", "Frank Herbert", true},
+		{"single word author with comma title", "Dune", "Herbert, Frank", true},
+		{"length asymmetry", "Moonshot_ The Inside Story of Mankind's Greatest Adventure", "Dan Parry", true},
+		{"length asymmetry 2", "Hope for Animals and Their World_ How Endangered Species Are Being Rescued from the Brink", "Jane Goodall & Than", true},
+
+		// Should NOT swap (correctly ordered or ambiguous)
+		{"correct author-title", "Frank Herbert", "Dune", false},
+		{"correct with series brackets", "Frank Herbert", "[Chronicles of Dune 01] - Dune", false},
+		{"correct Last, First author", "Tolkien, J. R. R.", "The Hobbit", false},
+		{"correct with & co-author", "J R R Tolkien & John D Rateliff", "The History of the Hobbit", false},
+		{"both have initials", "J. R. R. Tolkien", "J. R. R. Tolkien", false},
+		{"ambiguous 2-word vs 2-word", "Carrion Comfort", "Dan Simmons", false},
+		{"ambiguous 2-word vs 2-word 2", "Granny Dan", "Danielle Steel", false},
+		{"correct multi-word author", "David Sherman & Dan Cragg", "Double Jeopardy", false},
+		{"empty author", "", "Some Title", false},
+		{"empty title", "Some Author", "", false},
+		{"correct with comma in title", "Isaac Asimov", "Foundation Series 04 Robot Visions - Asimov, Isaac", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, detectAuthorTitleSwap(tc.author, tc.title))
+		})
+	}
+}
+
+func TestParseSearchV2_SwapsAuthorTitle(t *testing.T) {
+	// Test that ParseSearchV2 corrects swapped fields.
+	input := "!Bsk The Hobbit - J. R. R. Tolkien.epub  ::INFO:: 4.1MB"
+	reader := strings.NewReader(input)
+	results, errs := ParseSearchV2(reader)
+
+	require.Empty(t, errs)
+	require.Len(t, results, 1)
+
+	// "The Hobbit" is the title, "J. R. R. Tolkien" is the author.
+	// The parser should detect the swap and correct it.
+	assert.Equal(t, "J. R. R. Tolkien", results[0].Author, "author should be corrected from title field")
+	assert.Equal(t, "The Hobbit", results[0].Title, "title should be corrected from author field")
+	// Full (download string) must never be modified.
+	assert.Contains(t, results[0].Full, "The Hobbit - J. R. R. Tolkien")
+}
+
+func TestParseSearchV2_KeepsCorrectAuthorTitle(t *testing.T) {
+	// Test that ParseSearchV2 does NOT swap correctly ordered fields.
+	input := "!Bsk J R R Tolkien - The Hobbit (illus) (retail).epub"
+	reader := strings.NewReader(input)
+	results, errs := ParseSearchV2(reader)
+
+	require.Empty(t, errs)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "J R R Tolkien", results[0].Author, "author should not be swapped")
+	assert.Equal(t, "The Hobbit (illus) (retail)", results[0].Title, "title should not be swapped")
+}
+
 var sampleData = `Search results from SearchBot v3.00.07 by Ook, searching dll written by Iczelion, Based on Searchbot v2.22 by Dukelupus
 Searched 20 lists for "the great gatsby" , found 27 matches. Enjoy!
 This list includes results from ALL the lists SearchBot v3.00.07 currently has, some of these servers may be offline.

@@ -96,6 +96,12 @@ func ParseSearchV2(reader io.Reader) ([]BookDetail, []ParseError) {
 			if err != nil {
 				parseErrors = append(parseErrors, ParseError{Line: line, Error: err})
 			} else {
+				// Correct swapped author/title fields. IRC data sometimes
+				// uses "Title - Author" format instead of "Author - Title".
+				// Only swap when there's a strong signal — see detectAuthorTitleSwap.
+				if detectAuthorTitleSwap(dat.Author, dat.Title) {
+					dat.Author, dat.Title = dat.Title, dat.Author
+				}
 				books = append(books, dat)
 			}
 		}
@@ -104,6 +110,144 @@ func ParseSearchV2(reader io.Reader) ([]BookDetail, []ParseError) {
 	sort.Slice(books, func(i, j int) bool { return books[i].Server < books[j].Server })
 
 	return books, parseErrors
+}
+
+// detectAuthorTitleSwap returns true if the author and title fields appear to
+// be swapped (IRC data sometimes uses "Title - Author" format instead of
+// "Author - Title"). The heuristic is deliberately conservative — it only
+// recommends a swap when there's a strong signal, leaving ambiguous cases
+// as-is to avoid introducing new errors.
+func detectAuthorTitleSwap(author, title string) bool {
+	author = strings.TrimSpace(author)
+	title = strings.TrimSpace(title)
+	if author == "" || title == "" {
+		return false
+	}
+
+	// 1. "et al" in title field — clearly an author attribution.
+	if endsWithEtAl(title) && !endsWithEtAl(author) {
+		return true
+	}
+
+	// 2. "Last, First" comma pattern in title but not author.
+	if hasLastNameCommaPattern(title) && !hasLastNameCommaPattern(author) {
+		return true
+	}
+
+	// 3. Title starts with initials pattern (e.g., "J. R. R. Tolkien")
+	//    and author has no initials or comma pattern.
+	if hasInitialsPattern(title) && !hasInitialsPattern(author) && !hasLastNameCommaPattern(author) {
+		return true
+	}
+
+	// 4. Author starts with a definite article ("The/A/An") and title
+	//    doesn't and title looks like a person's name.
+	if startsWithArticle(author) && !startsWithArticle(title) && isNameLike(title) {
+		return true
+	}
+
+	// 5. Author ends with inverted article (", The/A/An") and title
+	//    looks like a person's name.
+	if endsWithInvertedArticle(author) && isNameLike(title) {
+		return true
+	}
+
+	// 6. Author is a single word and title is 2-4 words and looks like
+	//    a name. Single-word authors are very rare in ebook IRC data.
+	if wordCount(author) == 1 && wordCount(title) >= 2 && wordCount(title) <= 4 && isNameLike(title) {
+		return true
+	}
+
+	// 7. Author has >3x as many words as title and title looks like a name.
+	if wordCount(author) > wordCount(title)*3 && wordCount(title) >= 2 && wordCount(title) <= 4 && isNameLike(title) {
+		return true
+	}
+
+	return false
+}
+
+// startsWithArticle returns true if s starts with "The ", "A ", or "An ".
+func startsWithArticle(s string) bool {
+	lower := strings.ToLower(strings.TrimSpace(s))
+	return strings.HasPrefix(lower, "the ") ||
+		strings.HasPrefix(lower, "a ") ||
+		strings.HasPrefix(lower, "an ")
+}
+
+// endsWithInvertedArticle returns true if s ends with ", The", ", A", or ", An".
+func endsWithInvertedArticle(s string) bool {
+	lower := strings.ToLower(strings.TrimSpace(s))
+	return strings.HasSuffix(lower, ", the") ||
+		strings.HasSuffix(lower, ", a") ||
+		strings.HasSuffix(lower, ", an")
+}
+
+// endsWithEtAl returns true if s ends with "et al" or "et al.".
+func endsWithEtAl(s string) bool {
+	lower := strings.ToLower(strings.TrimSpace(s))
+	return strings.HasSuffix(lower, " et al") || strings.HasSuffix(lower, " et al.")
+}
+
+// hasInitialsPattern returns true if s starts with one or more single-letter
+// words (optionally followed by periods), like "J. R. R. Tolkien" or
+// "J R R Tolkien".
+func hasInitialsPattern(s string) bool {
+	fields := strings.Fields(s)
+	if len(fields) < 2 {
+		return false
+	}
+	for _, f := range fields {
+		cleaned := strings.TrimSuffix(f, ".")
+		if len(cleaned) == 1 && ((cleaned[0] >= 'a' && cleaned[0] <= 'z') || (cleaned[0] >= 'A' && cleaned[0] <= 'Z')) {
+			continue // initial
+		}
+		// First non-initial word — check we saw at least one initial before it.
+		break
+	}
+	// Check if the first field is a single letter (with optional period).
+	first := strings.TrimSuffix(fields[0], ".")
+	return len(first) == 1 && ((first[0] >= 'a' && first[0] <= 'z') || (first[0] >= 'A' && first[0] <= 'Z'))
+}
+
+// hasLastNameCommaPattern returns true if s has a "Last, First" pattern —
+// a comma after the first word, with non-empty content after the comma.
+// e.g., "Tolkien, J. R. R." or "Brown, Dan".
+func hasLastNameCommaPattern(s string) bool {
+	s = strings.TrimSpace(s)
+	idx := strings.Index(s, ",")
+	if idx <= 0 {
+		return false
+	}
+	before := strings.TrimSpace(s[:idx])
+	after := strings.TrimSpace(s[idx+1:])
+	if before == "" || after == "" {
+		return false
+	}
+	// "Before" should be a single word (the last name).
+	beforeWords := strings.Fields(before)
+	return len(beforeWords) == 1
+}
+
+// isNameLike returns true if s looks like a person's name rather than a
+// book title: 2-5 words, no leading/trailing articles, no colons or
+// semicolons (subtitle markers), no underscores (IRC filename artifact).
+func isNameLike(s string) bool {
+	fields := strings.Fields(s)
+	if len(fields) < 2 || len(fields) > 5 {
+		return false
+	}
+	if startsWithArticle(s) || endsWithInvertedArticle(s) {
+		return false
+	}
+	if strings.ContainsAny(s, ":;_") {
+		return false
+	}
+	return true
+}
+
+// wordCount returns the number of whitespace-separated words in s.
+func wordCount(s string) int {
+	return len(strings.Fields(s))
 }
 
 func parseLineV2(line string) (BookDetail, error) {
