@@ -1,30 +1,23 @@
 # Changelog
 
-## Unreleased
+## v3.1.0 - 2026-06-22
 
 ### Added
 
+- **MCP `confirm_book` clear metadata fields:** `confirm_book` now accepts `clear_series` and `clear_series_index` boolean params. When true, the field is removed from both the filename path and (with `rewrite_metadata=true`) the EPUB's internal OPF — the `calibre:series` / `calibre:series_index` meta tags are stripped entirely. Use when extracted metadata is wrong (e.g. "The Hobbit" tagged as "The Lord of the Rings" series index 0) and the user wants it removed, not just changed. Previously, omitting a field fell back to the extracted value with no way to clear it.
+- **MCP add missing series during confirm_book:** When extracted EPUB metadata has no series, the "series" naming option is now always generated (with a `[series]` placeholder preview) so the user can see it's available and provide a series name. The `download_book` description now explicitly instructs the agent to ask "is this book part of a series?" when series is missing. The `confirm_book` description clarifies that `option_id="series"` is always valid when author+title are available — pass the user-provided series name and index, and the server builds `Author/Series/Title/` and writes the series to the EPUB's OPF.
 - **Frontend contract tests:** Go contract tests in `server/contract_test.go` verify that `EPUBMetadata`, `RenamePromptResponse`, `StagedBookSummary`, and `StagedBookResumeResponse` serialize to JSON field names matching the frontend's TypeScript types. Catches field name drift between backend and frontend (the exact class of bug from the PascalCase → lowercase rename).
 - **Vitest for Vue components:** Set up vitest in `server/app/` with 8 tests covering the metadata field access pattern in `RenameModal.vue` and `StagedRenameModal.vue`. Includes a regression guard that verifies PascalCase field names would NOT populate the edit refs. Run with `npm --prefix server/app run test`.
-
-- **MCP add missing series during confirm_book:** When extracted EPUB metadata has no series, the "series" naming option is now always generated (with a `[series]` placeholder preview) so the user can see it's available and provide a series name. The `download_book` description now explicitly instructs the agent to ask "is this book part of a series?" when series is missing. The `confirm_book` description clarifies that `option_id="series"` is always valid when author+title are available — pass the user-provided series name and index, and the server builds `Author/Series/Title/` and writes the series to the EPUB's OPF.
 
 ### Improved
 
 - **MCP response token efficiency:** Removed redundant summary text from `search_books`, `list_search_results`, and `download_book` responses — the JSON is self-describing (includes `total`, `truncated`, `has_more`, `staged_id`), so the prepended natural-language summaries were duplicating information and wasting ~150 tokens per call. Responses are now pure JSON.
 - **MCP tool descriptions tightened:** The `download_book` CRITICAL block is now ~70 tokens (down from ~150) with the same behavioral instructions.
+- **MCP `download_book` stronger agent guidance:** The `download_book` tool description now explicitly instructs the agent to ask about each metadata field individually (author, title, series, series_index) and offer to clear wrong fields via `clear_series`/`clear_series_index` rather than just presenting save format options.
 - **EPUBMetadata JSON fields:** Added `omitempty` tags to `Series` and `SeriesIndex` so empty fields are no longer serialized as `"series":"","series_index":""`. Changed JSON field names from PascalCase (`Author`, `Title`, `Series`, `SeriesIndex`) to lowercase (`author`, `title`, `series`, `series_index`) for consistency with the rest of the MCP API. Web UI TypeScript types and Vue components updated to match.
 - **Option `isOrganized` field:** Added `omitempty` so `"isOrganized":false` is no longer serialized on non-organized options.
 - **MCP `stagedBookResponse`:** Dropped `replace_space` from the agent-facing response — it's internal config the agent never uses.
 - **MCP `has_more` field:** Added `omitempty` to `paginatedSearchResponse.has_more` so `"has_more":false` is no longer serialized on the last page of results.
-
-### Added
-
-- **MCP `confirm_book` clear metadata fields:** `confirm_book` now accepts `clear_series` and `clear_series_index` boolean params. When true, the field is removed from both the filename path and (with `rewrite_metadata=true`) the EPUB's internal OPF — the `calibre:series` / `calibre:series_index` meta tags are stripped entirely. Use when extracted metadata is wrong (e.g. "The Hobbit" tagged as "The Lord of the Rings" series index 0) and the user wants it removed, not just changed. Previously, omitting a field fell back to the extracted value with no way to clear it.
-
-### Improved
-
-- **MCP `download_book` stronger agent guidance:** The `download_book` tool description now explicitly instructs the agent to ask about each metadata field individually (author, title, series, series_index) and offer to clear wrong fields via `clear_series`/`clear_series_index` rather than just presenting save format options.
 - **MCP search shows 20 results inline:** `search_books` now returns the top 20 ranked results (up from 10), so broad queries like "Hobbit" show more variants without needing a second call.
 - **MCP `list_search_results` pagination:** `list_search_results` now accepts `offset` (default 0) and `limit` (default 20, max 50) parameters instead of dumping the full result set. The response includes `total`, `offset`, `limit`, and `has_more` so the agent can page through results naturally.
 - **MCP search titles cleaned:** IRC file annotations (e.g. `(retail)`, `(epub)`, `(illus)`, `(v5)`, `(kepub)`, `(unabridged)`) and trailing file extensions are now stripped from displayed titles for readability. "The Hobbit (illus) (retail) (epub)" displays as "The Hobbit". Edition years like `(2011)` and series info like `[Series 01]` are preserved. The `dl` download string is never affected.
