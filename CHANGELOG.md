@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Improved
+
+- **MCP tool call logging:** Every MCP tool call (`search_books`, `download_book`, `confirm_book`, `discard_staged`, `list_staged`, `list_servers`, `list_library`, `list_search_results`) now logs an entry and exit line to stderr via `slog`, with the tool name, key arguments, duration, and outcome (result count, staged ID, saved path, or error). Tool-layer errors are now logged server-side at `ERROR` level instead of only being returned to the agent.
+- **MCP activity log mirrored to stderr:** The `🤖 MCP` activity lines (search results count, download status, post-processing, staged ID, saved path) are now written to stderr in addition to the web UI activity feed, so `docker logs` shows the full MCP narrative.
+
 ## v3.0.45 - 2026-06-21
 
 ### Added

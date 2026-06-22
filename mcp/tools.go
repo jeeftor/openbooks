@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/evan-buss/openbooks/core"
 	"github.com/evan-buss/openbooks/staging"
@@ -36,6 +38,8 @@ type bookSource interface {
 	// LastSearch returns the cached query and full response from the most
 	// recent search_books call. ok is false if no search has been performed.
 	LastSearch() (query string, resp searchResponse, ok bool)
+	// Logger returns the session's slog logger for tool-layer logging.
+	Logger() *slog.Logger
 	Close()
 }
 
@@ -438,11 +442,14 @@ func searchBooksHandler(src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		query, err := req.RequireString("query")
 		if err != nil {
+			toolLogError(src, "search_books", time.Now(), err)
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		_, start := toolLog(src, "search_books", "query", query)
 
 		books, parseErrs, err := src.SearchBooks(ctx, query)
 		if err != nil {
+			toolLogError(src, "search_books", start, err, "query", query)
 			return mcp.NewToolResultError(fmt.Sprintf("search failed: %v", err)), nil
 		}
 
@@ -451,12 +458,14 @@ func searchBooksHandler(src bookSource) server.ToolHandlerFunc {
 			if len(parseErrs) > 0 {
 				msg += fmt.Sprintf(" (%d lines could not be parsed)", len(parseErrs))
 			}
+			toolLogDone(src, "search_books", start, "query", query, "results", 0)
 			return mcp.NewToolResultText(msg), nil
 		}
 
 		full := buildSearchResponse(books, src.isTrustedServer)
 
 		if len(full.Books) == 0 {
+			toolLogDone(src, "search_books", start, "query", query, "results", 0, "raw", len(books))
 			return mcp.NewToolResultText(fmt.Sprintf("No epub results from trusted servers found for %q.", query)), nil
 		}
 
@@ -479,18 +488,22 @@ func searchBooksHandler(src bookSource) server.ToolHandlerFunc {
 			summary += "\nMore results available — call list_search_results to see all."
 		}
 
+		toolLogDone(src, "search_books", start, "query", query, "total", top.Total, "shown", len(top.Books), "truncated", top.Truncated, "raw", len(books))
 		return mcp.NewToolResultText(summary), nil
 	}
 }
 
 func listSearchResultsHandler(src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		_, start := toolLog(src, "list_search_results")
 		query, resp, ok := src.LastSearch()
 		if !ok {
+			toolLogDone(src, "list_search_results", start, "cached", false)
 			return mcp.NewToolResultText("No search has been performed yet. Call search_books first."), nil
 		}
 		data, _ := json.Marshal(resp)
 		summary := fmt.Sprintf("Full results for %q (%d unique titles):\n%s", query, resp.Total, string(data))
+		toolLogDone(src, "list_search_results", start, "query", query, "total", resp.Total)
 		return mcp.NewToolResultText(summary), nil
 	}
 }
@@ -499,8 +512,10 @@ func downloadBookHandler(s *server.MCPServer, src bookSource) server.ToolHandler
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		dlStr, err := req.RequireString("download_string")
 		if err != nil {
+			toolLogError(src, "download_book", time.Now(), err)
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		_, start := toolLog(src, "download_book", "dl", dlStr)
 
 		// Drain any stale signal from a previous download.
 		select {
@@ -526,6 +541,7 @@ func downloadBookHandler(s *server.MCPServer, src bookSource) server.ToolHandler
 
 		book, err := src.DownloadBook(ctx, dlStr)
 		if err != nil {
+			toolLogError(src, "download_book", start, err, "dl", dlStr)
 			return mcp.NewToolResultError(fmt.Sprintf("download failed: %v", err)), nil
 		}
 
@@ -543,6 +559,7 @@ func downloadBookHandler(s *server.MCPServer, src bookSource) server.ToolHandler
 				"Call confirm_book with staged_id=%q (or discard_staged to cancel).\n%s",
 			book.ID, string(data),
 		)
+		toolLogDone(src, "download_book", start, "staged_id", book.ID, "irc_filename", book.IRCFilename)
 		return mcp.NewToolResultText(summary), nil
 	}
 }
@@ -551,12 +568,15 @@ func confirmBookHandler(src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		stagedID, err := req.RequireString("staged_id")
 		if err != nil {
+			toolLogError(src, "confirm_book", time.Now(), err)
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 		optionID, err := req.RequireString("option_id")
 		if err != nil {
+			toolLogError(src, "confirm_book", time.Now(), err, "staged_id", stagedID)
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		_, start := toolLog(src, "confirm_book", "staged_id", stagedID, "option", optionID)
 
 		args := toolArgs(req)
 		choice := staging.Choice{
@@ -572,17 +592,21 @@ func confirmBookHandler(src bookSource) server.ToolHandlerFunc {
 
 		relPath, err := src.ConfirmBook(stagedID, choice)
 		if err != nil {
+			toolLogError(src, "confirm_book", start, err, "staged_id", stagedID, "option", optionID)
 			return mcp.NewToolResultError(fmt.Sprintf("confirm failed: %v", err)), nil
 		}
 
+		toolLogDone(src, "confirm_book", start, "staged_id", stagedID, "option", optionID, "path", relPath, "rewrite", choice.RewriteMetadata)
 		return mcp.NewToolResultText(fmt.Sprintf("Saved to library: %s", relPath)), nil
 	}
 }
 
 func listStagedHandler(src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		_, start := toolLog(src, "list_staged")
 		books := src.ListStaged()
 		if len(books) == 0 {
+			toolLogDone(src, "list_staged", start, "count", 0)
 			return mcp.NewToolResultText("No staged books awaiting confirmation."), nil
 		}
 		out := make([]stagedBookResponse, len(books))
@@ -590,6 +614,7 @@ func listStagedHandler(src bookSource) server.ToolHandlerFunc {
 			out[i] = newStagedBookResponse(b)
 		}
 		data, _ := json.Marshal(out)
+		toolLogDone(src, "list_staged", start, "count", len(books))
 		return mcp.NewToolResultText(string(data)), nil
 	}
 }
@@ -598,11 +623,15 @@ func discardStagedHandler(src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		stagedID, err := req.RequireString("staged_id")
 		if err != nil {
+			toolLogError(src, "discard_staged", time.Now(), err)
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		_, start := toolLog(src, "discard_staged", "staged_id", stagedID)
 		if err := src.DiscardStaged(stagedID); err != nil {
+			toolLogError(src, "discard_staged", start, err, "staged_id", stagedID)
 			return mcp.NewToolResultError(fmt.Sprintf("discard failed: %v", err)), nil
 		}
+		toolLogDone(src, "discard_staged", start, "staged_id", stagedID)
 		return mcp.NewToolResultText(fmt.Sprintf("Discarded staged book %s.", stagedID)), nil
 	}
 }
@@ -636,26 +665,32 @@ func toolArgs(req mcp.CallToolRequest) map[string]string {
 
 func listServersHandler(src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		_, start := toolLog(src, "list_servers")
 		servers := src.Servers()
 		if len(servers) == 0 {
+			toolLogDone(src, "list_servers", start, "count", 0)
 			return mcp.NewToolResultText("No servers available yet. The server list is populated after joining IRC — try again shortly."), nil
 		}
 		data, _ := json.Marshal(servers)
+		toolLogDone(src, "list_servers", start, "count", len(servers))
 		return mcp.NewToolResultText(string(data)), nil
 	}
 }
 
 func listLibraryHandler(src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		books, err := src.ListLibrary()
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("library read failed: %v", err)), nil
-		}
-
 		var query string
 		if args, ok := req.Params.Arguments.(map[string]any); ok {
 			query, _ = args["query"].(string)
 		}
+		_, start := toolLog(src, "list_library", "query", query)
+
+		books, err := src.ListLibrary()
+		if err != nil {
+			toolLogError(src, "list_library", start, err, "query", query)
+			return mcp.NewToolResultError(fmt.Sprintf("library read failed: %v", err)), nil
+		}
+
 		if query != "" {
 			lower := strings.ToLower(query)
 			filtered := books[:0]
@@ -668,12 +703,35 @@ func listLibraryHandler(src bookSource) server.ToolHandlerFunc {
 		}
 
 		if len(books) == 0 {
+			toolLogDone(src, "list_library", start, "count", 0, "query", query)
 			if query != "" {
 				return mcp.NewToolResultText(fmt.Sprintf("No books found matching %q.", query)), nil
 			}
 			return mcp.NewToolResultText("Library is empty."), nil
 		}
 		data, _ := json.Marshal(books)
+		toolLogDone(src, "list_library", start, "count", len(books), "query", query)
 		return mcp.NewToolResultText(string(data)), nil
 	}
+}
+
+// toolLog is a small helper for tool-layer entry/exit logging. It returns a
+// start time; callers log the entry line themselves and call toolLogDone (or
+// toolLogError) on exit. All lines go to the session's slog logger (stderr).
+func toolLog(src bookSource, tool string, args ...any) (string, time.Time) {
+	start := time.Now()
+	src.Logger().Info("mcp tool call", append([]any{"tool", tool}, args...)...)
+	return tool, start
+}
+
+// toolLogDone logs a successful tool exit with outcome fields and duration.
+func toolLogDone(src bookSource, tool string, start time.Time, args ...any) {
+	all := append([]any{"tool", tool, "took", time.Since(start).Round(time.Millisecond)}, args...)
+	src.Logger().Info("mcp tool ok", all...)
+}
+
+// toolLogError logs a failed tool exit with the error and duration.
+func toolLogError(src bookSource, tool string, start time.Time, err error, args ...any) {
+	all := append([]any{"tool", tool, "took", time.Since(start).Round(time.Millisecond), "err", err}, args...)
+	src.Logger().Error("mcp tool error", all...)
 }

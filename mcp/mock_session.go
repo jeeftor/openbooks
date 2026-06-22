@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,6 +19,7 @@ import (
 type MockSession struct {
 	downloadDir string
 	replaceSpace string
+	log         *slog.Logger
 
 	mu     sync.Mutex
 	staged map[string]*staging.StagedBook
@@ -33,10 +35,14 @@ type MockSession struct {
 func NewMockSession(downloadDir string) *MockSession {
 	return &MockSession{
 		downloadDir:     downloadDir,
+		log:             slog.New(slog.NewTextHandler(os.Stderr, nil)),
 		staged:          make(map[string]*staging.StagedBook),
 		downloadStarted: make(chan struct{}, 1),
 	}
 }
+
+// Logger returns the mock session's slog logger.
+func (m *MockSession) Logger() *slog.Logger { return m.log }
 
 func (m *MockSession) DownloadStarted() <-chan struct{} {
 	return m.downloadStarted
