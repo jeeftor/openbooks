@@ -21,6 +21,9 @@
     "src/utils/**",
     "src/components/sidebar/styles.ts",
     "src/components/tables/styles.ts",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/__tests__/**",
     "node_modules"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]

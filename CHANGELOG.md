@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Frontend contract tests:** Go contract tests in `server/contract_test.go` verify that `EPUBMetadata`, `RenamePromptResponse`, `StagedBookSummary`, and `StagedBookResumeResponse` serialize to JSON field names matching the frontend's TypeScript types. Catches field name drift between backend and frontend (the exact class of bug from the PascalCase → lowercase rename).
+- **Vitest for Vue components:** Set up vitest in `server/app/` with 8 tests covering the metadata field access pattern in `RenameModal.vue` and `StagedRenameModal.vue`. Includes a regression guard that verifies PascalCase field names would NOT populate the edit refs. Run with `npm --prefix server/app run test`.
+
 - **MCP add missing series during confirm_book:** When extracted EPUB metadata has no series, the "series" naming option is now always generated (with a `[series]` placeholder preview) so the user can see it's available and provide a series name. The `download_book` description now explicitly instructs the agent to ask "is this book part of a series?" when series is missing. The `confirm_book` description clarifies that `option_id="series"` is always valid when author+title are available — pass the user-provided series name and index, and the server builds `Author/Series/Title/` and writes the series to the EPUB's OPF.
 
 ### Improved
