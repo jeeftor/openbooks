@@ -69,6 +69,16 @@ type paginatedSearchResponse struct {
 	HasMore bool         `json:"has_more,omitempty"`
 }
 
+// paginatedLibraryResponse is returned by list_library. It wraps the library
+// listing with pagination metadata so the agent knows if more pages exist.
+type paginatedLibraryResponse struct {
+	Books   []LibraryBook `json:"books"`
+	Total   int           `json:"total"`
+	Offset  int           `json:"offset"`
+	Limit   int           `json:"limit"`
+	HasMore bool          `json:"has_more,omitempty"`
+}
+
 // topNSearchResults is the maximum number of ranked results search_books
 // returns inline. The full set is available via list_search_results (paginated).
 const topNSearchResults = 20
@@ -491,9 +501,17 @@ Returns the final path relative to the download directory.`),
 
 	s.AddTool(
 		mcp.NewTool("list_library",
-			mcp.WithDescription("List ebooks already downloaded to the local library. Use query to filter by filename substring."),
+			mcp.WithDescription(`List ebooks already downloaded to the local library. Use query to filter by filename substring.
+
+Returns a paginated page: books[] plus total, offset, limit, and has_more so you can page through large libraries with offset/limit (default limit 50, max 200).`),
 			mcp.WithString("query",
 				mcp.Description("Optional filename substring filter, e.g. 'Cressida' or 'Dune'"),
+			),
+			mcp.WithNumber("offset",
+				mcp.Description("Number of results to skip for pagination (default 0)."),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Maximum results to return (default 50, max 200)."),
 			),
 		),
 		listLibraryHandler(src),
@@ -778,11 +796,29 @@ func listServersHandler(src bookSource) server.ToolHandlerFunc {
 
 func listLibraryHandler(src bookSource) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := toolArgs(req)
 		var query string
-		if args, ok := req.Params.Arguments.(map[string]any); ok {
-			query, _ = args["query"].(string)
+		if q, ok := args["query"]; ok {
+			query = q
 		}
-		_, start := toolLog(src, "list_library", "query", query)
+		offset := 0
+		limit := 50
+		if n, ok := args["offset"]; ok && n != "" {
+			if v, _ := fmt.Sscanf(n, "%d", &offset); v == 1 && offset < 0 {
+				offset = 0
+			}
+		}
+		if n, ok := args["limit"]; ok && n != "" {
+			if v, _ := fmt.Sscanf(n, "%d", &limit); v == 1 {
+				if limit <= 0 {
+					limit = 50
+				}
+				if limit > 200 {
+					limit = 200
+				}
+			}
+		}
+		_, start := toolLog(src, "list_library", "query", query, "offset", offset, "limit", limit)
 
 		books, err := src.ListLibrary()
 		if err != nil {
@@ -801,15 +837,39 @@ func listLibraryHandler(src bookSource) server.ToolHandlerFunc {
 			books = filtered
 		}
 
-		if len(books) == 0 {
+		total := len(books)
+		if total == 0 {
 			toolLogDone(src, "list_library", start, "count", 0, "query", query)
 			if query != "" {
 				return mcp.NewToolResultText(fmt.Sprintf("No books found matching %q.", query)), nil
 			}
 			return mcp.NewToolResultText("Library is empty."), nil
 		}
-		data, _ := json.Marshal(books)
-		toolLogDone(src, "list_library", start, "count", len(books), "query", query)
+		if offset >= total {
+			page := paginatedLibraryResponse{
+				Books:   []LibraryBook{},
+				Total:   total,
+				Offset:  offset,
+				Limit:   limit,
+				HasMore: false,
+			}
+			data, _ := json.Marshal(page)
+			toolLogDone(src, "list_library", start, "count", total, "query", query, "shown", 0, "offset", offset)
+			return mcp.NewToolResultText(string(data)), nil
+		}
+		end := offset + limit
+		if end > total {
+			end = total
+		}
+		page := paginatedLibraryResponse{
+			Books:   books[offset:end],
+			Total:   total,
+			Offset:  offset,
+			Limit:   limit,
+			HasMore: end < total,
+		}
+		data, _ := json.Marshal(page)
+		toolLogDone(src, "list_library", start, "count", total, "query", query, "shown", len(page.Books), "offset", offset, "has_more", page.HasMore)
 		return mcp.NewToolResultText(string(data)), nil
 	}
 }

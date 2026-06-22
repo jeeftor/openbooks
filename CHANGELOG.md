@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`list_library` pagination:** The `list_library` tool now accepts `offset` (default 0) and `limit` (default 50, max 200) parameters. The response includes `total`, `offset`, `limit`, and `has_more` so the agent can page through large libraries.
+
+### Improved
+
+- **MCP docs fixed:** Updated stale "top 10" references to "top 20" in `docs/docs/mcp.md`. Documented the JSON naming convention (MCP API = snake_case, WebSocket API = camelCase).
+
 ## v3.1.0 - 2026-06-22
 
 ### Added
