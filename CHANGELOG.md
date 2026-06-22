@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **MCP search returning zero results when IRC server list is empty:** Three compounding bugs caused `search_books` to report "No epub results from trusted servers found" (with `results=0 raw=23` in logs) even though the IRC search found real hits. (1) `core/reader.go` now separates multi-line IRC names replies (`353`) with a space so nicks at line boundaries don't merge and lose their elevated prefix. (2) `mcp/session.go` no longer overwrites a known-good server list with a transient empty update (e.g. netsplit, re-join, bots momentarily de-opped) — it keeps the previous list and logs a warning. (3) `mcp/tools.go` `buildSearchResponse` now falls back to returning all epub results when no trusted servers are known, so the agent always has something to show the user instead of silently discarding every result.
+
 ### Added
 
 - **`list_library` pagination:** The `list_library` tool now accepts `offset` (default 0) and `limit` (default 50, max 200) parameters. The response includes `total`, `offset`, `limit`, and `has_more` so the agent can page through large libraries.

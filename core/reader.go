@@ -83,6 +83,12 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 					event = MatchesFound
 				}
 			} else if strings.Contains(text, beginUserList) {
+				// RPL_NAMREPLY (353) can span multiple lines for large
+				// channels. Separate accumulated lines with a space so a nick
+				// at a line boundary doesn't merge into the next line's prefix.
+				if users.Len() > 0 {
+					users.WriteString(" ")
+				}
 				users.WriteString(text)
 			} else if strings.Contains(text, endUserList) {
 				event = ServerList

@@ -51,6 +51,27 @@ func TestBuildSearchResponse_FiltersNonEpubAndUntrusted(t *testing.T) {
 	assert.Equal(t, "T1", resp.Books[0].Title)
 }
 
+// When the trusted-server list is empty (transient IRC names reply), the
+// trusted filter would drop everything. The fallback should return all epub
+// results so the agent still has something to show the user.
+func TestBuildSearchResponse_FallbackWhenNoTrustedServers(t *testing.T) {
+	books := []core.BookDetail{
+		{Server: "BotA", Author: "A", Title: "T1", Format: "epub", Size: "1 MB", Full: "!BotA A - T1.epub"},
+		{Server: "BotB", Author: "A", Title: "T2", Format: "pdf", Size: "1 MB", Full: "!BotB A - T2.pdf"},
+		{Server: "BotC", Author: "A", Title: "T3", Format: "epub", Size: "1 MB", Full: "!BotC A - T3.epub"},
+	}
+	// No server is trusted — simulates an empty/stale server list.
+	trusted := func(string) bool { return false }
+
+	resp := buildSearchResponse(books, trusted)
+
+	// Fallback returns all epub results (T1, T3), PDF still filtered out.
+	assert.Len(t, resp.Books, 2)
+	titles := []string{resp.Books[0].Title, resp.Books[1].Title}
+	assert.Contains(t, titles, "T1")
+	assert.Contains(t, titles, "T3")
+}
+
 func TestRankBooks_PrefersQueryMatches(t *testing.T) {
 	books := []bookResult{
 		{Author: "Someone Else", Title: "Unrelated Book", Size: "5 MB", Copies: 1},
