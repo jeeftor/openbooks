@@ -35,9 +35,10 @@ func NewResultCache(maxAge time.Duration, maxSize int) *ResultCache {
 	}
 }
 
-// normalizeQuery lowercases and trims whitespace for consistent key lookup.
+// normalizeQuery lowercases and collapses all whitespace for consistent key lookup.
+// "The  Great  Gatsby" and "the great gatsby" resolve to the same cache entry.
 func normalizeQuery(q string) string {
-	return strings.ToLower(strings.TrimSpace(q))
+	return strings.ToLower(strings.Join(strings.Fields(q), " "))
 }
 
 // Get returns a cached result if it exists and has not expired.
@@ -59,8 +60,10 @@ func (rc *ResultCache) Set(query string, books []core.BookDetail, errors []core.
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
-	// Evict oldest entry when at capacity.
-	if len(rc.entries) >= rc.maxSize {
+	key := normalizeQuery(query)
+
+	// Evict oldest entry when at capacity, but only if we're adding a new key.
+	if _, exists := rc.entries[key]; !exists && len(rc.entries) >= rc.maxSize {
 		var oldestKey string
 		var oldestTime time.Time
 		for k, v := range rc.entries {
@@ -72,7 +75,7 @@ func (rc *ResultCache) Set(query string, books []core.BookDetail, errors []core.
 		delete(rc.entries, oldestKey)
 	}
 
-	rc.entries[normalizeQuery(query)] = &CachedResult{
+	rc.entries[key] = &CachedResult{
 		Query:     query,
 		Books:     books,
 		Errors:    errors,
