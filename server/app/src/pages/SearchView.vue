@@ -42,8 +42,22 @@ const isShowingCachedResults = computed(() => {
   return !isSearching.value
     && ts !== undefined
     && appStore.activeItem?.results !== undefined
-    && historyStore.getCachedResults(ts) !== undefined;
+    && (historyStore.getCachedResults(ts) !== undefined || !!appStore.activeItem?.cachedAt);
 });
+
+// Age of server-cached results in minutes (null when not from server cache).
+const cachedResultsAgeMinutes = computed(() => {
+  const ca = appStore.activeItem?.cachedAt;
+  if (!ca) return null;
+  return (Date.now() - new Date(ca).getTime()) / 60000;
+});
+
+function formatCacheAge(minutes: number): string {
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${Math.round(minutes)}m ago`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
+  return `${Math.round(minutes / 1440)}d ago`;
+}
 const validInput = computed(() => {
   if (!appStore.isConnected) return false;
   return errorMode.value ? query.value.startsWith("!") : query.value.trim() !== "";
@@ -358,15 +372,30 @@ function handleSearch(e: Event) {
 
       <!-- Cached results banner + table -->
       <template v-if="appStore.activeItem && appStore.activeItem.results !== undefined">
+        <!-- Age-aware cached results banner -->
         <div
           v-if="isShowingCachedResults && appStore.isConnected"
-          class="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
-          <span>Showing saved results from a previous search.</span>
+          class="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 border-b text-xs"
+          :class="cachedResultsAgeMinutes !== null && cachedResultsAgeMinutes > 30
+            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'">
+          <span v-if="cachedResultsAgeMinutes !== null && cachedResultsAgeMinutes > 30">
+            Results from {{ formatCacheAge(cachedResultsAgeMinutes) }} — may be outdated.
+          </span>
+          <span v-else-if="cachedResultsAgeMinutes !== null">
+            Results from {{ formatCacheAge(cachedResultsAgeMinutes) }}.
+          </span>
+          <span v-else>
+            Showing saved results from a previous search.
+          </span>
           <button
-            class="flex items-center gap-1 font-medium px-2.5 py-1 rounded border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+            class="flex-shrink-0 flex items-center gap-1 font-medium px-2.5 py-1 rounded border transition-colors"
+            :class="cachedResultsAgeMinutes !== null && cachedResultsAgeMinutes > 30
+              ? 'border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+              : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'"
             @click="retrySearch">
             <RefreshCw :size="11" />
-            Search again
+            {{ cachedResultsAgeMinutes !== null && cachedResultsAgeMinutes > 30 ? 'Refresh' : 'Search again' }}
           </button>
         </div>
         <BookCards v-if="isMobile" :books="appStore.activeItem.results" />

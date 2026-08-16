@@ -58,6 +58,10 @@ type server struct {
 
 	// searchHistory records recent searches, persisted to disk.
 	searchHistory *SearchHistoryStore
+
+	// resultCache stores recent IRC search results so they can be served
+	// to other sessions without hitting IRC again.
+	resultCache *ResultCache
 }
 
 // Config contains settings for server
@@ -79,11 +83,21 @@ type Config struct {
 	ReplaceSpace      string
 	PostProcessCmd    []string // command + args; file path appended automatically
 	DevMode           bool
-	EnableMCP         bool     // mount MCP server at /mcp
-	MCPFormats        []string // file format filter for MCP searches (default: epub)
+	EnableMCP         bool          // mount MCP server at /mcp
+	MCPFormats        []string      // file format filter for MCP searches (default: epub)
+	ResultCacheTTL    time.Duration // how long cached search results are valid (default: 60m)
+	ResultCacheSize   int           // max number of distinct queries to cache (default: 100)
 }
 
 func New(config Config) *server {
+	cacheTTL := config.ResultCacheTTL
+	if cacheTTL == 0 {
+		cacheTTL = 60 * time.Minute
+	}
+	cacheSize := config.ResultCacheSize
+	if cacheSize == 0 {
+		cacheSize = 100
+	}
 	return &server{
 		repository:  NewRepository(),
 		config:      &config,
@@ -99,6 +113,7 @@ func New(config Config) *server {
 			"UPDATE: ",
 			log.LstdFlags|log.Lmsgprefix,
 		)),
+		resultCache: NewResultCache(cacheTTL, cacheSize),
 	}
 }
 

@@ -53,6 +53,7 @@ export interface SearchResponse extends WsResponse {
   books: BookDetail[];
   errors: ParseError[];
   raw?: string;
+  cachedAt?: string; // ISO timestamp — present when results come from the server-side cache
 }
 
 export interface DownloadResponse extends WsResponse {
@@ -114,6 +115,7 @@ export interface HistoryItem {
   results?: BookDetail[];
   errors?: ParseError[];
   timedOut?: boolean;
+  cachedAt?: string; // ISO timestamp — present when these results came from the server-side cache
 }
 
 export interface EPUBMetadata {
