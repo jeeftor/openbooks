@@ -6,6 +6,9 @@ import type { BookDetail } from "../../types/messages";
 import { useServers } from "../../composables/useApi";
 import { usePreferencesStore } from "../../stores/preferences";
 import DownloadButton from "./DownloadButton.vue";
+import StatusDot from "../shared/StatusDot.vue";
+import FormatBadge from "../shared/FormatBadge.vue";
+import FilterChip from "../shared/FilterChip.vue";
 
 const props = defineProps<{ books: BookDetail[]; isLoading?: boolean }>();
 
@@ -385,9 +388,7 @@ function toggleFormat(fmt: string) {
               :key="srv"
               class="flex items-center gap-2 px-3 py-1 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
               <input type="checkbox" :value="srv" @change="toggleServer(srv)" :checked="serverFilter.includes(srv)" class="rounded text-brand-400 focus:ring-brand-400" />
-              <span
-                class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-                :class="servers.includes(srv) ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'" />
+              <StatusDot :online="servers.includes(srv)" />
               <span class="text-xs text-slate-700 dark:text-slate-300">{{ srv }}</span>
             </label>
             <div v-if="serverFilter.length" class="border-t border-slate-200 dark:border-slate-700 mt-1 pt-1 px-3">
@@ -437,45 +438,31 @@ function toggleFormat(fmt: string) {
 
       <!-- Row 2: format chips + save preference -->
       <div class="flex items-center gap-1.5 px-3 pb-2 flex-wrap">
-        <button
-          class="px-2 py-0.5 rounded text-[11px] font-medium border transition-colors"
-          :class="!formatFilter.length
-            ? 'bg-brand-400 border-brand-400 text-white'
-            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300'"
-          @click="formatFilter = []">
-          All
-        </button>
-        <button
+        <FilterChip :active="!formatFilter.length" @toggle="formatFilter = []">All</FilterChip>
+        <FilterChip
           v-for="fmt in allFormats"
           :key="fmt"
-          class="px-2 py-0.5 rounded text-[11px] font-medium border transition-colors"
-          :class="formatFilter.includes(fmt)
-            ? 'bg-brand-400 border-brand-400 text-white'
-            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300'"
-          @click="toggleFormat(fmt)">
+          :active="formatFilter.includes(fmt)"
+          @toggle="toggleFormat(fmt)">
           {{ fmt.toUpperCase() }}
-        </button>
+        </FilterChip>
         <!-- Exclude N/A size toggle -->
-        <button
-          class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap"
-          :class="excludeNoSize
-            ? 'bg-brand-400 border-brand-400 text-white'
-            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300'"
+        <FilterChip
+          :active="excludeNoSize"
+          class="whitespace-nowrap"
           title="Hide entries with unknown file size"
-          @click="excludeNoSize = !excludeNoSize">
+          @toggle="excludeNoSize = !excludeNoSize">
           N/A size
-        </button>
+        </FilterChip>
         <!-- Group Books toggle -->
-        <button
-          class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap"
-          :class="groupBooks
-            ? 'bg-brand-400 border-brand-400 text-white'
-            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300'"
+        <FilterChip
+          :active="groupBooks"
+          class="flex items-center gap-1 whitespace-nowrap"
           title="Group duplicate EPUBs together"
-          @click="groupBooks = !groupBooks; expandedGroups.clear()">
+          @toggle="groupBooks = !groupBooks; expandedGroups.clear()">
           <Layers :size="10" />
           Group Books
-        </button>
+        </FilterChip>
         <!-- Export button -->
         <button
           class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-brand-300 transition-colors whitespace-nowrap"
@@ -595,9 +582,7 @@ function toggleFormat(fmt: string) {
                       return g?.books.length || 0;
                     })() }}</span>
                   </button>
-                  <span
-                    class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    :class="servers.includes(displayBooks[vItem.index].server) ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'" />
+                  <StatusDot :online="servers.includes(displayBooks[vItem.index].server)" />
                   <span class="truncate text-slate-600 dark:text-slate-300">
                     {{ displayBooks[vItem.index].server }}
                   </span>
@@ -610,11 +595,7 @@ function toggleFormat(fmt: string) {
                 <span class="truncate block">{{ displayBooks[vItem.index].title }}</span>
               </td>
               <td class="px-3 py-1.5">
-                <span
-                  v-if="displayBooks[vItem.index].format"
-                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-300">
-                  {{ displayBooks[vItem.index].format.toUpperCase() }}
-                </span>
+                <FormatBadge :format="displayBooks[vItem.index].format" />
               </td>
               <td class="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                 {{ displayBooks[vItem.index].size }}

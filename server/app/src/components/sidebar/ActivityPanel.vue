@@ -13,6 +13,8 @@ import {
 import { useTaskStore } from "../../stores/tasks";
 import type { Task } from "../../stores/tasks";
 import LogsPanel from "./LogsPanel.vue";
+import EmptyPanel from "../shared/EmptyPanel.vue";
+import PanelHeader from "../shared/PanelHeader.vue";
 
 const taskStore = useTaskStore();
 
@@ -64,32 +66,31 @@ function toggleExpand(id: string) {
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <div class="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-      <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Activity</span>
-      <div class="flex items-center gap-2">
-        <span
-          v-if="taskStore.activeCount > 0"
-          class="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full">
-          {{ taskStore.activeCount }} live
-        </span>
-        <button
-          v-if="completedTasks.length > 0"
-          class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-          @click="taskStore.clearCompleted()">
-          Clear
-        </button>
-      </div>
-    </div>
+    <PanelHeader>
+      Activity
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <span
+            v-if="taskStore.activeCount > 0"
+            class="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full">
+            {{ taskStore.activeCount }} live
+          </span>
+          <button
+            v-if="completedTasks.length > 0"
+            class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            @click="taskStore.clearCompleted()">
+            Clear
+          </button>
+        </div>
+      </template>
+    </PanelHeader>
 
     <!-- Task list -->
     <div class="flex-1 overflow-y-auto">
       <!-- Empty state -->
-      <div
-        v-if="taskStore.tasks.length === 0"
-        class="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
-        <Activity :size="28" class="text-slate-300 dark:text-slate-600" />
-        <p class="text-xs text-slate-400 dark:text-slate-500">No activity yet</p>
-      </div>
+      <EmptyPanel v-if="taskStore.tasks.length === 0" :icon="Activity">
+        No activity yet
+      </EmptyPanel>
 
       <!-- Task items -->
       <div

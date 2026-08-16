@@ -7,6 +7,8 @@ import { useAppStore } from "../../stores/app";
 import { useBooks, deleteBook } from "../../composables/useApi";
 import { getApiUrl } from "../../composables/useWebSocket";
 import type { Book } from "../../types/messages";
+import EmptyPanel from "../shared/EmptyPanel.vue";
+import PanelHeader from "../shared/PanelHeader.vue";
 
 const appStore = useAppStore();
 const { libraryVersion } = storeToRefs(appStore);
@@ -102,24 +104,23 @@ function formatDate(dateStr: string) {
 <template>
   <div class="h-full flex flex-col overflow-hidden">
     <!-- Header -->
-    <div
-      class="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-      <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
-        {{ totalLabel || `${books.length} files` }}
-      </span>
-      <div class="flex items-center gap-1">
-        <span class="text-[10px] text-slate-400 dark:text-slate-500">
-          {{ sortLabel }}
-        </span>
-        <button
-          class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
-          :class="{ 'animate-spin': loading }"
-          title="Refresh"
-          @click="refresh()">
-          <RefreshCw :size="13" />
-        </button>
-      </div>
-    </div>
+    <PanelHeader>
+      {{ totalLabel || `${books.length} files` }}
+      <template #actions>
+        <div class="flex items-center gap-1">
+          <span class="text-[10px] text-slate-400 dark:text-slate-500">
+            {{ sortLabel }}
+          </span>
+          <button
+            class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+            :class="{ 'animate-spin': loading }"
+            title="Refresh"
+            @click="refresh()">
+            <RefreshCw :size="13" />
+          </button>
+        </div>
+      </template>
+    </PanelHeader>
 
     <!-- Loading -->
     <div
@@ -129,12 +130,9 @@ function formatDate(dateStr: string) {
     </div>
 
     <!-- Empty -->
-    <div
-      v-else-if="!books.length"
-      class="flex-1 flex flex-col items-center justify-center gap-2 text-center px-4">
-      <Library :size="28" class="text-slate-300 dark:text-slate-600" />
-      <p class="text-xs text-slate-400 dark:text-slate-500">No downloaded books yet.</p>
-    </div>
+    <EmptyPanel v-else-if="!books.length" :icon="Library">
+      No downloaded books yet.
+    </EmptyPanel>
 
     <!-- Grouped list -->
     <div v-else class="flex-1 overflow-y-auto">
