@@ -29,6 +29,8 @@ func init() {
 	serverCmd.Flags().StringSliceVar(&serverConfig.PostProcessCmd, "post-process-cmd", nil, "Command to run after each book download. File path is appended as last argument. Example: --post-process-cmd 'calibre-polish,--embed-fonts,--smarten-punctuation'")
 	serverCmd.Flags().BoolVar(&serverConfig.EnableMCP, "mcp", false, "Mount an MCP server at /mcp for AI agent access.")
 	serverCmd.Flags().StringSliceVar(&serverConfig.MCPFormats, "mcp-formats", []string{"epub"}, "File formats the MCP server will return in search results.")
+	serverCmd.Flags().DurationVar(&serverConfig.ResultCacheTTL, "result-cache-ttl", 0, "How long to cache IRC search results across sessions (default: 60m). Set to 0 to use the default.")
+	serverCmd.Flags().IntVar(&serverConfig.ResultCacheSize, "result-cache-size", 0, "Maximum number of distinct queries to cache (default: 100). Set to 0 to use the default.")
 }
 
 var serverCmd = &cobra.Command{

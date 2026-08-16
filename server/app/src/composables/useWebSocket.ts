@@ -102,13 +102,13 @@ export function useWebSocket() {
         // Internal status ping — no toast/notification.
         return;
       case MessageType.SEARCH: {
-        const { books, errors, raw } = response as SearchResponse;
+        const { books, errors, raw, cachedAt } = response as SearchResponse;
         // Route results to the oldest pending (in-flight) history item, in
         // case the user navigated to a different item while waiting.
         const pending = historyStore.items.find(i => i.results === undefined && !i.timedOut);
         const target = pending ?? appStore.activeItem;
         if (target) {
-          const updated = { ...target, results: books, errors };
+          const updated = { ...target, results: books, errors, cachedAt };
           appStore.setRawSearchResult(target.timestamp, raw);
           historyStore.updateItem(updated);
           // Only update activeItem if this is the one currently being viewed

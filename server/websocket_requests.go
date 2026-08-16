@@ -191,11 +191,22 @@ func broadcastToClients(clients []*Client, msg interface{}) {
 	}
 }
 
-// sendSearchRequest enqueues a search query in the session's search queue.
-// The queue is drained by processSearchQueue with a cooldown between each request.
+// sendSearchRequest checks the server-side result cache and either returns cached
+// results immediately or enqueues the query in the session's search queue.
 func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 	sess := server.getSession(c.uuid)
 	if sess == nil {
+		return
+	}
+
+	// Serve from cache when a recent result exists.
+	if cached, ok := server.resultCache.Get(s.Query); ok {
+		cachedAt := cached.Timestamp
+		resp := newSearchResponse(cached.Books, cached.Errors, "")
+		resp.CachedAt = &cachedAt
+		c.send <- resp
+		server.searchHistory.Add(s.Query)
+		server.logBuf.info(fmt.Sprintf("📋 Cache hit for %q (age: %.0fm)", s.Query, time.Since(cachedAt).Minutes()))
 		return
 	}
 

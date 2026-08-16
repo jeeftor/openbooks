@@ -88,9 +88,10 @@ type ConnectionResponse struct {
 // SearchResponse is a response that is sent containing BookDetails objects that matched the query
 type SearchResponse struct {
 	StatusResponse
-	Books  []core.BookDetail `json:"books"`
-	Errors []core.ParseError `json:"errors"`
-	Raw    string            `json:"raw,omitempty"`
+	Books    []core.BookDetail `json:"books"`
+	Errors   []core.ParseError `json:"errors"`
+	Raw      string            `json:"raw,omitempty"`
+	CachedAt *time.Time        `json:"cachedAt,omitempty"` // non-nil when results come from the server-side cache
 }
 
 // DownloadResponse is a response that sends the requested book to the client

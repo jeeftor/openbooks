@@ -32,7 +32,7 @@ export const useHistoryStore = defineStore("history", () => {
     const idx = items.value.findIndex((x: HistoryItem) => x.timestamp === updated.timestamp);
     if (idx !== -1) {
       const copy = [...items.value];
-      copy[idx] = { query: updated.query, timestamp: updated.timestamp, timedOut: updated.timedOut };
+      copy[idx] = { query: updated.query, timestamp: updated.timestamp, timedOut: updated.timedOut, cachedAt: updated.cachedAt };
       items.value = copy;
     }
     // Keep in-memory cache up to date when results arrive.

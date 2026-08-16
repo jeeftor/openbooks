@@ -63,6 +63,11 @@ func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer, srv 
 		broadcastToClients(sess.getClients(), newSearchResponse(bookResults, parseErrors, string(rawResults)))
 		os.Remove(extractedPath)
 
+		// Cache the results so other sessions can get them without hitting IRC.
+		if sess.query != "" {
+			srv.resultCache.Set(sess.query, bookResults, parseErrors, sess.username)
+		}
+
 		// Record the search in server-side history.
 		if sess.query != "" {
 			srv.searchHistory.Add(sess.query)

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- **Shared result cache:** IRC search results are now cached server-side for 60 minutes (configurable via `--result-cache-ttl`). When a user searches for something recently searched by any session, cached results are returned instantly with an age indicator. Configurable capacity via `--result-cache-size` (default: 100 queries).
+- **Age-aware stale results banner:** Results from the server cache show "Results from Xm ago" with a Refresh button. Results older than 30 minutes use a more prominent amber warning. The banner no longer just says "Showing saved results from a previous search."
+
 ### Removed
 
 - Deleted 23 dead React/Redux/Mantine files (~2200 lines) that were superseded by the active Vue 3 frontend (`src/App.tsx`, `src/main.tsx`, `src/state/`, `src/utils/animation.ts`, `src/components/drawer/`, `src/components/sidebar/*.tsx`, `src/components/tables/`)
