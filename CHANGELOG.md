@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Removed
+
+- Deleted 23 dead React/Redux/Mantine files (~2200 lines) that were superseded by the active Vue 3 frontend (`src/App.tsx`, `src/main.tsx`, `src/state/`, `src/utils/animation.ts`, `src/components/drawer/`, `src/components/sidebar/*.tsx`, `src/components/tables/`)
+
 ### Fixed
 
 - **Parser detects and corrects swapped author/title fields:** IRC ebook search results have mixed field ordering — some entries use `Author - Title.ext`, others use `Title - Author.ext`. The parser previously assumed `Author - Title` always, so swapped entries displayed incorrectly (e.g., "Author: The Hobbit, Title: J. R. R. Tolkien"). A conservative heuristic now detects obvious swaps and corrects them. Signals: "et al" in title field, "Last, First" comma pattern in title, initials pattern in title (e.g., "J. R. R. Tolkien"), leading/trailing articles in author field ("The Hobbit", "Hobbit, The"), single-word author with multi-word name-like title, and large word-count asymmetry. Ambiguous cases are left as-is to avoid introducing new errors. The download string (`Full` field) is never modified.
