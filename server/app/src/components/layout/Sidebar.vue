@@ -24,6 +24,10 @@ import VersionLink from "./VersionLink.vue";
 type Tab = "history" | "books" | "activity";
 
 const activeTab = useLocalStorage<Tab>("ob-sidebar-tab", "history");
+// Migrate stale values (e.g. "logs" from before the Activity panel rename).
+if (!["history", "books", "activity"].includes(activeTab.value)) {
+  activeTab.value = "history";
+}
 const appStore = useAppStore();
 const notifStore = useNotificationStore();
 const taskStore = useTaskStore();

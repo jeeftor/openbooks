@@ -49,7 +49,9 @@ const isShowingCachedResults = computed(() => {
 const cachedResultsAgeMinutes = computed(() => {
   const ca = appStore.activeItem?.cachedAt;
   if (!ca) return null;
-  return (Date.now() - new Date(ca).getTime()) / 60000;
+  const ms = new Date(ca).getTime();
+  if (isNaN(ms)) return null;
+  return (Date.now() - ms) / 60000;
 });
 
 function formatCacheAge(minutes: number): string {

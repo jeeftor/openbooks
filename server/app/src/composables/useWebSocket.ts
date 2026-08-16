@@ -69,9 +69,14 @@ export function sendMessage(msg: unknown) {
 
 /**
  * Called by SearchView before sending SEARCH so the task is created immediately.
+ * If a previous search task is still active (rapid re-search), marks it cancelled.
  */
 export function registerSearchTask(query: string): void {
   const taskStore = useTaskStore();
+  if (_activeSearchTaskId) {
+    taskStore.updateTask(_activeSearchTaskId, { status: 'failed' }, 'Superseded by new search');
+    _activeSearchTaskId = null;
+  }
   const task = taskStore.createTask('search', query, { query });
   _activeSearchTaskId = task.id;
 }
@@ -316,6 +321,8 @@ export function useWebSocket() {
   onUnmounted(() => {
     if (retryTimeout) clearTimeout(retryTimeout);
     _sendFn = null;
+    _activeSearchTaskId = null;
+    _downloadTaskIds.clear();
     socket?.close(1000, "App unmounted");
   });
 }
