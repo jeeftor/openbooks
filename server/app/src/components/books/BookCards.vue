@@ -7,6 +7,7 @@ import { useServers } from "../../composables/useApi";
 import { usePreferencesStore } from "../../stores/preferences";
 import DownloadButton from "./DownloadButton.vue";
 import FilterDrawer from "./FilterDrawer.vue";
+import FormatBadge from "../shared/FormatBadge.vue";
 
 const props = defineProps<{ books: BookDetail[] }>();
 
@@ -132,11 +133,7 @@ watch(
                 {{ displayBooks[vItem.index]?.author }}
               </p>
               <div class="flex items-center gap-2 mt-1">
-                <span
-                  v-if="displayBooks[vItem.index]?.format"
-                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-300">
-                  {{ displayBooks[vItem.index]?.format.toUpperCase() }}
-                </span>
+                <FormatBadge :format="displayBooks[vItem.index]?.format" />
                 <span
                   v-if="displayBooks[vItem.index]?.size"
                   class="text-[11px] text-slate-400 dark:text-slate-500">

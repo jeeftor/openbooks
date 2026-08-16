@@ -3,6 +3,8 @@ import { Clock, Trash2, SearchCode } from "lucide-vue-next";
 import { useHistoryStore } from "../../stores/history";
 import { useAppStore } from "../../stores/app";
 import type { HistoryItem } from "../../types/messages";
+import EmptyPanel from "../shared/EmptyPanel.vue";
+import PanelHeader from "../shared/PanelHeader.vue";
 
 const historyStore = useHistoryStore();
 const appStore = useAppStore();
@@ -38,29 +40,23 @@ function select(item: HistoryItem) {
 <template>
   <div class="h-full flex flex-col overflow-hidden">
     <!-- Header -->
-    <div
-      class="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-      <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
-        {{ historyStore.items.length }} searches
-      </span>
-      <button
-        v-if="historyStore.items.length"
-        class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
-        title="Clear all history"
-        @click="historyStore.clearAll()">
-        <Trash2 :size="13" />
-      </button>
-    </div>
+    <PanelHeader>
+      {{ historyStore.items.length }} searches
+      <template #actions>
+        <button
+          v-if="historyStore.items.length"
+          class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
+          title="Clear all history"
+          @click="historyStore.clearAll()">
+          <Trash2 :size="13" />
+        </button>
+      </template>
+    </PanelHeader>
 
     <!-- Empty -->
-    <div
-      v-if="!historyStore.items.length"
-      class="flex-1 flex flex-col items-center justify-center gap-2 text-center px-4">
-      <Clock :size="28" class="text-slate-300 dark:text-slate-600" />
-      <p class="text-xs text-slate-400 dark:text-slate-500">
-        No search history yet.
-      </p>
-    </div>
+    <EmptyPanel v-if="!historyStore.items.length" :icon="Clock">
+      No search history yet.
+    </EmptyPanel>
 
     <!-- List -->
     <ul
