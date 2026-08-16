@@ -3,7 +3,7 @@ import { ref } from "vue";
 import {
   History,
   BookMarked,
-  ScrollText,
+  Activity,
   X,
   Bell,
   Moon,
@@ -14,17 +14,19 @@ import {
 import { useDark, useToggle } from "@vueuse/core";
 import { useAppStore } from "../../stores/app";
 import { useNotificationStore } from "../../stores/notifications";
+import { useTaskStore } from "../../stores/tasks";
 import { useVersion } from "../../composables/useApi";
 import HistoryPanel from "../sidebar/HistoryPanel.vue";
 import LibraryPanel from "../sidebar/LibraryPanel.vue";
-import LogsPanel from "../sidebar/LogsPanel.vue";
+import ActivityPanel from "../sidebar/ActivityPanel.vue";
 import VersionLink from "./VersionLink.vue";
 
-type Tab = "history" | "books" | "logs";
+type Tab = "history" | "books" | "activity";
 
 const activeTab = ref<Tab | null>(null);
 const appStore = useAppStore();
 const notifStore = useNotificationStore();
+const taskStore = useTaskStore();
 const version = useVersion();
 
 const isDark = useDark({ storageKey: "ob-dark-mode" });
@@ -33,7 +35,7 @@ const toggleDark = useToggle(isDark);
 const TABS = [
   { id: "history" as Tab, label: "History", icon: History },
   { id: "books" as Tab, label: "Downloads", icon: BookMarked },
-  { id: "logs" as Tab, label: "Logs", icon: ScrollText }
+  { id: "activity" as Tab, label: "Activity", icon: Activity }
 ];
 
 function selectTab(tab: Tab) {
@@ -97,7 +99,7 @@ function selectTab(tab: Tab) {
       <div class="flex-1 overflow-hidden">
         <HistoryPanel v-if="activeTab === 'history'" />
         <LibraryPanel v-else-if="activeTab === 'books'" />
-        <LogsPanel v-else />
+        <ActivityPanel v-else />
       </div>
     </div>
   </Transition>
@@ -114,7 +116,14 @@ function selectTab(tab: Tab) {
         ? 'text-brand-400 dark:text-brand-300'
         : 'text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
       @click="selectTab(tab.id)">
-      <component :is="tab.icon" :size="20" />
+      <div class="relative">
+        <component :is="tab.icon" :size="20" />
+        <span
+          v-if="tab.id === 'activity' && taskStore.activeCount > 0"
+          class="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 text-[9px] font-bold leading-none rounded-full bg-blue-500 text-white flex items-center justify-center">
+          {{ taskStore.activeCount }}
+        </span>
+      </div>
       <span>{{ tab.label }}</span>
     </button>
   </nav>

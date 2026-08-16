@@ -6,6 +6,9 @@
 
 - **Shared result cache:** IRC search results are now cached server-side for 60 minutes (configurable via `--result-cache-ttl`). When a user searches for something recently searched by any session, cached results are returned instantly with an age indicator. Configurable capacity via `--result-cache-size` (default: 100 queries).
 - **Age-aware stale results banner:** Results from the server cache show "Results from Xm ago" with a Refresh button. Results older than 30 minutes use a more prominent amber warning. The banner no longer just says "Showing saved results from a previous search."
+- **Task manager:** Every search, download, and save operation is now a first-class Task with lifecycle stages (queued → active → done/failed/timed-out) and a timestamped event log.
+- **Activity panel:** Replaces the raw Logs tab in the sidebar and mobile bottom nav. Shows active and completed tasks with expandable event timelines. Raw server logs still accessible via "Show server logs" toggle.
+- **Download queue depth:** The waiting-for-bot banner now shows "+ N more queued" with a link to open the Activity panel.
 
 ### Removed
 

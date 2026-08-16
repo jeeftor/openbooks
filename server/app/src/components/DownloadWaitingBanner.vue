@@ -1,13 +1,26 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from "vue";
-import { useMediaQuery } from "@vueuse/core";
+import { useMediaQuery, useLocalStorage } from "@vueuse/core";
 import { useAppStore } from "../stores/app";
+import { useTaskStore } from "../stores/tasks";
 
 const isMobile = useMediaQuery("(max-width: 767px)");
 
 const appStore = useAppStore();
+const taskStore = useTaskStore();
 const waiting = computed(() => appStore.waitingDownload);
 const phase = computed(() => appStore.downloadPhase);
+
+// Number of downloads still queued (not yet active).
+const queuedCount = computed(() =>
+  taskStore.tasks.filter(t => t.type === 'download' && t.status === 'queued').length
+);
+
+// Switch the sidebar/mobile nav to the Activity tab.
+const sidebarTab = useLocalStorage<string>("ob-sidebar-tab", "history");
+function openActivityTab() {
+  sidebarTab.value = "activity";
+}
 
 // Remember the last title/bot so we can show them during the "transferring" phase
 // after waitingDownload has been cleared.
@@ -122,6 +135,12 @@ function formatTime(secs: number) {
           <p class="text-xs text-slate-400 truncate mt-0.5">
             {{ isTransferring ? lastTitle : waiting!.bookTitle }}
           </p>
+          <button
+            v-if="queuedCount > 0"
+            class="mt-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
+            @click="openActivityTab()">
+            + {{ queuedCount }} more queued
+          </button>
         </div>
       </div>
     </div>
