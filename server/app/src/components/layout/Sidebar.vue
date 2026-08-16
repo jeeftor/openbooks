@@ -12,19 +12,21 @@ import {
 import { useDark, useToggle } from "@vueuse/core";
 import { useAppStore } from "../../stores/app";
 import { useNotificationStore } from "../../stores/notifications";
+import { useTaskStore } from "../../stores/tasks";
 import { useVersion } from "../../composables/useApi";
 import { MessageType } from "../../types/messages";
 import { sendMessage } from "../../composables/useWebSocket";
 import HistoryPanel from "../sidebar/HistoryPanel.vue";
 import LibraryPanel from "../sidebar/LibraryPanel.vue";
-import LogsPanel from "../sidebar/LogsPanel.vue";
+import ActivityPanel from "../sidebar/ActivityPanel.vue";
 import VersionLink from "./VersionLink.vue";
 
-type Tab = "history" | "books" | "logs";
+type Tab = "history" | "books" | "activity";
 
 const activeTab = useLocalStorage<Tab>("ob-sidebar-tab", "history");
 const appStore = useAppStore();
 const notifStore = useNotificationStore();
+const taskStore = useTaskStore();
 const version = useVersion();
 
 const isDark = useDark({ storageKey: "ob-dark-mode" });
@@ -33,7 +35,7 @@ const toggleDark = useToggle(isDark);
 const TABS: { id: Tab; label: string }[] = [
   { id: "history", label: "History" },
   { id: "books", label: "Downloads" },
-  { id: "logs", label: "Logs" }
+  { id: "activity", label: "Activity" }
 ];
 
 function selectTab(tab: Tab) {
@@ -89,13 +91,18 @@ function selectTab(tab: Tab) {
         <button
           v-for="tab in TABS"
           :key="tab.id"
-          class="flex-1 text-xs py-1.5 rounded-md font-medium transition-all"
+          class="flex-1 text-xs py-1.5 rounded-md font-medium transition-all relative"
           :class="activeTab === tab.id
             ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-50 shadow-sm'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
           @click="selectTab(tab.id)"
         >
           {{ tab.label }}
+          <span
+            v-if="tab.id === 'activity' && taskStore.activeCount > 0"
+            class="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 text-[9px] font-bold leading-none rounded-full bg-blue-500 text-white flex items-center justify-center">
+            {{ taskStore.activeCount }}
+          </span>
         </button>
       </div>
     </div>
@@ -104,7 +111,7 @@ function selectTab(tab: Tab) {
     <div class="flex-1 overflow-hidden">
       <HistoryPanel v-if="activeTab === 'history'" />
       <LibraryPanel v-else-if="activeTab === 'books'" />
-      <LogsPanel v-else />
+      <ActivityPanel v-else />
     </div>
 
     <!-- Footer -->

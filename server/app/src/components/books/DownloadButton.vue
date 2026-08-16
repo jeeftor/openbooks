@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { DownloadCloud, Loader, Clock, Sparkles } from "lucide-vue-next";
 import { useAppStore } from "../../stores/app";
-import { sendMessage } from "../../composables/useWebSocket";
+import { sendMessage, registerDownloadTask } from "../../composables/useWebSocket";
 import { MessageType } from "../../types/messages";
 
 const props = defineProps<{
@@ -20,6 +20,7 @@ const clicked = computed(() => appStore.clickedDownloads.has(props.book));
 
 function handleDownload() {
   if (clicked.value) return;
+  registerDownloadTask(props.book, props.title);
   appStore.addInFlightDownload(props.book);
   sendMessage({
     type: MessageType.DOWNLOAD,

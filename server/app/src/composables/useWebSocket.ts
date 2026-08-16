@@ -20,6 +20,7 @@ import {
 import { useAppStore } from "../stores/app";
 import { useHistoryStore } from "../stores/history";
 import { useNotificationStore } from "../stores/notifications";
+import { useTaskStore } from "../stores/tasks";
 
 const MAX_RETRIES = 10;
 const INITIAL_DELAY = 1000;
@@ -55,11 +56,44 @@ export function downloadFile(relativeURL?: string) {
 
 let _sendFn: ((serialized: string) => void) | null = null;
 
+// Module-level task ID tracking so IDs survive component remounts.
+let _activeSearchTaskId: string | null = null;
+const _downloadTaskIds = new Map<string, string>(); // IRC book string → task ID
+
 export function sendMessage(msg: unknown) {
   const serialized = JSON.stringify(msg);
   if (_sendFn) {
     _sendFn(serialized);
   }
+}
+
+/**
+ * Called by SearchView before sending SEARCH so the task is created immediately.
+ */
+export function registerSearchTask(query: string): void {
+  const taskStore = useTaskStore();
+  const task = taskStore.createTask('search', query, { query });
+  _activeSearchTaskId = task.id;
+}
+
+/**
+ * Called by SearchView when the 60s timeout fires with no results.
+ */
+export function markSearchTimedOut(): void {
+  if (!_activeSearchTaskId) return;
+  const taskStore = useTaskStore();
+  taskStore.updateTask(_activeSearchTaskId, { status: 'timed-out' }, 'Timed out — no response from IRC');
+  _activeSearchTaskId = null;
+}
+
+/**
+ * Called by DownloadButton before sending DOWNLOAD so the task is created immediately.
+ */
+export function registerDownloadTask(book: string, title?: string): void {
+  const taskStore = useTaskStore();
+  const label = title ?? book;
+  const task = taskStore.createTask('download', label, { bookTitle: label, phase: 'queued' });
+  _downloadTaskIds.set(book, task.id);
 }
 
 export function useWebSocket() {
@@ -89,6 +123,7 @@ export function useWebSocket() {
   }
 
   function route(event: MessageEvent) {
+    const taskStore = useTaskStore();
     const response = JSON.parse(event.data as string) as WsResponse;
     const timestamp = Date.now();
     const notification: AppNotification = { ...response, timestamp };
@@ -116,30 +151,82 @@ export function useWebSocket() {
             appStore.setActiveItem(updated);
           }
         }
+        // Update search task
+        if (_activeSearchTaskId) {
+          const resultCount = books?.length ?? 0;
+          const errorCount = errors?.length ?? 0;
+          const summary = resultCount > 0
+            ? `${resultCount} result${resultCount === 1 ? '' : 's'}${errorCount > 0 ? `, ${errorCount} error${errorCount === 1 ? '' : 's'}` : ''}`
+            : 'No results';
+          taskStore.updateTask(_activeSearchTaskId, { status: 'done', resultCount, errorCount }, summary);
+          _activeSearchTaskId = null;
+        }
         break;
       }
-      case MessageType.DOWNLOAD:
+      case MessageType.DOWNLOAD: {
+        const completedBook = appStore.inFlightDownloads[0];
         downloadFile((response as DownloadResponse).downloadPath);
         appStore.removeInFlightDownload();
+        if (completedBook) {
+          const taskId = _downloadTaskIds.get(completedBook);
+          if (taskId) {
+            taskStore.updateTask(taskId, { status: 'done', phase: 'done' }, 'Download complete');
+            _downloadTaskIds.delete(completedBook);
+          }
+        }
         break;
-      case MessageType.RENAME_PROMPT:
+      }
+      case MessageType.RENAME_PROMPT: {
         appStore.pendingRename = response as RenamePromptResponse;
         appStore.waitingDownload = null;
         appStore.setDownloadPhase(null);
+        const activeBook = appStore.inFlightDownloads[0];
+        if (activeBook) {
+          const taskId = _downloadTaskIds.get(activeBook);
+          if (taskId) taskStore.updateTask(taskId, { phase: 'rename' }, 'Rename prompt');
+        }
         return;
+      }
       case MessageType.DOWNLOAD_WAITING: {
         const dw = response as DownloadWaitingResponse;
         appStore.waitingDownload = dw.active ? dw : null;
+        const waitingBook = appStore.inFlightDownloads[0];
+        if (waitingBook && dw.active) {
+          const taskId = _downloadTaskIds.get(waitingBook);
+          if (taskId) {
+            taskStore.updateTask(taskId, {
+              status: 'active',
+              phase: 'waiting',
+              bookTitle: dw.bookTitle ?? undefined,
+            }, `Waiting for ${dw.bot ?? 'bot'}`);
+          }
+        }
         return;
       }
-      case MessageType.DOWNLOAD_STARTED:
+      case MessageType.DOWNLOAD_STARTED: {
         appStore.setDownloadPhase("transferring");
+        const transferBook = appStore.inFlightDownloads[0];
+        if (transferBook) {
+          const taskId = _downloadTaskIds.get(transferBook);
+          if (taskId) taskStore.updateTask(taskId, { phase: 'transferring' }, 'Transfer started');
+        }
         return;
-      case MessageType.POST_PROCESS_STARTED:
+      }
+      case MessageType.POST_PROCESS_STARTED: {
         appStore.setDownloadPhase("cleaning");
+        const cleanBook = appStore.inFlightDownloads[0];
+        if (cleanBook) {
+          const taskId = _downloadTaskIds.get(cleanBook);
+          if (taskId) taskStore.updateTask(taskId, { phase: 'cleaning' }, 'Post-processing');
+        }
         return;
+      }
       case MessageType.RATELIMIT:
         historyStore.deleteItem(undefined);
+        if (_activeSearchTaskId) {
+          taskStore.updateTask(_activeSearchTaskId, { status: 'failed' }, 'Rate limited');
+          _activeSearchTaskId = null;
+        }
         break;
       case MessageType.STAGED_BOOKS_NOTIFY:
         appStore.setStagedBooksCount((response as StagedBooksNotifyResponse).count);

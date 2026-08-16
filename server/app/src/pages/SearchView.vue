@@ -4,7 +4,7 @@ import { useMediaQuery } from "@vueuse/core";
 import { Search, PanelLeftOpen, Loader, Wifi, WifiOff, Download, RefreshCw } from "lucide-vue-next";
 import { useAppStore } from "../stores/app";
 import { useHistoryStore } from "../stores/history";
-import { sendMessage } from "../composables/useWebSocket";
+import { sendMessage, registerSearchTask, markSearchTimedOut } from "../composables/useWebSocket";
 import { MessageType } from "../types/messages";
 import { useServers } from "../composables/useApi";
 import BookTable from "../components/books/BookTable.vue";
@@ -116,6 +116,7 @@ function issueSearch(q: string) {
   const timestamp = Date.now();
   appStore.setActiveItem({ query: q, timestamp });
   historyStore.addItem({ query: q, timestamp });
+  registerSearchTask(q);
   sendMessage({ type: MessageType.SEARCH, payload: { query: q } });
   isSearching.value = true;
 
@@ -128,6 +129,7 @@ function issueSearch(q: string) {
       appStore.setActiveItem(timedOut);
       historyStore.updateItem(timedOut);
     }
+    markSearchTimedOut();
     isSearching.value = false;
     searchTimeout = null;
   }, 60000);
