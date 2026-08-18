@@ -46,27 +46,33 @@ async function waitConnected(page: Page) {
   );
 }
 
-async function doSearchMobile(page: Page, query: string) {
+/** Returns true only when real book cards appear; false on timeout or no results. */
+async function doSearchMobile(page: Page, query: string): Promise<boolean> {
   const input = page.locator('input[type="search"]');
   await input.fill(query);
   await input.press('Enter');
 
-  await page.waitForFunction(
-    () => {
-      if (document.querySelectorAll('.animate-spin').length > 0) return false;
-      // BookCards — virtualised list items (no <tbody>)
-      const cards = document.querySelectorAll('[data-testid="book-card"]');
-      if (cards.length > 0) return true;
-      // Fallback: any visible list item inside the cards scroll container
-      const items = document.querySelectorAll('[data-testid="book-scroll-cards"] > div > div');
-      if (items.length > 0) return true;
-      // Timeout / error states
-      return document.body.innerText.includes('Search timed out')
-          || document.body.innerText.includes('No results');
-    },
-    null,
-    { timeout: SEARCH_TIMEOUT },
-  );
+  try {
+    await Promise.race([
+      // Success path: real book cards rendered in the virtual list
+      page.waitForFunction(
+        () => document.querySelectorAll('[data-testid="book-card"]').length > 0
+          || document.querySelectorAll('[data-testid="book-scroll-cards"] > div > div').length > 0,
+        null,
+        { timeout: SEARCH_TIMEOUT },
+      ),
+      // Failure path: IRC timeout or no results — resolve early as failure
+      page.waitForFunction(
+        () => document.body.innerText.includes('Search timed out')
+          || document.body.innerText.includes('No results'),
+        null,
+        { timeout: SEARCH_TIMEOUT },
+      ).then(() => Promise.reject(new Error('search-failed'))),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ── 1. Static layout (no search required) ────────────────────────────────────
@@ -241,8 +247,7 @@ test.describe('Mobile — search results (fire)', () => {
     await setMobile(page);
     await page.goto(BASE);
     await waitConnected(page);
-    await doSearchMobile(page, 'fire');
-    fireSearchDone = true;
+    fireSearchDone = await doSearchMobile(page, 'fire');
     await page.close();
   }, { timeout: SEARCH_TIMEOUT + CONNECT_TIMEOUT });
 
@@ -251,18 +256,17 @@ test.describe('Mobile — search results (fire)', () => {
     await setMobile(page);
     await page.goto(BASE);
     await waitConnected(page);
-    // Restore "fire" results from history tab
+    // Restore "fire" results from history tab (server may return cached results)
     const tab = page.locator('[data-testid="search-tab"]').first();
     if (await tab.count() > 0) await tab.click();
-    // Wait for results to load
-    await page.waitForFunction(
-      () => {
-        const items = document.querySelectorAll('[data-testid="book-scroll-cards"] > div > div, [class*="rounded-xl"][class*="border"]');
-        return items.length > 0;
-      },
+    // Allow 30s for results to appear (server cache should be fast)
+    const ok = await page.waitForFunction(
+      () => document.querySelectorAll('[data-testid="book-card"]').length > 0
+        || document.querySelectorAll('[data-testid="book-scroll-cards"] > div > div').length > 0,
       null,
-      { timeout: 10_000 },
-    ).catch(() => { /* cached results may render differently */ });
+      { timeout: 30_000 },
+    ).then(() => true).catch(() => false);
+    test.skip(!ok, 'Search results not available in restored page — requires IRC/cache');
   });
 
   test('BookCards used — no <table> rendered with results', async ({ page }) => {

@@ -111,7 +111,7 @@ watch(
     </div>
 
     <!-- Virtual list -->
-    <div ref="scrollContainer" class="flex-1 overflow-auto">
+    <div ref="scrollContainer" data-testid="book-scroll-cards" class="flex-1 overflow-auto">
       <div :style="{ height: virtualizer.getTotalSize() + 'px', position: 'relative' }">
         <div
           v-for="vItem in virtualizer.getVirtualItems()"
@@ -123,7 +123,7 @@ watch(
             padding: '4px 12px'
           }"
           :class="prefStore.showUnmatched && vItem.index >= matchedBooks.length ? 'opacity-30' : ''">
-          <div class="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/60 shadow-sm">
+          <div data-testid="book-card" class="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/60 shadow-sm">
             <!-- Text -->
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate leading-snug">
