@@ -77,7 +77,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col">
     <!-- Filter bar -->
     <div
       class="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-slate-200 dark:border-slate-700">

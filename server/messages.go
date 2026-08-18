@@ -40,6 +40,7 @@ const (
 	HISTORY_DELETE       // client → server: delete one history entry by timestamp
 	HISTORY_CLEAR        // client → server: delete all history entries
 	SERVER_LIST          // server → client: updated IRC server list with timestamp
+	DOWNLOAD_FAILED      // server → client: book download failed (DCC error or staging failure)
 )
 
 type NotificationType int
@@ -300,6 +301,14 @@ func newPostProcessStartedResponse() StatusResponse {
 func newErrorResponse(title string) StatusResponse {
 	return StatusResponse{
 		MessageType:      STATUS,
+		NotificationType: DANGER,
+		Title:            title,
+	}
+}
+
+func newDownloadFailedResponse(title string) StatusResponse {
+	return StatusResponse{
+		MessageType:      DOWNLOAD_FAILED,
 		NotificationType: DANGER,
 		Title:            title,
 	}

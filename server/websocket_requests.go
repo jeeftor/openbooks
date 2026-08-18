@@ -192,15 +192,16 @@ func broadcastToClients(clients []*Client, msg interface{}) {
 }
 
 // sendSearchRequest checks the server-side result cache and either returns cached
-// results immediately or enqueues the query in the session's search queue.
+// results immediately, subscribes to an in-flight IRC query, or enqueues a new search.
 func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 	sess := server.getSession(c.uuid)
 	if sess == nil {
 		return
 	}
 
-	// Serve from cache when a recent result exists.
-	if cached, ok := server.resultCache.Get(s.Query); ok {
+	cached, ch, fromCache := server.resultCache.GetOrSubscribe(s.Query)
+	if fromCache {
+		// Serve fresh cached result immediately.
 		cachedAt := cached.Timestamp
 		resp := newSearchResponse(cached.Books, cached.Errors, "")
 		resp.CachedAt = &cachedAt
@@ -210,6 +211,26 @@ func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 		return
 	}
 
+	if ch != nil {
+		// Same query already in-flight — wait for the result rather than firing duplicate IRC.
+		server.logBuf.info(fmt.Sprintf("🔁 Deduped search for %q — waiting for in-flight result", s.Query))
+		c.send <- newStatusResponse(NOTIFY, "Search in progress — waiting for results.")
+		go func() {
+			select {
+			case result := <-ch:
+				if result != nil {
+					cachedAt := result.Timestamp
+					resp := newSearchResponse(result.Books, result.Errors, "")
+					resp.CachedAt = &cachedAt
+					safeSend(c, resp)
+				}
+			case <-c.ctx.Done():
+			}
+		}()
+		return
+	}
+
+	// New query — enqueue to IRC.
 	pending := len(sess.searchQueue)
 	if pending > 0 {
 		c.log.Printf("Search queued (position %d): %q\n", pending+1, s.Query)
@@ -222,6 +243,8 @@ func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 	select {
 	case sess.searchQueue <- searchJob{query: s.Query}:
 	default:
+		// Queue is full — cancel the in-flight mark so subscribers aren't left waiting.
+		server.resultCache.CancelInFlight(s.Query)
 		c.send <- newStatusResponse(WARNING, "Search queue is full. Please wait before searching again.")
 	}
 }

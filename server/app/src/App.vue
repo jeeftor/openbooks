@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { useDark, useMediaQuery } from "@vueuse/core";
+import { ref } from "vue";
+import { useDark } from "@vueuse/core";
 import { Toaster } from "vue-sonner";
 import { useWebSocket } from "./composables/useWebSocket";
-import { useAppStore } from "./stores/app";
-import Sidebar from "./components/layout/Sidebar.vue";
-import MobileNav from "./components/layout/MobileNav.vue";
+import AppHeader from "./components/layout/AppHeader.vue";
+import SearchTabBar from "./components/layout/SearchTabBar.vue";
+import FloatingTaskPanel from "./components/layout/FloatingTaskPanel.vue";
 import SearchView from "./pages/SearchView.vue";
+import LibraryPanel from "./components/sidebar/LibraryPanel.vue";
 import NotificationDrawer from "./components/notifications/NotificationDrawer.vue";
 import RenameModal from "./components/RenameModal.vue";
 import StagedBooksModal from "./components/StagedBooksModal.vue";
@@ -13,22 +15,36 @@ import StagedBooksListModal from "./components/StagedBooksListModal.vue";
 import StagedRenameModal from "./components/StagedRenameModal.vue";
 import DownloadWaitingBanner from "./components/DownloadWaitingBanner.vue";
 
-useDark({ storageKey: 'ob-dark-mode', initialValue: 'dark' });
+useDark({ storageKey: "ob-dark-mode", initialValue: "dark" });
 useWebSocket();
 
-const appStore = useAppStore();
-const isMobile = useMediaQuery("(max-width: 767px)");
+const showLibrary = ref(false);
 </script>
 
 <template>
-  <div class="h-dvh flex overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-50" style="padding-top: env(safe-area-inset-top)">
-    <Sidebar v-if="!isMobile && appStore.isSidebarOpen" />
+  <div
+    class="h-dvh flex flex-col overflow-hidden bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-50"
+    style="padding-top: env(safe-area-inset-top)">
 
-    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <AppHeader />
+    <SearchTabBar :library-open="showLibrary" @toggle-library="showLibrary = !showLibrary" />
+
+    <main class="flex-1 overflow-hidden relative flex flex-col">
+      <!-- Library overlay (slides in from right) -->
+      <Transition name="library-slide">
+        <div
+          v-if="showLibrary"
+          class="absolute inset-0 z-10 bg-white dark:bg-slate-900 flex flex-col border-l border-slate-200 dark:border-slate-800">
+          <LibraryPanel />
+        </div>
+      </Transition>
+
       <SearchView />
     </main>
 
-    <MobileNav v-if="isMobile" />
+    <FloatingTaskPanel />
+
+    <!-- Global overlays (order matters for z-index stacking) -->
     <NotificationDrawer />
     <RenameModal />
     <StagedBooksModal />
@@ -38,3 +54,15 @@ const isMobile = useMediaQuery("(max-width: 767px)");
     <Toaster rich-colors position="top-center" />
   </div>
 </template>
+
+<style>
+.library-slide-enter-active,
+.library-slide-leave-active {
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.library-slide-enter-from,
+.library-slide-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
+</style>

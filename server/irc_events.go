@@ -44,18 +44,21 @@ func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer, srv 
 		if err != nil {
 			lb.error(fmt.Sprintf("Search download failed: %v", err))
 			broadcastToClients(sess.getClients(), newErrorResponse("Error when downloading search results."))
+			srv.resultCache.CancelInFlight(sess.query)
 			return
 		}
 
 		bookResults, parseErrors, err := core.ParseSearchFile(extractedPath)
 		if err != nil {
 			broadcastToClients(sess.getClients(), newErrorResponse("Error when parsing search results."))
+			srv.resultCache.CancelInFlight(sess.query)
 			return
 		}
 		rawResults, _ := os.ReadFile(extractedPath)
 
 		if len(bookResults) == 0 && len(parseErrors) == 0 {
 			sess.noResultsHandler()(text)
+			srv.resultCache.CancelInFlight(sess.query)
 			return
 		}
 
@@ -63,9 +66,9 @@ func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer, srv 
 		broadcastToClients(sess.getClients(), newSearchResponse(bookResults, parseErrors, string(rawResults)))
 		os.Remove(extractedPath)
 
-		// Cache the results so other sessions can get them without hitting IRC.
+		// Cache the results and notify any deduplicated waiters.
 		if sess.query != "" {
-			srv.resultCache.Set(sess.query, bookResults, parseErrors, sess.username)
+			srv.resultCache.Resolve(sess.query, bookResults, parseErrors, sess.username)
 		}
 
 		// Record the search in server-side history.
@@ -99,6 +102,7 @@ func (sess *session) bookResultHandler(
 
 		if err := staging.EnsureStagingDir(dir); err != nil {
 			lb.error("Failed to create staging directory.")
+			broadcastToClients(sess.getClients(), newDownloadFailedResponse("Failed to prepare download directory."))
 			if handle != nil {
 				handle.release()
 			}
@@ -125,7 +129,7 @@ func (sess *session) bookResultHandler(
 		extractedPath, err := core.DownloadExtractDCCString(stage, text, nil)
 		if err != nil {
 			sess_lb.error(fmt.Sprintf("Download failed: %v", err))
-			broadcastToClients(sess.getClients(), newErrorResponse("Error when downloading book."))
+			broadcastToClients(sess.getClients(), newDownloadFailedResponse("Error when downloading book."))
 			if handle != nil {
 				handle.release()
 			}

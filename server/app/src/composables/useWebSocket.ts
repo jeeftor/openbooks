@@ -56,8 +56,10 @@ export function downloadFile(relativeURL?: string) {
 
 let _sendFn: ((serialized: string) => void) | null = null;
 
-// Module-level task ID tracking so IDs survive component remounts.
-let _activeSearchTaskId: string | null = null;
+// Module-level task tracking so IDs survive component remounts.
+// _searchTaskQueue is FIFO: front = currently being searched by IRC.
+interface SearchTaskEntry { id: string; query: string; }
+const _searchTaskQueue: SearchTaskEntry[] = [];
 const _downloadTaskIds = new Map<string, string>(); // IRC book string → task ID
 
 export function sendMessage(msg: unknown) {
@@ -69,26 +71,58 @@ export function sendMessage(msg: unknown) {
 
 /**
  * Called by SearchView before sending SEARCH so the task is created immediately.
- * If a previous search task is still active (rapid re-search), marks it cancelled.
+ * Queues behind any already-running searches rather than superseding them.
  */
 export function registerSearchTask(query: string): void {
   const taskStore = useTaskStore();
-  if (_activeSearchTaskId) {
-    taskStore.updateTask(_activeSearchTaskId, { status: 'failed' }, 'Superseded by new search');
-    _activeSearchTaskId = null;
-  }
-  const task = taskStore.createTask('search', query, { query });
-  _activeSearchTaskId = task.id;
+  const isFirst = _searchTaskQueue.length === 0;
+  const now = Date.now();
+  const task = taskStore.createTask('search', query, {
+    status: isFirst ? 'active' : 'queued',
+    events: [{ time: now, message: isFirst ? 'Started' : 'Queued', level: 'info' as const }],
+    meta: { query },
+    activeAt: isFirst ? now : undefined,
+  });
+  _searchTaskQueue.push({ id: task.id, query });
+}
+
+/** Returns the query currently being IRC-searched (front of FIFO queue). */
+export function getActiveSearchQuery(): string | undefined {
+  return _searchTaskQueue[0]?.query;
 }
 
 /**
  * Called by SearchView when the 60s timeout fires with no results.
+ * Accepts the query so it can verify the front of the queue still matches
+ * before shifting — prevents corrupting the queue when results arrived
+ * while the user was viewing a different tab (and the timeout wasn't cleared).
  */
-export function markSearchTimedOut(): void {
-  if (!_activeSearchTaskId) return;
+export function markSearchTimedOut(query: string): void {
+  if (!query || _searchTaskQueue[0]?.query !== query) return;
+  const entry = _searchTaskQueue.shift()!;
   const taskStore = useTaskStore();
-  taskStore.updateTask(_activeSearchTaskId, { status: 'timed-out' }, 'Timed out — no response from IRC');
-  _activeSearchTaskId = null;
+  taskStore.updateTask(entry.id, { status: 'timed-out' }, 'Timed out — no response from IRC');
+  // Promote the next queued search to active
+  const next = _searchTaskQueue[0];
+  if (next) taskStore.updateTask(next.id, { status: 'active', activeAt: Date.now() }, 'Started');
+}
+
+/**
+ * Called when the user explicitly saves a download for later via the rename modal.
+ * Clears the in-flight download state and marks the task done without waiting for
+ * a server round-trip (the server only sends STAGED_BOOKS_NOTIFY, not DOWNLOAD).
+ */
+export function markActiveDownloadStaged(): void {
+  const appStore = useAppStore();
+  const taskStore = useTaskStore();
+  const book = appStore.inFlightDownloads[0];
+  if (!book) return;
+  const taskId = _downloadTaskIds.get(book);
+  if (taskId) {
+    taskStore.updateTask(taskId, { status: 'done', phase: 'staged' }, 'Saved for later');
+    _downloadTaskIds.delete(book);
+  }
+  appStore.removeInFlightDownload();
 }
 
 /**
@@ -143,10 +177,14 @@ export function useWebSocket() {
         return;
       case MessageType.SEARCH: {
         const { books, errors, raw, cachedAt } = response as SearchResponse;
-        // Route results to the oldest pending (in-flight) history item, in
-        // case the user navigated to a different item while waiting.
-        const pending = historyStore.items.find(i => i.results === undefined && !i.timedOut);
-        const target = pending ?? appStore.activeItem;
+        // Route results to the correct history item.
+        // Match by query from the front of the FIFO queue (server processes in order).
+        // historyStore.items never carries results directly (updateItem strips them),
+        // so we cannot use i.results === undefined to find the pending item.
+        const completedEntry = _searchTaskQueue[0]; // peek before shifting
+        const target = completedEntry
+          ? (historyStore.items.find(i => i.query === completedEntry.query) ?? appStore.activeItem)
+          : appStore.activeItem;
         if (target) {
           const updated = { ...target, results: books, errors, cachedAt };
           appStore.setRawSearchResult(target.timestamp, raw);
@@ -156,15 +194,17 @@ export function useWebSocket() {
             appStore.setActiveItem(updated);
           }
         }
-        // Update search task
-        if (_activeSearchTaskId) {
+        // Complete the task and promote the next queued search
+        const done = _searchTaskQueue.shift();
+        if (done) {
           const resultCount = books?.length ?? 0;
           const errorCount = errors?.length ?? 0;
           const summary = resultCount > 0
             ? `${resultCount} result${resultCount === 1 ? '' : 's'}${errorCount > 0 ? `, ${errorCount} error${errorCount === 1 ? '' : 's'}` : ''}`
             : 'No results';
-          taskStore.updateTask(_activeSearchTaskId, { status: 'done', resultCount, errorCount }, summary);
-          _activeSearchTaskId = null;
+          taskStore.updateTask(done.id, { status: 'done', resultCount, errorCount }, summary);
+          const next = _searchTaskQueue[0];
+          if (next) taskStore.updateTask(next.id, { status: 'active', activeAt: Date.now() }, 'Started');
         }
         break;
       }
@@ -177,6 +217,20 @@ export function useWebSocket() {
           if (taskId) {
             taskStore.updateTask(taskId, { status: 'done', phase: 'done' }, 'Download complete');
             _downloadTaskIds.delete(completedBook);
+          }
+        }
+        break;
+      }
+      case MessageType.DOWNLOAD_FAILED: {
+        const failedBook = appStore.inFlightDownloads[0];
+        appStore.removeInFlightDownload();
+        appStore.waitingDownload = null;
+        appStore.setDownloadPhase(null);
+        if (failedBook) {
+          const taskId = _downloadTaskIds.get(failedBook);
+          if (taskId) {
+            taskStore.updateTask(taskId, { status: 'failed' }, 'Download failed');
+            _downloadTaskIds.delete(failedBook);
           }
         }
         break;
@@ -226,13 +280,19 @@ export function useWebSocket() {
         }
         return;
       }
-      case MessageType.RATELIMIT:
-        historyStore.deleteItem(undefined);
-        if (_activeSearchTaskId) {
-          taskStore.updateTask(_activeSearchTaskId, { status: 'failed' }, 'Rate limited');
-          _activeSearchTaskId = null;
+      case MessageType.RATELIMIT: {
+        const rateLimited = _searchTaskQueue.shift();
+        if (rateLimited) {
+          taskStore.updateTask(rateLimited.id, { status: 'failed' }, 'Rate limited');
+          // Mark the tab as timed-out (shows WifiOff icon) rather than deleting it.
+          const histItem = historyStore.items.find(i => i.query === rateLimited.query);
+          if (histItem) historyStore.updateItem({ ...histItem, timedOut: true });
+          // Promote next search to active — server already has it in its cooldown queue.
+          const next = _searchTaskQueue[0];
+          if (next) taskStore.updateTask(next.id, { status: 'active', activeAt: Date.now() }, 'Started');
         }
         break;
+      }
       case MessageType.STAGED_BOOKS_NOTIFY:
         appStore.setStagedBooksCount((response as StagedBooksNotifyResponse).count);
         return;
@@ -321,7 +381,7 @@ export function useWebSocket() {
   onUnmounted(() => {
     if (retryTimeout) clearTimeout(retryTimeout);
     _sendFn = null;
-    _activeSearchTaskId = null;
+    _searchTaskQueue.length = 0;
     _downloadTaskIds.clear();
     socket?.close(1000, "App unmounted");
   });

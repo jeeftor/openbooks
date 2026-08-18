@@ -176,16 +176,32 @@ function confirm() {
       stagedId: b.stagedId,
     },
   });
+  // Remove from the list optimistically so it's gone when the list reappears.
+  if (appStore.stagedBooksList) {
+    appStore.setStagedBooksList(appStore.stagedBooksList.filter(x => x.id !== b.stagedId));
+  }
   appStore.setPendingStagedBook(null);
 }
 
 function saveLater() {
   const b = book.value;
   if (!b) return;
+  // Book stays staged — just close the rename modal and return to the list.
   sendMessage({
     type: MessageType.STAGED_QUEUE_LATER,
     payload: { stagedId: b.stagedId },
   });
+  appStore.setPendingStagedBook(null);
+}
+
+function deleteBook() {
+  const b = book.value;
+  if (!b) return;
+  sendMessage({ type: MessageType.DELETE_STAGED, payload: { stagedId: b.stagedId } });
+  // Remove from the list optimistically.
+  if (appStore.stagedBooksList) {
+    appStore.setStagedBooksList(appStore.stagedBooksList.filter(x => x.id !== b.stagedId));
+  }
   appStore.setPendingStagedBook(null);
 }
 
@@ -423,19 +439,27 @@ function saveLater() {
         </div>
 
         <!-- Footer -->
-        <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-3">
+        <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
           <button
-            @click="saveLater"
-            class="px-4 py-2 text-sm rounded-lg border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+            @click="deleteBook"
+            class="px-4 py-2 text-sm rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
           >
-            Save Later
+            Delete
           </button>
-          <button
-            @click="confirm"
-            class="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-          >
-            Save Book
-          </button>
+          <div class="flex items-center gap-3">
+            <button
+              @click="saveLater"
+              class="px-4 py-2 text-sm rounded-lg border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+            >
+              Save Later
+            </button>
+            <button
+              @click="confirm"
+              class="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            >
+              Save Book
+            </button>
+          </div>
         </div>
       </div>
     </div>
