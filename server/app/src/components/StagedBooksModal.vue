@@ -12,11 +12,17 @@ const appStore = useAppStore();
 const dismissed = useSessionStorage("ob-staged-dismissed", false);
 
 // Only auto-show when transitioning from 0 staged books → some.
-// Do NOT re-show every time a new book is added — the user knows they staged it.
+// Skip when the user themselves just clicked "Save for Later" — they already know.
 watch(
   () => appStore.stagedBooksCount,
   (count, prev) => {
-    if ((prev ?? 0) === 0 && count > 0) dismissed.value = false;
+    if ((prev ?? 0) === 0 && count > 0) {
+      if (appStore.justStagedBook) {
+        appStore.justStagedBook = false;
+        return;
+      }
+      dismissed.value = false;
+    }
   }
 );
 

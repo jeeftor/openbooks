@@ -122,6 +122,8 @@ export function markActiveDownloadStaged(): void {
     taskStore.updateTask(taskId, { status: 'done', phase: 'staged' }, 'Saved for later');
     _downloadTaskIds.delete(book);
   }
+  // Tell StagedBooksModal the user explicitly staged this — suppress the popup.
+  appStore.justStagedBook = true;
   appStore.removeInFlightDownload();
 }
 

@@ -42,6 +42,10 @@ export const useAppStore = defineStore("app", () => {
   // Number of books waiting in staging (from STAGED_BOOKS_NOTIFY).
   const stagedBooksCount = ref(0);
 
+  // Set by markActiveDownloadStaged so StagedBooksModal knows the user
+  // explicitly staged a book and doesn't need a "hey you have staged books" popup.
+  const justStagedBook = ref(false);
+
   // The staged book currently being processed (from STAGED_BOOK_RESUME).
   const pendingStagedBook = ref<StagedBookResumeResponse | null>(null);
   const stagedBooksList = ref<StagedBookSummary[] | null>(null); // null = list closed
@@ -162,6 +166,7 @@ export const useAppStore = defineStore("app", () => {
     toggleLibrarySortMode,
     clickedDownloads,
     isDownloading,
+    justStagedBook,
     setStagedBooksCount,
     setPendingStagedBook,
     setStagedBooksList,
