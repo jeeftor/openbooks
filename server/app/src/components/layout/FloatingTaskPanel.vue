@@ -48,6 +48,7 @@ function phaseLabel(task: Task): string {
   <Transition name="task-panel-fade">
     <div
       v-if="hasAny"
+      data-testid="task-panel"
       class="fixed z-40"
       :class="[
         'bottom-4 right-4',

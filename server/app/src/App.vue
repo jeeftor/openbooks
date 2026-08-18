@@ -14,6 +14,7 @@ import StagedBooksModal from "./components/StagedBooksModal.vue";
 import StagedBooksListModal from "./components/StagedBooksListModal.vue";
 import StagedRenameModal from "./components/StagedRenameModal.vue";
 import DownloadWaitingBanner from "./components/DownloadWaitingBanner.vue";
+import MobileNav from "./components/layout/MobileNav.vue";
 
 useDark({ storageKey: "ob-dark-mode", initialValue: "dark" });
 useWebSocket();
@@ -42,7 +43,15 @@ const showLibrary = ref(false);
       <SearchView />
     </main>
 
+    <!-- Spacer so content doesn't disappear under the fixed MobileNav bar (mobile only) -->
+    <div class="h-14 flex-shrink-0 md:hidden" />
+
     <FloatingTaskPanel />
+
+    <!-- Mobile bottom navigation (hidden on md+ breakpoint) -->
+    <div class="md:hidden">
+      <MobileNav />
+    </div>
 
     <!-- Global overlays (order matters for z-index stacking) -->
     <NotificationDrawer />
