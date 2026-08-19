@@ -87,6 +87,8 @@ type Config struct {
 	MCPFormats        []string      // file format filter for MCP searches (default: epub)
 	ResultCacheTTL    time.Duration // how long cached search results are valid (default: 60m)
 	ResultCacheSize   int           // max number of distinct queries to cache (default: 100)
+	AutoRename        bool          // skip rename prompt and auto-select AutoRenameOption
+	AutoRenameOption  string        // which option to auto-select when AutoRename is on (default: author-title-flat)
 }
 
 func New(config Config) *server {
@@ -226,6 +228,9 @@ func Start(config Config) {
 	srv.log.Printf("Base path:              %s", config.Basepath)
 	srv.log.Printf("Download directory:     %s", config.DownloadDir)
 	srv.log.Printf("Organize downloads:     %v", config.OrganizeDownloads)
+	if config.AutoRename {
+		srv.log.Printf("Auto-rename:            %v (option: %s)", config.AutoRename, config.AutoRenameOption)
+	}
 	srv.log.Printf("Dev mode:               %v", config.DevMode)
 	srv.log.Printf("IRC server:             %s (TLS: %v)", config.Server, config.EnableTLS)
 	srv.log.Printf("Username:               %s", config.UserName)

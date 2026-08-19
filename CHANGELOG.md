@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **`--auto-rename` flag:** Skip the rename prompt entirely and auto-save downloads using a configurable naming scheme. Perfect for headless / automated workflows where you just want books saved as `Author - Title.epub` without babysitting popups. Use with `--auto-rename-option` to choose the naming scheme (default: `author-title-flat`, i.e. `Author - Title.ext`). Other options: `keep`, `title`, `organized`, `series`.
+
 ### Fixed
 
 - **Removed dead `--no-browser-downloads` and `--persist` docs:** These flags were leftover from the upstream fork and never existed in this fork's code. The docs configuration table, docker setup, getting-started, and binary setup pages no longer reference them. This fork is disk-first by design — downloads always save to the configured `--dir` directory.
