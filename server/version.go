@@ -28,7 +28,7 @@ func newVersionInfo(version string, commitSHA string, buildDate string) VersionI
 	}
 
 	info := VersionInfo{
-		DisplayVersion: devDisplayVersion(commitSHA),
+		DisplayVersion: nonReleaseDisplayVersion(rawVersion, commitSHA),
 		RawVersion:     rawVersion,
 		CommitSHA:      normalizeBuildValue(commitSHA),
 		BuildDate:      normalizeBuildValue(buildDate),
@@ -50,13 +50,18 @@ func newVersionInfo(version string, commitSHA string, buildDate string) VersionI
 	return info
 }
 
-// devDisplayVersion returns a compact non-release label for UI display.
-func devDisplayVersion(commitSHA string) string {
+// nonReleaseDisplayVersion returns a compact branch/channel label for UI display.
+func nonReleaseDisplayVersion(version string, commitSHA string) string {
+	label := strings.TrimSpace(version)
+	if label == "" || label == "unknown" {
+		label = "dev"
+	}
+
 	shortSHA := shortCommitSHA(commitSHA)
 	if shortSHA == "" {
-		return "dev"
+		return label
 	}
-	return "dev " + shortSHA
+	return label + " " + shortSHA
 }
 
 // shortCommitSHA returns the abbreviated commit used in dev build labels.

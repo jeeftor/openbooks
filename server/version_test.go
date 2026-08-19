@@ -59,20 +59,45 @@ func TestNewVersionInfoSupportsPrereleaseBuildMetadata(t *testing.T) {
 	}
 }
 
-func TestNewVersionInfoDevBuildUsesCommitLabel(t *testing.T) {
+func TestNewVersionInfoBranchBuildUsesChannelAndCommitLabel(t *testing.T) {
 	info := newVersionInfo("master", "abcdef1234567890", "unknown")
 
 	if info.IsRelease {
-		t.Fatal("expected dev version")
+		t.Fatal("expected non-release version")
 	}
-	if info.DisplayVersion != "dev abcdef1" {
-		t.Fatalf("display version = %q, want %q", info.DisplayVersion, "dev abcdef1")
+	if info.DisplayVersion != "master abcdef1" {
+		t.Fatalf("display version = %q, want %q", info.DisplayVersion, "master abcdef1")
 	}
 	if info.ReleaseNotesURL != "" {
 		t.Fatalf("release notes URL = %q, want empty", info.ReleaseNotesURL)
 	}
 	if info.RawVersion != "master" {
 		t.Fatalf("raw version = %q, want %q", info.RawVersion, "master")
+	}
+}
+
+func TestNewVersionInfoDevBuildKeepsGenericDevLabel(t *testing.T) {
+	info := newVersionInfo("dev", "abcdef1234567890", "unknown")
+
+	if info.IsRelease {
+		t.Fatal("expected non-release version")
+	}
+	if info.DisplayVersion != "dev abcdef1" {
+		t.Fatalf("display version = %q, want %q", info.DisplayVersion, "dev abcdef1")
+	}
+	if info.RawVersion != "dev" {
+		t.Fatalf("raw version = %q, want %q", info.RawVersion, "dev")
+	}
+}
+
+func TestNewVersionInfoUnknownBuildFallsBackToDev(t *testing.T) {
+	info := newVersionInfo("unknown", "unknown", "unknown")
+
+	if info.IsRelease {
+		t.Fatal("expected non-release version")
+	}
+	if info.DisplayVersion != "dev" {
+		t.Fatalf("display version = %q, want %q", info.DisplayVersion, "dev")
 	}
 }
 
