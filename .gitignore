@@ -130,3 +130,5 @@ typings/
 
 # End of https://www.gitignore.io/api/node,go
 books/
+server/app/test-results/
+test-results/

@@ -86,11 +86,6 @@ export function registerSearchTask(query: string): void {
   _searchTaskQueue.push({ id: task.id, query });
 }
 
-/** Returns the query currently being IRC-searched (front of FIFO queue). */
-export function getActiveSearchQuery(): string | undefined {
-  return _searchTaskQueue[0]?.query;
-}
-
 /**
  * Called by SearchView when the 60s timeout fires with no results.
  * Accepts the query so it can verify the front of the queue still matches

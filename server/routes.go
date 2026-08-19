@@ -151,16 +151,6 @@ func (server *server) usernameInUseByAnotherSession(username string, userID uuid
 	return false
 }
 
-// usernameInUseByAnotherClient is kept for test compatibility; checks client map.
-func (server *server) usernameInUseByAnotherClient(username string, userID uuid.UUID) bool {
-	for clientID, client := range server.clients {
-		if clientID != userID && client.username == username {
-			return true
-		}
-	}
-	return false
-}
-
 func (server *server) staticFilesHandler(assetPath string) http.Handler {
 	// update the embedded file system's tree so that index.html is at the root
 	app, err := fs.Sub(reactClient, assetPath)

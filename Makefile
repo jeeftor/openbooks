@@ -1,6 +1,6 @@
 .PHONY: help install install-go install-npm \
         dev dev-mobile dev-mock dev-mock-mobile \
-        dev1 dev2 dev-mock1 dev-mock2 dev-cli \
+        dev1 dev2 dev-mock1 dev-mock2 \
         build build-frontend build-backend build-release \
         test test-go test-frontend type-check \
         lint lint-go lint-frontend \
@@ -46,7 +46,6 @@ help:
 	@echo "  make fmt               Format all code"
 	@echo ""
 	@echo "  ── Other ───────────────────────────────────────────────"
-	@echo "  make dev-cli           openbooks-abs CLI mode (mock IRC)"
 	@echo "  make docker            Build Docker image (distroless)"
 	@echo "  make docker-run        Run Docker image on :8080"
 	@echo "  make docker-calibre    Build calibre image (includes ebook-polish)"
@@ -162,10 +161,6 @@ dev-mock2: build-frontend
 	@echo "Backend → :5228  (mock IRC, username: $(NAME))"
 	@echo "Run 'make dev2' in another terminal once backend is ready."
 	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 --dev
-
-# ── CLI mode ──────────────────────────────────────────────────────────────────
-dev-cli:
-	cd cmd/openbooks && go build && ./openbooks cli --tls=false --server localhost:6667
 
 # ─── Build ───────────────────────────────────────────────────────────────────
 build: build-frontend build-backend

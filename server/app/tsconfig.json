@@ -17,10 +17,6 @@
   "exclude": [
     "src/**/*.tsx",
     "src/**/*.jsx",
-    "src/state/**",
-    "src/utils/**",
-    "src/components/sidebar/styles.ts",
-    "src/components/tables/styles.ts",
     "src/**/*.test.ts",
     "src/**/*.spec.ts",
     "src/**/__tests__/**",

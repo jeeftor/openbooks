@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+
+- **CLI mode deleted:** The entire `cli/` package and `cmd/openbooks/cli.go` have been removed. CLI mode was leftover from the upstream fork, had no tests, no documentation in the README, and no feature parity with server mode (missing metadata extraction, post-processing, staging, series registry). This fork is web-service-only.
+- **`github.com/schollz/progressbar/v3` dependency removed:** Only used by the deleted CLI mode.
+- **Dead Go code removed:** `server.Repository` struct (created but never read), `server.getClient()` function (never called), `server.userCtxKey` constant (never used), `server.usernameInUseByAnotherClient()` function (never called).
+- **Dead frontend code removed:** `Sidebar.vue` component (never imported), `AgeBanner.vue` shared component (never used outside tests), `getActiveSearchQuery()` export (never called), `isSidebarOpen`/`toggleSidebar()` store properties (only used by deleted Sidebar), `@tanstack/vue-table` npm dependency (unused — `@tanstack/vue-virtual` is the one in use), stale tsconfig.json exclusions for deleted React directories.
+- **Stale docs rewritten:** `docs/docs/developers/index.md` was entirely stale (referenced Task build system, React frontend, CLI mode — all removed/replaced). Rewritten to reflect the current Makefile + Vue 3 + server-only architecture.
+
+### Changed
+
+- **Docker docs updated to GHCR:** `docs/docs/setup/docker.md` and `docs/docs/getting-started.md` now reference `ghcr.io/jeeftor/openbooks-abs` instead of the upstream `evanbuss/openbooks` Docker Hub image. CLI mode references removed from configuration docs.
+
 ## v0.2.1 - 2026-08-18
 
 ### Added

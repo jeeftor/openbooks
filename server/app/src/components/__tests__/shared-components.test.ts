@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 
 import StatusDot from "../shared/StatusDot.vue";
 import FormatBadge from "../shared/FormatBadge.vue";
-import AgeBanner from "../shared/AgeBanner.vue";
 import FilterChip from "../shared/FilterChip.vue";
 import EmptyPanel from "../shared/EmptyPanel.vue";
 import PanelHeader from "../shared/PanelHeader.vue";
@@ -60,41 +59,6 @@ describe("FormatBadge", () => {
   it("renders pdf uppercased", () => {
     const wrapper = mount(FormatBadge, { props: { format: "pdf" } });
     expect(wrapper.text()).toBe("PDF");
-  });
-});
-
-// ── AgeBanner ─────────────────────────────────────────────────────────────────
-
-describe("AgeBanner", () => {
-  it("renders the message prop", () => {
-    const wrapper = mount(AgeBanner, { props: { message: "Showing cached results." } });
-    expect(wrapper.text()).toContain("Showing cached results.");
-  });
-
-  it("uses 'Search again' as the default actionLabel", () => {
-    const wrapper = mount(AgeBanner, { props: { message: "old data" } });
-    expect(wrapper.find("button").text()).toContain("Search again");
-  });
-
-  it("renders a custom actionLabel when provided", () => {
-    const wrapper = mount(AgeBanner, {
-      props: { message: "Stale data", actionLabel: "Refresh now" },
-    });
-    expect(wrapper.find("button").text()).toContain("Refresh now");
-  });
-
-  it("emits 'refresh' when the button is clicked", async () => {
-    const wrapper = mount(AgeBanner, { props: { message: "old" } });
-    await wrapper.find("button").trigger("click");
-    expect(wrapper.emitted("refresh")).toHaveLength(1);
-  });
-
-  it("renders the icon slot", () => {
-    const wrapper = mount(AgeBanner, {
-      props: { message: "old" },
-      slots: { icon: '<svg data-testid="refresh-icon" />' },
-    });
-    expect(wrapper.find('[data-testid="refresh-icon"]').exists()).toBe(true);
   });
 });
 

@@ -22,9 +22,6 @@ type server struct {
 	// Shared app configuration
 	config *Config
 
-	// Shared data
-	repository *Repository
-
 	// Registered clients (active WebSocket connections).
 	clients map[uuid.UUID]*Client
 
@@ -101,7 +98,6 @@ func New(config Config) *server {
 		cacheSize = 100
 	}
 	return &server{
-		repository:  NewRepository(),
 		config:      &config,
 		logBuf:      newLogBuffer(500),
 		register:    make(chan *Client),
