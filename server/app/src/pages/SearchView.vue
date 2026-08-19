@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useMediaQuery } from "@vueuse/core";
-import { Search, PanelLeftOpen, Loader, Wifi, WifiOff, Download, RefreshCw } from "lucide-vue-next";
+import { Search, Loader, Wifi, WifiOff, Download, RefreshCw, Clock } from "lucide-vue-next";
 import { useAppStore } from "../stores/app";
 import { useHistoryStore } from "../stores/history";
+import { useTaskStore } from "../stores/tasks";
 import { sendMessage, registerSearchTask, markSearchTimedOut } from "../composables/useWebSocket";
 import { MessageType } from "../types/messages";
 import { useServers } from "../composables/useApi";
@@ -14,13 +15,70 @@ import EmptyState from "../components/search/EmptyState.vue";
 
 const appStore = useAppStore();
 const historyStore = useHistoryStore();
+const taskStore = useTaskStore();
 const { servers, isFresh, refresh: refreshServers } = useServers();
 const isMobile = useMediaQuery("(max-width: 767px)");
 
 const query = ref("");
 const showErrors = ref(false);
 const isSearching = ref(false);
+// Tracks which query the active searchTimeout is guarding (cleared alongside the timeout).
+let timedOutQuery: string | null = null;
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const SEARCH_TIMEOUT_MS = 60_000;
+
+// Task for the query currently being IRC-searched.
+const activeSearchTask = computed(() =>
+  taskStore.tasks.find(t =>
+    t.type === 'search' && t.status === 'active' &&
+    t.meta?.query === appStore.activeItem?.query
+  )
+);
+// Task for the query queued but not yet searching.
+const queuedSearchTask = computed(() =>
+  taskStore.tasks.find(t =>
+    t.type === 'search' && t.status === 'queued' &&
+    t.meta?.query === appStore.activeItem?.query
+  )
+);
+// Queue position (1-based) for the current queued item.
+const queuePosition = computed(() => {
+  const q = appStore.activeItem?.query;
+  if (!q) return 0;
+  const queued = taskStore.tasks
+    .filter(t => t.type === 'search' && (t.status === 'active' || t.status === 'queued'))
+    .reverse(); // oldest-first
+  return queued.findIndex(t => t.meta?.query === q) + 1;
+});
+
+// Reactive clock for the countdown (only ticks while an active search is running).
+const now = ref(Date.now());
+let _nowInterval: ReturnType<typeof setInterval> | null = null;
+watch(
+  () => !!activeSearchTask.value,
+  (active) => {
+    if (active && !_nowInterval) {
+      _nowInterval = setInterval(() => { now.value = Date.now(); }, 1000);
+    } else if (!active && _nowInterval) {
+      clearInterval(_nowInterval);
+      _nowInterval = null;
+    }
+  },
+  { immediate: true }
+);
+
+// Progress 0→1 as 60s timeout drains.
+const searchProgressPct = computed(() => {
+  const task = activeSearchTask.value;
+  if (!task?.activeAt) return 0;
+  return Math.min((now.value - task.activeAt) / SEARCH_TIMEOUT_MS, 1) * 100;
+});
+const secondsRemaining = computed(() => {
+  const task = activeSearchTask.value;
+  if (!task?.activeAt) return SEARCH_TIMEOUT_MS / 1000;
+  return Math.max(0, Math.ceil((SEARCH_TIMEOUT_MS - (now.value - task.activeAt)) / 1000));
+});
 
 const hasErrors = computed(
   () => (appStore.activeItem?.errors?.length ?? 0) > 0
@@ -45,13 +103,22 @@ const isShowingCachedResults = computed(() => {
     && (historyStore.getCachedResults(ts) !== undefined || !!appStore.activeItem?.cachedAt);
 });
 
-// Age of server-cached results in minutes (null when not from server cache).
+// Age of cached results in minutes.
+// Prefers server-supplied cachedAt; falls back to item.timestamp (when search completed).
+// Returns null only when there's nothing to show age for.
 const cachedResultsAgeMinutes = computed(() => {
   const ca = appStore.activeItem?.cachedAt;
-  if (!ca) return null;
-  const ms = new Date(ca).getTime();
-  if (isNaN(ms)) return null;
-  return (Date.now() - ms) / 60000;
+  if (ca) {
+    const ms = new Date(ca).getTime();
+    if (!isNaN(ms)) return (Date.now() - ms) / 60000;
+  }
+  // Session-local: derive from timestamp, but only show if > 2 minutes old
+  const ts = appStore.activeItem?.timestamp;
+  if (ts && isShowingCachedResults.value) {
+    const mins = (Date.now() - ts) / 60000;
+    return mins > 2 ? mins : null;
+  }
+  return null;
 });
 
 function formatCacheAge(minutes: number): string {
@@ -96,43 +163,72 @@ watch(
   }
 );
 
-// Watch for results arriving to clear the searching state
+// Watch for results arriving to clear the searching state.
+// Only clear the timeout when the results are for the query THIS timer is guarding —
+// switching to a completed tab must not cancel the timeout for an unrelated in-flight search.
 watch(
-  () => appStore.activeItem?.results,
-  (results) => {
-    if (results !== undefined) {
+  () => appStore.activeItem,
+  (item) => {
+    if (item?.results !== undefined && item.query === timedOutQuery) {
       isSearching.value = false;
       if (searchTimeout) {
         clearTimeout(searchTimeout);
         searchTimeout = null;
       }
+      timedOutQuery = null;
     }
-  }
+  },
+  { deep: false }
 );
 
 onUnmounted(() => {
   if (searchTimeout) clearTimeout(searchTimeout);
+  if (_nowInterval) clearInterval(_nowInterval);
+  timedOutQuery = null;
 });
 
 function issueSearch(q: string) {
-  const timestamp = Date.now();
-  appStore.setActiveItem({ query: q, timestamp });
-  historyStore.addItem({ query: q, timestamp });
-  registerSearchTask(q);
-  sendMessage({ type: MessageType.SEARCH, payload: { query: q } });
-  isSearching.value = true;
+  const normalized = q.trim().toLowerCase();
 
-  // Set a 60s timeout — if no results arrive, mark as failed
+  // Reuse existing results or in-flight search for the same (normalized) query.
+  const existing = historyStore.items.find(i => i.query === normalized);
+  if (existing) {
+    const cached = historyStore.getCachedResults(existing.timestamp);
+    if (cached) {
+      historyStore.restoreItem(existing);
+      return;
+    }
+    const inFlight = taskStore.tasks.some(t =>
+      t.type === 'search' && (t.status === 'active' || t.status === 'queued') &&
+      t.meta?.query === normalized
+    );
+    if (inFlight) {
+      appStore.setActiveItem(existing);
+      return;
+    }
+  }
+
+  const timestamp = Date.now();
+  appStore.setActiveItem({ query: normalized, timestamp });
+  historyStore.addItem({ query: normalized, timestamp });
+  registerSearchTask(normalized);
+  sendMessage({ type: MessageType.SEARCH, payload: { query: normalized } });
+  isSearching.value = true;
+  timedOutQuery = normalized;
+
+  // Set a 60s timeout — if no results arrive, mark as failed.
+  // Passes the query so markSearchTimedOut can verify it's still the right entry.
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
     const active = appStore.activeItem;
-    if (active && active.results === undefined) {
+    if (active && active.query === normalized && active.results === undefined) {
       const timedOut = { ...active, results: [], errors: [], timedOut: true };
       appStore.setActiveItem(timedOut);
       historyStore.updateItem(timedOut);
     }
-    markSearchTimedOut();
+    markSearchTimedOut(normalized);
     isSearching.value = false;
+    timedOutQuery = null;
     searchTimeout = null;
   }, 60000);
 }
@@ -181,9 +277,7 @@ function handleSearch(e: Event) {
 </script>
 
 <template>
-  <div
-    class="flex-1 flex flex-col overflow-hidden"
-    :class="isMobile ? 'pb-14' : ''">
+  <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Connection status banner (hidden when connected) -->
     <div
       v-if="!appStore.isConnected"
@@ -200,15 +294,6 @@ function handleSearch(e: Event) {
     <!-- Search bar row -->
     <div class="flex-shrink-0 px-4 pt-4 pb-3 bg-slate-100 dark:bg-slate-950 z-10">
       <div class="flex items-center gap-2">
-        <!-- Sidebar toggle (desktop only, when sidebar is closed) -->
-        <button
-          v-if="!isMobile && !appStore.isSidebarOpen"
-          class="flex-shrink-0 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
-          title="Open sidebar"
-          @click="appStore.toggleSidebar()">
-          <PanelLeftOpen :size="20" />
-        </button>
-
         <!-- Search form -->
         <form class="flex-1 flex gap-2" @submit="handleSearch">
           <div class="relative flex-1">
@@ -363,19 +448,71 @@ function handleSearch(e: Event) {
       <div
         v-else-if="appStore.activeItem.results === undefined"
         class="h-full flex items-center justify-center">
-        <div class="flex flex-col items-center gap-3 text-center max-w-sm px-4">
-          <Loader :size="28" class="animate-spin text-brand-400" />
-          <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Searching for &ldquo;{{ appStore.activeItem.query }}&rdquo;&hellip;
-          </p>
-          <p class="text-xs text-slate-400 dark:text-slate-500">
-            Waiting for IRC response
-          </p>
+        <div class="flex flex-col items-center gap-4 text-center max-w-xs px-4">
+          <!-- Circular SVG countdown ring (searching) or clock icon (queued) -->
+          <div class="relative">
+            <svg
+              v-if="activeSearchTask"
+              class="-rotate-90"
+              width="56" height="56" viewBox="0 0 56 56">
+              <circle cx="28" cy="28" r="22" fill="none" stroke-width="4"
+                class="stroke-slate-200 dark:stroke-slate-700" />
+              <circle cx="28" cy="28" r="22" fill="none" stroke-width="4"
+                class="stroke-brand-400"
+                :stroke-dasharray="138.23"
+                :stroke-dashoffset="138.23 * searchProgressPct / 100"
+                style="transition: stroke-dashoffset 1s linear" />
+            </svg>
+            <!-- Centered icon inside the ring -->
+            <div class="absolute inset-0 flex items-center justify-center" v-if="activeSearchTask">
+              <Search :size="18" class="text-brand-400" />
+            </div>
+            <!-- Queued: just a clock icon, no ring -->
+            <div v-else class="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <Clock :size="24" class="text-slate-400" />
+            </div>
+          </div>
+
+          <!-- Label -->
+          <div>
+            <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
+              <template v-if="activeSearchTask">
+                Searching for &ldquo;{{ appStore.activeItem.query }}&rdquo;&hellip;
+              </template>
+              <template v-else>
+                &ldquo;{{ appStore.activeItem.query }}&rdquo; is queued
+              </template>
+            </p>
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">
+              <template v-if="activeSearchTask">
+                {{ secondsRemaining }}s remaining before timeout
+              </template>
+              <template v-else-if="queuePosition > 0">
+                Position {{ queuePosition }} in queue
+              </template>
+            </p>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              v-if="activeSearchTask"
+              class="h-full bg-brand-400 rounded-full"
+              style="transition: width 1s linear"
+              :style="{ width: `${100 - searchProgressPct}%` }" />
+            <div
+              v-else
+              class="h-full w-8 bg-slate-400 dark:bg-slate-500 rounded-full animate-pulse" />
+          </div>
         </div>
       </div>
 
-      <!-- Cached results banner + table -->
-      <template v-if="appStore.activeItem && appStore.activeItem.results !== undefined">
+      <!-- Cached results banner + table.
+           Must be a real element (not <template>) so the flex column
+           correctly constrains BookTable to remaining height. -->
+      <div
+        v-if="appStore.activeItem && appStore.activeItem.results !== undefined"
+        class="flex flex-col h-full overflow-hidden">
         <!-- Age-aware cached results banner -->
         <div
           v-if="isShowingCachedResults && appStore.isConnected"
@@ -402,9 +539,10 @@ function handleSearch(e: Event) {
             {{ cachedResultsAgeMinutes !== null && cachedResultsAgeMinutes > 30 ? 'Refresh' : 'Search again' }}
           </button>
         </div>
-        <BookCards v-if="isMobile" :books="appStore.activeItem.results" />
-        <BookTable v-else :books="appStore.activeItem.results" />
-      </template>
+        <!-- flex-1 min-h-0: fill remaining height after the banner without overflowing -->
+        <BookCards v-if="isMobile" class="flex-1 overflow-auto" :books="appStore.activeItem.results" />
+        <BookTable v-else class="flex-1 min-h-0" :books="appStore.activeItem.results" />
+      </div>
     </div>
   </div>
 </template>

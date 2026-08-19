@@ -18,6 +18,7 @@ export interface Task {
   updatedAt: number;
   events: TaskEvent[];
   meta: Record<string, unknown>;
+  activeAt?: number;    // Unix ms when task became the active (IRC-searching) entry
   // convenience fields:
   query?: string;       // search
   bookTitle?: string;   // download
@@ -50,6 +51,7 @@ export const useTaskStore = defineStore('tasks', {
         ...extra,
       };
       this.tasks.unshift(task);
+      if (this.tasks.length > 200) this.tasks.splice(200);
       return task;
     },
     updateTask(id: string, updates: Partial<Task>, eventMessage?: string) {

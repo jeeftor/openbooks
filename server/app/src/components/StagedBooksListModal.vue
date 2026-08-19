@@ -10,8 +10,9 @@ const appStore = useAppStore();
 const confirmDeleteId = ref<string | null>(null);
 
 function processOne(book: StagedBookSummary) {
+  // Don't close the list — it stays open behind StagedRenameModal.
+  // When the rename modal closes, the list reappears automatically.
   sendMessage({ type: MessageType.PROCESS_ONE_STAGED, payload: { stagedId: book.id } });
-  appStore.setStagedBooksList(null);
 }
 
 function requestDelete(id: string) {
@@ -48,7 +49,7 @@ function formatDate(iso: string): string {
 <template>
   <Transition name="modal">
     <div
-      v-if="appStore.stagedBooksList !== null"
+      v-if="appStore.stagedBooksList !== null && !appStore.pendingStagedBook"
       class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center bg-black/60 backdrop-blur-sm"
       @click.self="close"
     >
@@ -145,8 +146,9 @@ function formatDate(iso: string): string {
               <button
                 @click="processOne(book)"
                 class="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                title="Open rename dialog for this book"
               >
-                Save
+                Process
                 <ChevronRight :size="12" />
               </button>
             </template>

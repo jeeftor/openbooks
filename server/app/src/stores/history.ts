@@ -19,7 +19,7 @@ export const useHistoryStore = defineStore("history", () => {
 
   // Populate items from server-sent HISTORY_LIST payload.
   function loadFromServer(entries: Array<{ query: string; timestamp: number; timedOut?: boolean }>) {
-    items.value = entries.map((e) => ({ query: e.query, timestamp: e.timestamp, timedOut: e.timedOut }));
+    items.value = entries.map((e) => ({ query: e.query.toLowerCase(), timestamp: e.timestamp, timedOut: e.timedOut }));
   }
 
   function addItem(item: HistoryItem) {

@@ -11,11 +11,18 @@ const appStore = useAppStore();
 // but a new tab or server restart will show it again.
 const dismissed = useSessionStorage("ob-staged-dismissed", false);
 
-// Reset dismissed whenever new books arrive (count increased).
+// Only auto-show when transitioning from 0 staged books → some.
+// Skip when the user themselves just clicked "Save for Later" — they already know.
 watch(
   () => appStore.stagedBooksCount,
   (count, prev) => {
-    if (count > (prev ?? 0)) dismissed.value = false;
+    if ((prev ?? 0) === 0 && count > 0) {
+      if (appStore.justStagedBook) {
+        appStore.justStagedBook = false;
+        return;
+      }
+      dismissed.value = false;
+    }
   }
 );
 

@@ -252,14 +252,17 @@ const displayBooks = computed<DisplayBook[]>(() => {
     });
     return result;
   }
-  
+
+  // When showUnmatched is on, append filtered-out books after the matched ones.
+  // isMatched(idx) dims rows at idx >= matchedBooks.length.
+  if (prefStore.showUnmatched) {
+    return [
+      ...matchedBooks.value,
+      ...sortedBooks.value.filter(b => !matchesBook(b)),
+    ];
+  }
   return matchedBooks.value;
 });
-
-function getGroupForBook(book: BookDetail): BookGroup | null {
-  if (!groupBooks.value || !groupedBooks.value) return null;
-  return groupedBooks.value.find(g => g.books.includes(book)) || null;
-}
 
 function toggleGroup(groupKey: string) {
   if (expandedGroups.value.has(groupKey)) {
@@ -362,7 +365,7 @@ function toggleFormat(fmt: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
+  <div class="flex flex-col overflow-hidden">
     <!-- Filter bar -->
     <div class="flex-shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       <!-- Row 1: text filters + count -->
@@ -493,7 +496,7 @@ function toggleFormat(fmt: string) {
     </div>
 
     <!-- Virtualised table -->
-    <div ref="scrollContainer" class="flex-1 overflow-auto">
+    <div ref="scrollContainer" data-testid="book-scroll-container" class="flex-1 overflow-auto">
       <table class="w-full text-xs border-collapse" style="table-layout: fixed">
         <colgroup>
           <col v-for="(w, i) in columnWidths" :key="i" :style="{ width: w + 'px' }" />

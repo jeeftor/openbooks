@@ -28,7 +28,8 @@ export enum MessageType {
   HISTORY_LIST,
   HISTORY_DELETE,
   HISTORY_CLEAR,
-  SERVER_LIST
+  SERVER_LIST,
+  DOWNLOAD_FAILED
 }
 
 export interface AppNotification {

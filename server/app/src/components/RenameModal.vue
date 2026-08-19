@@ -2,7 +2,7 @@
 import { ref, computed, watch } from "vue";
 import { useAppStore } from "../stores/app";
 import { MessageType, type RenameOption } from "../types/messages";
-import { sendMessage } from "../composables/useWebSocket";
+import { sendMessage, markActiveDownloadStaged } from "../composables/useWebSocket";
 
 const appStore = useAppStore();
 
@@ -177,6 +177,7 @@ function confirm() {
 }
 
 function saveLater() {
+  markActiveDownloadStaged();
   sendMessage({
     type: MessageType.STAGED_QUEUE_LATER,
     payload: { stagedId: "" },
