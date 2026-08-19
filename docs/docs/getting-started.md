@@ -16,9 +16,9 @@ If you'd prefer to use OpenBooks from your terminal, check out [CLI Mode](./conf
 
 : Basic configuration that exposes the web interface on [http://localhost:8080](http://localhost:8080) and saves all files to an anonymous volume.
 
-`docker run -p 8080:80 -v ~/Downloads/openbooks:/books evanbuss/openbooks --persist`
+`docker run -p 8080:80 -v ~/Downloads/openbooks:/books evanbuss/openbooks`
 
-: More advanced configuration that exposes the web interface on [http://localhost:8080](http://localhost:8080) and persists all eBook files to the mounted volume at `~/Downloads/openbooks`.
+: More advanced configuration that exposes the web interface on [http://localhost:8080](http://localhost:8080) and saves all eBook files to the mounted volume at `~/Downloads/openbooks`.
 
 > For more information see the [docker guide](./setup/docker.md).
 

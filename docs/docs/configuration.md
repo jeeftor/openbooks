@@ -25,8 +25,6 @@ These options apply to both Server and CLI mode.
 | `--basepath`             | `/`         | Web UI Path. Must have trailing `/`. (Ex. `/openbooks/`)  |
 | `--browser`/`-b`         | `false`     | Open the browser on startup.                              |
 | `--dir`/`-d`             | `/temp`[^1] | Directory where search results and eBooks are saved.      |
-| `--no-browser-downloads` | `false`     | Don't send files to browser but save them to disk.        |
-| `--persist`              | `false`     | Save eBook files after sending to browser.                |
 | `--port`/`-p`            | `5228`      | The port that the server listens on.                      |
 | `--rate-limit`/`-r`      | `10`        | Seconds to wait between IRC search requests. (minimum 10) |
 
