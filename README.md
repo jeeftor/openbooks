@@ -225,6 +225,8 @@ Because both containers mount `./books`, a book saved by OpenBooks ABS to `./boo
 | `--name` | Optional IRC username prefix. If omitted in server mode, OpenBooks ABS generates a readable guest name for each browser client. |
 | `--dir` | Directory where books are saved. Use the directory mounted into Audiobookshelf. |
 | `--organize-downloads` | Legacy compatibility flag for organized download workflows. Final placement is chosen in the rename prompt. |
+| `--auto-rename` | Skip the rename prompt and auto-save downloads using `--auto-rename-option`. Ideal for headless / automated setups. |
+| `--auto-rename-option` | Naming scheme for `--auto-rename`. Default: `author-title-flat` (`Author - Title.ext`). Also: `keep`, `title`, `organized`, `series`. |
 | `--replace-space` | Replace spaces in generated folder names, for example `.` or `_`. |
 | `--post-process-cmd` | Command to run after each book download. The downloaded file path is appended as the final argument. |
 | `--dev` | Preserve the raw download beside the cleaned file as `name.orig.ext`. Useful when validating `ebook-polish`. |

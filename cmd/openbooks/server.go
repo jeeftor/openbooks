@@ -31,6 +31,8 @@ func init() {
 	serverCmd.Flags().StringSliceVar(&serverConfig.MCPFormats, "mcp-formats", []string{"epub"}, "File formats the MCP server will return in search results.")
 	serverCmd.Flags().DurationVar(&serverConfig.ResultCacheTTL, "result-cache-ttl", 0, "How long to cache IRC search results across sessions (default: 60m). Set to 0 to use the default.")
 	serverCmd.Flags().IntVar(&serverConfig.ResultCacheSize, "result-cache-size", 0, "Maximum number of distinct queries to cache (default: 100). Set to 0 to use the default.")
+	serverCmd.Flags().BoolVar(&serverConfig.AutoRename, "auto-rename", false, "Skip the rename prompt and automatically save downloads using the --auto-rename-option naming scheme.")
+	serverCmd.Flags().StringVar(&serverConfig.AutoRenameOption, "auto-rename-option", "author-title-flat", "Which naming option to use with --auto-rename. One of: keep, title, author-title-flat, organized, series.")
 }
 
 var serverCmd = &cobra.Command{

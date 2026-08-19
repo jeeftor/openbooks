@@ -20,13 +20,15 @@ These options apply to both Server and CLI mode.
 
 ## Server Mode Options
 
-| Flag                     | Default     | Description                                               |
-|--------------------------|-------------|-----------------------------------------------------------|
-| `--basepath`             | `/`         | Web UI Path. Must have trailing `/`. (Ex. `/openbooks/`)  |
-| `--browser`/`-b`         | `false`     | Open the browser on startup.                              |
-| `--dir`/`-d`             | `/temp`[^1] | Directory where search results and eBooks are saved.      |
-| `--port`/`-p`            | `5228`      | The port that the server listens on.                      |
-| `--rate-limit`/`-r`      | `10`        | Seconds to wait between IRC search requests. (minimum 10) |
+| Flag                     | Default             | Description                                               |
+|--------------------------|---------------------|-----------------------------------------------------------|
+| `--auto-rename`          | `false`             | Skip the rename prompt and auto-save downloads.           |
+| `--auto-rename-option`   | `author-title-flat` | Naming option for `--auto-rename`. One of: `keep`, `title`, `author-title-flat`, `organized`, `series`. |
+| `--basepath`             | `/`                 | Web UI Path. Must have trailing `/`. (Ex. `/openbooks/`)  |
+| `--browser`/`-b`         | `false`             | Open the browser on startup.                              |
+| `--dir`/`-d`             | `/temp`[^1]         | Directory where search results and eBooks are saved.      |
+| `--port`/`-p`            | `5228`              | The port that the server listens on.                      |
+| `--rate-limit`/`-r`      | `10`                | Seconds to wait between IRC search requests. (minimum 10) |
 
 ## CLI Mode Options
 
