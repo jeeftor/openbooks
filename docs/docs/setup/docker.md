@@ -1,7 +1,6 @@
-[![Docker Pulls](https://img.shields.io/docker/pulls/evanbuss/openbooks.svg)](https://hub.docker.com/r/
-evanbuss/openbooks/)
+# Docker
 
-The OpenBooks docker image allows you to run [Server Mode](../modes/server.md). A multi-platform Docker container is published to Docker Hub for each release.
+The OpenBooks ABS docker image runs [Server Mode](../modes/server.md). Multi-platform images are published to GitHub Container Registry for each release.
 
 ## Docker Compose
 
@@ -12,12 +11,12 @@ version: "3.3"
 services:
   openbooks:
     container_name: OpenBooks
-    image: evanbuss/openbooks:latest
+    image: ghcr.io/jeeftor/openbooks-abs:latest
     restart: unless-stopped
     ports:
       - "8080:80"
     volumes:
-      - "~/Downoads/openbooks:/books"
+      - "~/Downloads/openbooks:/books"
     environment:
       - BASE_PATH=/openbooks/
 ```
@@ -30,22 +29,21 @@ Use the `environment` property to optionally set a custom base path for the serv
 
 ## Image Tags
 
-`evanbuss/openbooks:latest`
+`ghcr.io/jeeftor/openbooks-abs:latest`
 
-: The majority of users will want this image and will always be up to date with the latest release. Note that auto-updating between version could break configuration.[^1]
+: The majority of users will want this image and will always be up to date with the latest release. Note that auto-updating between versions could break configuration.[^1]
 
-`evanbuss/openbooks:X.X.X`
+`ghcr.io/jeeftor/openbooks-abs:X.X.X`
 
 : Version specific tags. Each time a new release is cut, a new version tagged image is published.
 
-`evanbuss/openbooks:edge`
+`ghcr.io/jeeftor/openbooks-abs:latest-calibre`
 
-: Built from the latest development build. This image is best if you want to test the latest changes but be warned that it could be unstable and not work at all.
+: Includes Calibre tools (ebook-polish) for post-processing.
 
 ## Image Platforms
 
 - `linux/amd64`
 - `linux/arm64`
-- `linux/arm`
 
-[^1]: I personally auto-update all of my docker containers and haven't experienced many issues. Tools like [Watchtower](https://containrrr.dev/watchtower/) can check for updates, pull images, and restart containers automatically.
+[^1]: Tools like [Watchtower](https://containrrr.dev/watchtower/) can check for updates, pull images, and restart containers automatically.

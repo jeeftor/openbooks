@@ -1,51 +1,31 @@
-# Getting Started
+# Development
 
-OpenBooks makes use of the [Task](https://taskfile.dev/) build system which provides a cross platform and simple alternative to GNU Make.
+OpenBooks ABS uses a [Makefile](https://github.com/jeeftor/openbooks/blob/master/Makefile) for common development tasks.
 
-If making use of the [devcontainer](./dev-container.md), Task will automatically be set up for you.
-Otherwise follow the install instructions on the Task website. The rest of the guide assumes you have Task installed.
+## Setup
 
-`task dev:init`
+`make install`
 
-: Installs NPM and Go dependencies.
+: Installs Go and NPM dependencies.
 
-`task dev:mock`
+`make dev-mock`
 
-: Starts a mock IRC / DCC server that mimics basic requests / responses from IRC Highway. 95% of the time you should be connecting to the mock server to avoid making requests to the IRC Highway's server. See [IRC notes](../irc-notes.md).
+: Starts a mock IRC / DCC server on `:6667` that mimics basic requests / responses from IRC Highway. Use this for local development to avoid making real requests. See [IRC notes](../irc-notes.md).
 
 ## Server Mode Development
 
 Run the following commands in separate terminals.
 
-`task dev:client`
+`make dev1`
 
-: Starts the React front-end and enabled hot reload via Vite.
+: Starts the Vite dev server with hot reload (Vue 3 frontend).
 
-`task dev:server`
+`make dev2`
 
-: Compiles and runs OpenBooks in Server mode. Connects to the Mock IRC server.
-
-## CLI Mode Development
-
-`task dev:cli`
-
-: Compiles and runs OpenBooks in CLI mode. Connects to the Mock IRC server.
-
-<!-- ## Why / How
-
-- I wrote this as an easier way to search and download books from irchighway.net. It handles all the extraction and data processing for you. You just have to click the book you want. Hopefully you find it much easier than the IRC interface.
-- It was also interesting to learn how the [IRC](https://en.wikipedia.org/wiki/Internet_Relay_Chat) and [DCC](https://en.wikipedia.org/wiki/Direct_Client-to-Client) protocols work and write custom implementations.
+: Compiles and runs the Go backend in server mode. Connects to the mock IRC server on `localhost:6667`.
 
 ## Technology
 
-- Backend
-  - Golang
-  - Chi
-  - gorilla/websocket
-  - Archiver (extract files from various archive formats)
-- Frontend
-  - React.js
-  - TypeScript
-  - Redux / Redux Toolkit
-  - Mantine UI / @emotion/react
-  - Framer Motion -->
+- **Backend:** Go, Chi router, gorilla/websocket, embedded SPA
+- **Frontend:** Vue 3, Pinia, Tailwind CSS, TanStack Virtual, Lucide icons
+- **MCP:** Model Context Protocol server for AI agent integration

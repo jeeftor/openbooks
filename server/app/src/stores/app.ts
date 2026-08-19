@@ -8,7 +8,6 @@ type LibrarySortMode = "newest" | "alpha";
 export const useAppStore = defineStore("app", () => {
   const isConnected = ref(false);
   const isConnecting = ref(true); // true until first successful connect or max retries
-  const isSidebarOpen = useLocalStorage("ob-sidebar-open", true);
   const username = ref<string | undefined>(undefined);
   const inFlightDownloads = ref<string[]>([]);
 
@@ -86,10 +85,6 @@ export const useAppStore = defineStore("app", () => {
     rawSearchResults.value = next;
   }
 
-  function toggleSidebar() {
-    isSidebarOpen.value = !isSidebarOpen.value;
-  }
-
   function addInFlightDownload(book: string) {
     inFlightDownloads.value.push(book);
     clickedDownloads.value.add(book);
@@ -137,7 +132,6 @@ export const useAppStore = defineStore("app", () => {
   return {
     isConnected,
     isConnecting,
-    isSidebarOpen,
     username,
     inFlightDownloads,
     activeItem,
@@ -159,7 +153,6 @@ export const useAppStore = defineStore("app", () => {
     setUsername,
     setActiveItem,
     setRawSearchResult,
-    toggleSidebar,
     addInFlightDownload,
     removeInFlightDownload,
     setDownloadPhase,

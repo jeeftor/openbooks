@@ -10,7 +10,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@tanstack/vue-table": "^8.17.3",
     "@tanstack/vue-virtual": "^3.8.4",
     "@vueuse/core": "^10.9.0",
     "lucide-vue-next": "^0.378.0",
