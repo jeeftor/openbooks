@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.4 - 2026-08-18
+
+### Fixed
+
+- **Autocomplete suggestion layout:** Age now appears inline right after the query text instead of being stretched to the far right edge of the dropdown.
+
 ## v0.3.3 - 2026-08-18
 
 ### Added
