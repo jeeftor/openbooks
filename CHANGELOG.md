@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Search input autocomplete:** Typing in the search box now shows matching previous searches as a dropdown, each with relative age (e.g. "3d ago", "2h ago"). Clicking a suggestion (or navigating with arrow keys + Enter) instantly loads cached results if available, or re-runs the search if not. The dropdown dismisses on selection, blur, or Escape.
+
 ### Removed
 
 - **"Staged Books Ready" popup removed:** The auto-popup modal that appeared on login/reconnect when staged books exist has been removed. The amber badge in the header already shows the staged book count and is clickable to review them — the popup was redundant and annoying on every login. The `justStagedBook` store flag (only used to suppress the popup) has also been cleaned up.

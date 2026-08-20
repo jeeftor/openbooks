@@ -7,6 +7,7 @@ import { useHistoryStore } from "../stores/history";
 import { useTaskStore } from "../stores/tasks";
 import { sendMessage, registerSearchTask, markSearchTimedOut } from "../composables/useWebSocket";
 import { MessageType } from "../types/messages";
+import type { HistoryItem } from "../types/messages";
 import { useServers } from "../composables/useApi";
 import BookTable from "../components/books/BookTable.vue";
 import BookCards from "../components/books/BookCards.vue";
@@ -22,6 +23,9 @@ const isMobile = useMediaQuery("(max-width: 767px)");
 const query = ref("");
 const showErrors = ref(false);
 const isSearching = ref(false);
+// Autocomplete dropdown state
+const showSuggestions = ref(false);
+const selectedSuggestion = ref(-1);
 // Tracks which query the active searchTimeout is guarding (cleared alongside the timeout).
 let timedOutQuery: string | null = null;
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -127,6 +131,79 @@ function formatCacheAge(minutes: number): string {
   if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
   return `${Math.round(minutes / 1440)}d ago`;
 }
+
+// ── Search input autocomplete ──────────────────────────────────────────────────
+// Filters history items by the typed query, showing relative age and allowing
+// quick-load of cached results (or re-search if not cached).
+
+const suggestions = computed(() => {
+  const q = query.value.trim().toLowerCase();
+  if (!q || q.length < 2) return [];
+  return historyStore.items
+    .filter(item => item.query.includes(q))
+    .slice(0, 8);
+});
+
+function formatAge(timestamp: number): string {
+  const mins = (Date.now() - timestamp) / 60000;
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${Math.round(mins)}m ago`;
+  if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
+  return `${Math.round(mins / 1440)}d ago`;
+}
+
+function selectSuggestion(item: { query: string; timestamp: number; timedOut?: boolean }) {
+  const cached = historyStore.getCachedResults(item.timestamp);
+  if (cached) {
+    historyStore.restoreItem(item as HistoryItem);
+  } else {
+    appStore.pendingQuery = item.query;
+  }
+  query.value = "";
+  showSuggestions.value = false;
+  selectedSuggestion.value = -1;
+}
+
+function onSearchKeydown(e: KeyboardEvent) {
+  if (!showSuggestions.value || suggestions.value.length === 0) return;
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    selectedSuggestion.value = Math.min(selectedSuggestion.value + 1, suggestions.value.length - 1);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    selectedSuggestion.value = Math.max(selectedSuggestion.value - 1, 0);
+  } else if (e.key === "Enter" && selectedSuggestion.value >= 0) {
+    e.preventDefault();
+    selectSuggestion(suggestions.value[selectedSuggestion.value]);
+  } else if (e.key === "Escape") {
+    showSuggestions.value = false;
+    selectedSuggestion.value = -1;
+  }
+}
+
+function onSearchFocus() {
+  if (suggestions.value.length > 0) {
+    showSuggestions.value = true;
+  }
+}
+
+function onSearchBlur() {
+  // Delay to allow suggestion click to register before the dropdown closes.
+  setTimeout(() => {
+    showSuggestions.value = false;
+    selectedSuggestion.value = -1;
+  }, 150);
+}
+
+// Show/hide suggestions as the user types.
+watch(
+  () => query.value,
+  (q) => {
+    showSuggestions.value = q.trim().length >= 2 && suggestions.value.length > 0;
+    selectedSuggestion.value = -1;
+  }
+);
+
 const validInput = computed(() => {
   if (!appStore.isConnected) return false;
   return errorMode.value ? query.value.startsWith("!") : query.value.trim() !== "";
@@ -309,7 +386,34 @@ function handleSearch(e: Event) {
               spellcheck="false"
               :placeholder="searchPlaceholder"
               :disabled="!appStore.isConnected"
+              @focus="onSearchFocus"
+              @blur="onSearchBlur"
+              @keydown="onSearchKeydown"
               class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-50 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition" />
+            <!-- Autocomplete dropdown -->
+            <Transition name="suggest">
+              <ul
+                v-if="showSuggestions && suggestions.length > 0"
+                class="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden max-h-72 overflow-y-auto">
+                <li
+                  v-for="(item, idx) in suggestions"
+                  :key="item.timestamp"
+                  @mousedown.prevent="selectSuggestion(item)"
+                  @mouseenter="selectedSuggestion = idx"
+                  class="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors"
+                  :class="idx === selectedSuggestion
+                    ? 'bg-brand-50 dark:bg-brand-900/20'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'">
+                  <Search :size="13" class="flex-shrink-0 text-slate-400" />
+                  <span class="flex-1 truncate text-sm text-slate-700 dark:text-slate-200">
+                    {{ item.query }}
+                  </span>
+                  <span class="flex-shrink-0 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+                    {{ formatAge(item.timestamp) }}
+                  </span>
+                </li>
+              </ul>
+            </Transition>
           </div>
           <button
             type="submit"
@@ -546,3 +650,15 @@ function handleSearch(e: Event) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.suggest-enter-active,
+.suggest-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.suggest-enter-from,
+.suggest-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>
