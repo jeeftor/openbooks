@@ -10,7 +10,6 @@ import SearchView from "./pages/SearchView.vue";
 import LibraryPanel from "./components/sidebar/LibraryPanel.vue";
 import NotificationDrawer from "./components/notifications/NotificationDrawer.vue";
 import RenameModal from "./components/RenameModal.vue";
-import StagedBooksModal from "./components/StagedBooksModal.vue";
 import StagedBooksListModal from "./components/StagedBooksListModal.vue";
 import StagedRenameModal from "./components/StagedRenameModal.vue";
 import DownloadWaitingBanner from "./components/DownloadWaitingBanner.vue";
@@ -56,7 +55,6 @@ const showLibrary = ref(false);
     <!-- Global overlays (order matters for z-index stacking) -->
     <NotificationDrawer />
     <RenameModal />
-    <StagedBooksModal />
     <StagedBooksListModal />
     <StagedRenameModal />
     <DownloadWaitingBanner />
