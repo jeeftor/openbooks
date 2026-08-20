@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+
+- **"Staged Books Ready" popup removed:** The auto-popup modal that appeared on login/reconnect when staged books exist has been removed. The amber badge in the header already shows the staged book count and is clickable to review them — the popup was redundant and annoying on every login. The `justStagedBook` store flag (only used to suppress the popup) has also been cleaned up.
+
 ## v0.3.0 - 2026-08-18
 
 ### Removed
