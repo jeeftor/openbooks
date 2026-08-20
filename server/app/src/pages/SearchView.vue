@@ -405,7 +405,7 @@ function handleSearch(e: Event) {
                     ? 'bg-brand-50 dark:bg-brand-900/20'
                     : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'">
                   <Search :size="13" class="flex-shrink-0 text-slate-400" />
-                  <span class="flex-1 truncate text-sm text-slate-700 dark:text-slate-200">
+                  <span class="truncate text-sm text-slate-700 dark:text-slate-200">
                     {{ item.query }}
                   </span>
                   <span class="flex-shrink-0 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
