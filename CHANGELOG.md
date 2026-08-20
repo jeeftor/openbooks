@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.5 - 2026-08-18
+
+### Fixed
+
+- **Autocomplete now triggers on 1 character:** Previously required 2+ characters before showing suggestions. Now a single letter will match previous searches.
+
 ## v0.3.4 - 2026-08-18
 
 ### Fixed

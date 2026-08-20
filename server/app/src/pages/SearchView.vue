@@ -138,7 +138,7 @@ function formatCacheAge(minutes: number): string {
 
 const suggestions = computed(() => {
   const q = query.value.trim().toLowerCase();
-  if (!q || q.length < 2) return [];
+  if (!q) return [];
   return historyStore.items
     .filter(item => item.query.includes(q))
     .slice(0, 8);
@@ -199,7 +199,7 @@ function onSearchBlur() {
 watch(
   () => query.value,
   (q) => {
-    showSuggestions.value = q.trim().length >= 2 && suggestions.value.length > 0;
+    showSuggestions.value = q.trim().length >= 1 && suggestions.value.length > 0;
     selectedSuggestion.value = -1;
   }
 );
