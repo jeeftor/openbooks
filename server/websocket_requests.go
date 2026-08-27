@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/jeeftor/openbooks/core"
@@ -16,6 +17,12 @@ import (
 // chose to defer the book ("queue_later"). The caller should return/continue
 // without broadcasting — no file was moved.
 var errQueueLater = errors.New("queued for later")
+
+// errFileConflict is a sentinel returned by processStagedBookChoice when the
+// destination path already exists and the user didn't force an overwrite. A
+// FILE_CONFLICT response has already been sent to the client; the caller
+// should wait for the next renameConfirm and retry.
+var errFileConflict = errors.New("file conflict")
 
 // RequestHandler defines a generic handle() method that is called when a specific request type is made
 type RequestHandler interface {
@@ -266,6 +273,7 @@ func (c *Client) handleRenameConfirm(req *RenameConfirmRequest, server *server) 
 		Title:           req.Title,
 		Series:          req.Series,
 		SeriesIndex:     req.SeriesIndex,
+		Force:           req.Force,
 	}
 	select {
 	case c.renameConfirm <- choice:
@@ -302,6 +310,9 @@ func (c *Client) handleGetStagedList(server *server) {
 // book from the staged store. Returns nil on success, an error if the move
 // fails. If choice.OptionID is "queue_later", sends a status message and
 // returns errQueueLater so the caller can return/continue without broadcasting.
+// If the destination already exists and choice.Force is false, sends a
+// FILE_CONFLICT response and returns errFileConflict so channel-based callers
+// can wait for the user's next decision.
 func (c *Client) processStagedBookChoice(server *server, staged *StagedBook, choice RenameChoice) error {
 	if choice.OptionID == "queue_later" {
 		safeSend(c, newStatusResponse(NOTIFY, "Book saved for later."))
@@ -309,6 +320,18 @@ func (c *Client) processStagedBookChoice(server *server, staged *StagedBook, cho
 	}
 
 	finalPath := staging.ResolveFinalPath(server.config.DownloadDir, choice, staged.IRCFilename, staged.Metadata, staged.ReplaceSpace)
+
+	// Conflict check: if the destination exists and the user didn't force
+	// overwrite, send FILE_CONFLICT and let the caller wait for a new choice.
+	if !choice.Force && staging.FileExists(finalPath) {
+		rel, _ := filepath.Rel(server.config.DownloadDir, finalPath)
+		safeSend(c, newFileConflictResponse(
+			staged.IRCFilename, staged.Metadata, staged.Options, staged.ReplaceSpace,
+			staged.CoverBase64, staged.CoverMime, filepath.ToSlash(rel), staged.ID,
+		))
+		return errFileConflict
+	}
+
 	if err := staging.MoveFile(staged.StagedPath, finalPath); err != nil {
 		safeSend(c, newErrorResponse(fmt.Sprintf("Move failed: %v", err)))
 		return err
@@ -364,12 +387,29 @@ func (c *Client) handleProcessOneStaged(req *ProcessOneStagedRequest, server *se
 		return
 	}
 
-	if err := c.processStagedBookChoice(server, staged, choice); err == errQueueLater {
-		return
-	} else if err != nil {
+	for {
+		err := c.processStagedBookChoice(server, staged, choice)
+		if err == nil {
+			server.broadcastStagedCount()
+			return
+		}
+		if err == errQueueLater {
+			return
+		}
+		if err == errFileConflict {
+			// FILE_CONFLICT already sent — wait for the user's next decision.
+			select {
+			case choice = <-c.renameConfirm:
+			case <-time.After(30 * time.Minute):
+				return
+			case <-c.ctx.Done():
+				return
+			}
+			continue
+		}
+		// Other error (move failure etc.) — already reported to client.
 		return
 	}
-	server.broadcastStagedCount()
 }
 
 // handleDeleteStaged permanently deletes a staged file from disk and removes it from the registry.
@@ -442,10 +482,27 @@ func (c *Client) handleProcessStagedBooks(server *server) {
 			return
 		}
 
-		if err := c.processStagedBookChoice(server, staged, choice); err == errQueueLater {
-			continue
-		} else if err != nil {
-			continue
+		for {
+			err := c.processStagedBookChoice(server, staged, choice)
+			if err == nil {
+				break // success — move to next staged book
+			}
+			if err == errQueueLater {
+				break // deferred — move to next staged book
+			}
+			if err == errFileConflict {
+				// FILE_CONFLICT already sent — wait for the user's next decision.
+				select {
+				case choice = <-c.renameConfirm:
+				case <-time.After(30 * time.Minute):
+					return
+				case <-c.ctx.Done():
+					return
+				}
+				continue
+			}
+			// Other error (move failure etc.) — already reported, move on.
+			break
 		}
 	}
 
@@ -470,9 +527,14 @@ func (c *Client) handleStagedRenameConfirm(req *RenameConfirmRequest, server *se
 		Title:           req.Title,
 		Series:          req.Series,
 		SeriesIndex:     req.SeriesIndex,
+		Force:           req.Force,
 	}
 
 	if err := c.processStagedBookChoice(server, staged, choice); err == errQueueLater {
+		return
+	} else if err == errFileConflict {
+		// FILE_CONFLICT response already sent — the frontend will re-show the
+		// modal and the user will send a new RENAME_CONFIRM.
 		return
 	} else if err != nil {
 		return

@@ -1,6 +1,7 @@
 package staging
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -403,5 +404,172 @@ func TestSanitizePathComponent(t *testing.T) {
 				t.Errorf("SanitizePathComponent(%q, %q) = %q, want %q", tc.input, tc.replaceSpace, got, tc.want)
 			}
 		})
+	}
+}
+
+// --- Conflict detection tests ---
+
+func TestFileExists(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "book.epub")
+	if err := os.WriteFile(existing, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !FileExists(existing) {
+		t.Fatal("FileExists should return true for an existing file")
+	}
+	if FileExists(filepath.Join(dir, "nonexistent.epub")) {
+		t.Fatal("FileExists should return false for a non-existing file")
+	}
+}
+
+func TestMoveFileCheckedNoConflict(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.epub")
+	dst := filepath.Join(dir, "dst.epub")
+	if err := os.WriteFile(src, []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := MoveFileChecked(src, dst, false); err != nil {
+		t.Fatalf("MoveFileChecked (no conflict) error = %v", err)
+	}
+	if FileExists(src) {
+		t.Fatal("source should be gone after move")
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "content" {
+		t.Fatalf("dst content = %q, want %q", got, "content")
+	}
+}
+
+func TestMoveFileCheckedConflictReturnsError(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.epub")
+	dst := filepath.Join(dir, "dst.epub")
+	if err := os.WriteFile(src, []byte("new"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := MoveFileChecked(src, dst, false)
+	if !errors.Is(err, ErrFileExists) {
+		t.Fatalf("MoveFileChecked (conflict, force=false) error = %v, want ErrFileExists", err)
+	}
+
+	// Both files should be untouched.
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "old" {
+		t.Fatalf("dst should be unchanged, got %q, want %q", got, "old")
+	}
+	if !FileExists(src) {
+		t.Fatal("src should still exist after conflict")
+	}
+}
+
+func TestMoveFileCheckedForceOverwrites(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.epub")
+	dst := filepath.Join(dir, "dst.epub")
+	if err := os.WriteFile(src, []byte("new"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := MoveFileChecked(src, dst, true); err != nil {
+		t.Fatalf("MoveFileChecked (force=true) error = %v", err)
+	}
+
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new" {
+		t.Fatalf("dst should be overwritten, got %q, want %q", got, "new")
+	}
+	if FileExists(src) {
+		t.Fatal("src should be gone after forced move")
+	}
+}
+
+func TestUniquePathNoConflict(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "book.epub")
+
+	got := UniquePath(dst)
+	if got != dst {
+		t.Fatalf("UniquePath (no conflict) = %q, want %q", got, dst)
+	}
+}
+
+func TestUniquePathWithConflict(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "book.epub")
+	if err := os.WriteFile(dst, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := UniquePath(dst)
+	want := filepath.Join(dir, "book (2).epub")
+	if got != want {
+		t.Fatalf("UniquePath (1 conflict) = %q, want %q", got, want)
+	}
+}
+
+func TestUniquePathMultipleConflicts(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "book.epub")
+	// Pre-create book.epub, book (2).epub, book (3).epub
+	for _, name := range []string{"book.epub", "book (2).epub", "book (3).epub"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got := UniquePath(dst)
+	want := filepath.Join(dir, "book (4).epub")
+	if got != want {
+		t.Fatalf("UniquePath (3 conflicts) = %q, want %q", got, want)
+	}
+}
+
+func TestUniquePathNoExtension(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "book")
+	if err := os.WriteFile(dst, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := UniquePath(dst)
+	want := filepath.Join(dir, "book (2)")
+	if got != want {
+		t.Fatalf("UniquePath (no ext) = %q, want %q", got, want)
 	}
 }

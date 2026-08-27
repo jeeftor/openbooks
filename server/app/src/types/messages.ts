@@ -29,7 +29,8 @@ export enum MessageType {
   HISTORY_DELETE,
   HISTORY_CLEAR,
   SERVER_LIST,
-  DOWNLOAD_FAILED
+  DOWNLOAD_FAILED,
+  FILE_CONFLICT
 }
 
 export interface AppNotification {
@@ -142,6 +143,17 @@ export interface RenamePromptResponse extends WsResponse {
   coverMime?: string;
 }
 
+export interface FileConflictResponse extends WsResponse {
+  ircFilename: string;
+  metadata?: EPUBMetadata;
+  options: RenameOption[];
+  replaceSpace: string;
+  coverBase64?: string;
+  coverMime?: string;
+  conflictPath: string;
+  stagedId?: string;
+}
+
 export interface DownloadWaitingResponse extends WsResponse {
   active: boolean;
   bot?: string;
@@ -161,6 +173,7 @@ export interface RenameConfirmRequest {
     series: string;
     seriesIndex: string;
     stagedId?: string;
+    force?: boolean;
   };
 }
 

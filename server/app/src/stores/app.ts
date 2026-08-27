@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse, StagedBookResumeResponse, StagedBookSummary } from "../types/messages";
+import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse, StagedBookResumeResponse, StagedBookSummary, FileConflictResponse } from "../types/messages";
 
 type LibrarySortMode = "newest" | "alpha";
 
@@ -31,6 +31,11 @@ export const useAppStore = defineStore("app", () => {
   // Set when the server sends a RENAME_PROMPT. RenameModal watches this
   // and clears it after the user confirms or cancels.
   const pendingRename = ref<RenamePromptResponse | null>(null);
+
+  // Set when the server sends a FILE_CONFLICT — the rename modal shows a
+  // conflict banner with the existing path and an "Overwrite" button.
+  // Cleared when the user resolves the conflict (overwrite, rename, or cancel).
+  const conflictPath = ref<string | null>(null);
 
   // Set while waiting for an IRC bot to send its DCC offer.
   const waitingDownload = ref<DownloadWaitingResponse | null>(null);
@@ -66,6 +71,10 @@ export const useAppStore = defineStore("app", () => {
 
   function setActiveItem(item: HistoryItem | null) {
     activeItem.value = item;
+  }
+
+  function setConflictPath(path: string | null) {
+    conflictPath.value = path;
   }
 
   function setRawSearchResult(timestamp: number, raw: string | undefined) {
@@ -134,6 +143,7 @@ export const useAppStore = defineStore("app", () => {
     rawSearchResults,
     pendingQuery,
     pendingRename,
+    conflictPath,
     waitingDownload,
     downloadPhase,
     libraryVersion,
@@ -148,6 +158,7 @@ export const useAppStore = defineStore("app", () => {
     setConnecting,
     setUsername,
     setActiveItem,
+    setConflictPath,
     setRawSearchResult,
     addInFlightDownload,
     removeInFlightDownload,

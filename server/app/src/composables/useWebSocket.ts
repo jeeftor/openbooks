@@ -8,6 +8,7 @@ import {
   type SearchResponse,
   type DownloadResponse,
   type RenamePromptResponse,
+  type FileConflictResponse,
   type DownloadWaitingResponse,
   type StagedBooksNotifyResponse,
   type StagedBookResumeResponse,
@@ -238,6 +239,25 @@ export function useWebSocket() {
         if (activeBook) {
           const taskId = _downloadTaskIds.get(activeBook);
           if (taskId) taskStore.updateTask(taskId, { phase: 'rename' }, 'Rename prompt');
+        }
+        return;
+      }
+      case MessageType.FILE_CONFLICT: {
+        const conflict = response as FileConflictResponse;
+        // Set conflict path so whichever modal is open shows the conflict banner.
+        appStore.setConflictPath(conflict.conflictPath);
+        // If this is a staged book conflict, update the pending staged book data
+        // so the StagedRenameModal re-renders with any changed options.
+        if (conflict.stagedId && appStore.pendingStagedBook) {
+          appStore.setPendingStagedBook({
+            ...appStore.pendingStagedBook,
+            ircFilename: conflict.ircFilename,
+            metadata: conflict.metadata,
+            options: conflict.options,
+            replaceSpace: conflict.replaceSpace,
+            coverBase64: conflict.coverBase64,
+            coverMime: conflict.coverMime,
+          });
         }
         return;
       }

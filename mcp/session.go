@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -269,23 +270,37 @@ func (s *Session) DownloadBook(ctx context.Context, downloadString string) (*sta
 	return staged, nil
 }
 
+// relPath returns dst relative to base using forward slashes. Falls back to
+// the full path if the relative computation fails.
+func relPath(base, dst string) string {
+	rel, err := filepath.Rel(base, dst)
+	if err != nil {
+		return dst
+	}
+	return rel
+}
+
 // ConfirmBook applies the caller's rename decision to a staged book: resolves
 // the final organised path, moves the file out of staging, optionally rewrites
 // the EPUB internal metadata, and removes the book from the staged store.
 // Returns the final path relative to the download directory.
 func (s *Session) ConfirmBook(stagedID string, choice staging.Choice) (string, error) {
-	book, ok, err := s.staged.GetAndRemove(stagedID)
-	if err != nil {
-		return "", fmt.Errorf("staged store error: %w", err)
-	}
+	book, ok := s.staged.Get(stagedID)
 	if !ok {
 		return "", fmt.Errorf("no staged book with id %q", stagedID)
 	}
 
 	finalPath := staging.ResolveFinalPath(s.downloadDir, choice, book.IRCFilename, book.Metadata, book.ReplaceSpace)
-	if err := staging.MoveFile(book.StagedPath, finalPath); err != nil {
+	if err := staging.MoveFileChecked(book.StagedPath, finalPath, choice.Force); err != nil {
+		if errors.Is(err, staging.ErrFileExists) {
+			// Book stays staged — the agent can re-call with force=true or a different name.
+			return "", fmt.Errorf("file already exists at %s — set force=true to overwrite, or choose a different name", filepath.ToSlash(relPath(s.downloadDir, finalPath)))
+		}
 		return "", fmt.Errorf("move failed: %w", err)
 	}
+
+	// Move succeeded — now safe to remove from the staged store.
+	s.staged.Remove(stagedID)
 
 	if choice.RewriteMetadata && strings.EqualFold(filepath.Ext(finalPath), ".epub") {
 		if err := staging.RewriteEPUBMetadata(finalPath, choice.Title, choice.Author, choice.Series, choice.SeriesIndex, choice.ClearSeries, choice.ClearSeriesIndex); err != nil {
