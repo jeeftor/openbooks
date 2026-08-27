@@ -41,6 +41,7 @@ const (
 	HISTORY_CLEAR        // client → server: delete all history entries
 	SERVER_LIST          // server → client: updated IRC server list with timestamp
 	DOWNLOAD_FAILED      // server → client: book download failed (DCC error or staging failure)
+	FILE_CONFLICT        // server → client: rename destination already exists, awaiting overwrite/rename/cancel
 )
 
 type NotificationType int
@@ -118,6 +119,27 @@ type RenamePromptResponse struct {
 	CoverMime    string             `json:"coverMime,omitempty"`   // e.g. "image/jpeg"
 }
 
+// FileConflictResponse is sent when the user's rename choice resolves to a
+// path that already exists on disk. It carries the same data as a
+// RenamePromptResponse (so the frontend can re-show the modal with the user's
+// previous edits) plus the conflicting path and, for staged books, the staged
+// ID. The user can then overwrite (force=true), pick a different name, or
+// cancel.
+type FileConflictResponse struct {
+	StatusResponse
+	IRCFilename  string             `json:"ircFilename"`
+	Metadata     *core.EPUBMetadata `json:"metadata,omitempty"`
+	Options      []RenameOption     `json:"options"`
+	ReplaceSpace string             `json:"replaceSpace"`
+	CoverBase64  string             `json:"coverBase64,omitempty"`
+	CoverMime    string             `json:"coverMime,omitempty"`
+	// ConflictPath is the existing file path (relative to download dir,
+	// forward slashes) that the user's choice would overwrite.
+	ConflictPath string `json:"conflictPath"`
+	// StagedID is non-empty when this conflict is for a staged book.
+	StagedID string `json:"stagedId,omitempty"`
+}
+
 // RenameConfirmRequest is sent by the client with the user's rename decision.
 type RenameConfirmRequest struct {
 	OptionID        string `json:"optionId"`
@@ -131,6 +153,9 @@ type RenameConfirmRequest struct {
 	SeriesIndex string `json:"seriesIndex,omitempty"`
 	// StagedID is non-empty when confirming the rename of a staged (already-downloaded) book.
 	StagedID string `json:"stagedId,omitempty"`
+	// Force is true when the user explicitly confirmed overwriting an existing
+	// file after receiving a FILE_CONFLICT prompt.
+	Force bool `json:"force,omitempty"`
 }
 
 // StageQueueLaterRequest is sent by the client to defer processing of a staged book.
@@ -325,6 +350,32 @@ func newSeriesAutocompleteResponse(series []string) SeriesAutocompleteResponse {
 	return SeriesAutocompleteResponse{
 		StatusResponse: StatusResponse{MessageType: SERIES_AUTOCOMPLETE},
 		Series:         series,
+	}
+}
+
+// newFileConflictResponse builds a FILE_CONFLICT response from a rename
+// prompt's data plus the conflicting path (relative to downloadDir, forward
+// slashes). For staged books, stagedID should be non-empty.
+func newFileConflictResponse(
+	ircFilename string,
+	meta *core.EPUBMetadata,
+	options []RenameOption,
+	replaceSpace, coverBase64, coverMime, conflictPath, stagedID string,
+) FileConflictResponse {
+	return FileConflictResponse{
+		StatusResponse: StatusResponse{
+			MessageType:      FILE_CONFLICT,
+			NotificationType: WARNING,
+			Title:            "File already exists",
+		},
+		IRCFilename:  ircFilename,
+		Metadata:     meta,
+		Options:      options,
+		ReplaceSpace: replaceSpace,
+		CoverBase64:  coverBase64,
+		CoverMime:    coverMime,
+		ConflictPath: conflictPath,
+		StagedID:     stagedID,
 	}
 }
 

@@ -36,6 +36,7 @@ watch(
 );
 
 const book = computed(() => appStore.pendingStagedBook);
+const conflictPath = computed(() => appStore.conflictPath);
 
 function sanitize(s: string, replaceSpace: string): string {
   s = s.trim().replace(/[/\\]/g, "-");
@@ -176,7 +177,33 @@ function confirm() {
       stagedId: b.stagedId,
     },
   });
+  appStore.setConflictPath(null);
   // Remove from the list optimistically so it's gone when the list reappears.
+  if (appStore.stagedBooksList) {
+    appStore.setStagedBooksList(appStore.stagedBooksList.filter(x => x.id !== b.stagedId));
+  }
+  appStore.setPendingStagedBook(null);
+}
+
+function overwrite() {
+  const b = book.value;
+  if (!b) return;
+  sendMessage({
+    type: MessageType.RENAME_CONFIRM,
+    payload: {
+      optionId: selectedId.value,
+      customName: customName.value,
+      fileName: editFileName.value,
+      rewriteMetadata: rewriteMetadata.value,
+      author: editAuthor.value,
+      title: editTitle.value,
+      series: editSeries.value,
+      seriesIndex: editSeriesIndex.value,
+      stagedId: b.stagedId,
+      force: true,
+    },
+  });
+  appStore.setConflictPath(null);
   if (appStore.stagedBooksList) {
     appStore.setStagedBooksList(appStore.stagedBooksList.filter(x => x.id !== b.stagedId));
   }
@@ -191,6 +218,7 @@ function saveLater() {
     type: MessageType.STAGED_QUEUE_LATER,
     payload: { stagedId: b.stagedId },
   });
+  appStore.setConflictPath(null);
   appStore.setPendingStagedBook(null);
 }
 
@@ -198,6 +226,7 @@ function deleteBook() {
   const b = book.value;
   if (!b) return;
   sendMessage({ type: MessageType.DELETE_STAGED, payload: { stagedId: b.stagedId } });
+  appStore.setConflictPath(null);
   // Remove from the list optimistically.
   if (appStore.stagedBooksList) {
     appStore.setStagedBooksList(appStore.stagedBooksList.filter(x => x.id !== b.stagedId));
@@ -243,6 +272,29 @@ function deleteBook() {
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 font-mono break-all">
               {{ book.ircFilename }}
             </p>
+          </div>
+        </div>
+
+        <!-- Conflict banner -->
+        <div
+          v-if="conflictPath"
+          class="px-6 py-3 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-700"
+        >
+          <div class="flex items-start gap-2">
+            <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-amber-800 dark:text-amber-300">
+                A file already exists at this path
+              </p>
+              <p class="mt-0.5 text-xs font-mono text-amber-700 dark:text-amber-400 break-all">
+                {{ conflictPath }}
+              </p>
+              <p class="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                Edit the name above to save elsewhere, or overwrite the existing file.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -446,7 +498,14 @@ function deleteBook() {
           >
             Delete
           </button>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 flex-wrap justify-end">
+            <button
+              v-if="conflictPath"
+              @click="overwrite"
+              class="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
+            >
+              Overwrite
+            </button>
             <button
               @click="saveLater"
               class="px-4 py-2 text-sm rounded-lg border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
@@ -457,7 +516,7 @@ function deleteBook() {
               @click="confirm"
               class="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
             >
-              Save Book
+              {{ conflictPath ? 'Save with new name' : 'Save Book' }}
             </button>
           </div>
         </div>

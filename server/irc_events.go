@@ -216,8 +216,14 @@ func (sess *session) bookResultHandler(
 		// Auto-rename: skip the prompt and auto-select the configured option.
 		if config.AutoRename {
 			choice := autoRenameChoice(config.AutoRenameOption, options, meta)
+			finalPath := staging.ResolveFinalPath(dir, choice, ircFilename, meta, config.ReplaceSpace)
+			if staging.FileExists(finalPath) {
+				finalPath = staging.UniquePath(finalPath)
+				rel, _ := filepath.Rel(dir, finalPath)
+				sess_lb.warn(fmt.Sprintf("⚠️  Auto-rename conflict — using: %s", filepath.ToSlash(rel)))
+			}
 			sess_lb.info(fmt.Sprintf("🤖 Auto-renamed [%s]: %s", choice.OptionID, ircFilename))
-			finalizeRename(choice, options, meta, ircFilename, extractedPath, stagedOriginalPath, dir, &config, sess_lb, sess, seriesReg)
+			finalizeRename(choice, options, meta, ircFilename, extractedPath, stagedOriginalPath, finalPath, dir, &config, sess_lb, sess, seriesReg)
 			return
 		}
 
@@ -261,7 +267,41 @@ func (sess *session) bookResultHandler(
 			return
 		}
 
-		finalizeRename(choice, options, meta, ircFilename, extractedPath, stagedOriginalPath, dir, &config, sess_lb, sess, seriesReg)
+		// Conflict loop: if the resolved path already exists and the user
+		// didn't explicitly force an overwrite, send FILE_CONFLICT and wait
+		// for a new decision. The user can edit the name, force overwrite,
+		// or queue for later.
+		for {
+			finalPath := staging.ResolveFinalPath(dir, choice, ircFilename, meta, config.ReplaceSpace)
+			if !staging.FileExists(finalPath) || choice.Force {
+				finalizeRename(choice, options, meta, ircFilename, extractedPath, stagedOriginalPath, finalPath, dir, &config, sess_lb, sess, seriesReg)
+				return
+			}
+
+			// Conflict — notify the client and wait for a new choice.
+			rel, _ := filepath.Rel(dir, finalPath)
+			sess_lb.warn(fmt.Sprintf("⚠️  Rename conflict: %s already exists", filepath.ToSlash(rel)))
+			safeSend(currentClient, newFileConflictResponse(
+				ircFilename, meta, options, config.ReplaceSpace,
+				coverBase64, coverMime, filepath.ToSlash(rel), "",
+			))
+
+			select {
+			case choice = <-currentClient.renameConfirm:
+			case <-time.After(30 * time.Minute):
+				sess_lb.warn(fmt.Sprintf("Rename conflict timed out — keeping staged: %s", ircFilename))
+				saveToStaged()
+				return
+			case <-currentClient.ctx.Done():
+				saveToStaged()
+				return
+			}
+
+			if choice.OptionID == "queue_later" {
+				saveToStaged()
+				return
+			}
+		}
 	}
 }
 
@@ -292,7 +332,8 @@ func autoRenameChoice(optionID string, options []staging.Option, meta *core.EPUB
 
 // finalizeRename moves the file to its final path, handles dev-mode originals,
 // optional metadata rewrite, series tracking, and notifications. Shared by the
-// auto-rename and interactive rename paths.
+// auto-rename and interactive rename paths. The caller is responsible for
+// resolving finalPath (and handling conflicts) before calling this function.
 func finalizeRename(
 	choice RenameChoice,
 	options []staging.Option,
@@ -300,6 +341,7 @@ func finalizeRename(
 	ircFilename string,
 	extractedPath string,
 	stagedOriginalPath string,
+	finalPath string,
 	dir string,
 	config *Config,
 	sess_lb *logSession,
@@ -314,7 +356,6 @@ func finalizeRename(
 			break
 		}
 	}
-	finalPath := staging.ResolveFinalPath(dir, choice, ircFilename, meta, config.ReplaceSpace)
 
 	if err := staging.MoveFile(extractedPath, finalPath); err != nil {
 		sess_lb.error(fmt.Sprintf("Failed to move file: %v", err))

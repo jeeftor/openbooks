@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **File conflict prompt on rename:** Downloading a book whose rename destination already exists no longer silently overwrites the existing file. The web UI now shows a conflict banner with the existing file path and offers three options: edit the name to save elsewhere, overwrite the existing file, or save for later. The auto-rename mode automatically picks a unique filename (e.g. `book (2).epub`) and logs a warning. The MCP `confirm_book` tool returns a descriptive error when the destination exists; set `force=true` to overwrite.
+
 ## v0.3.5 - 2026-08-18
 
 ### Fixed

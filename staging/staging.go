@@ -8,6 +8,7 @@
 package staging
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,10 @@ import (
 
 	"github.com/jeeftor/openbooks/core"
 )
+
+// ErrFileExists is returned by MoveFileChecked when the destination already
+// exists and the caller did not set force=true.
+var ErrFileExists = errors.New("destination file already exists")
 
 // Option is one naming choice presented to the user/agent.
 type Option struct {
@@ -40,6 +45,10 @@ type Choice struct {
 	SeriesIndex       string
 	ClearSeries       bool
 	ClearSeriesIndex  bool
+	// Force overwrites an existing file at the destination path instead of
+	// returning ErrFileExists. Used when the user explicitly confirms an
+	// overwrite after a conflict prompt.
+	Force bool
 }
 
 // StagingDir returns the hidden staging subdirectory inside downloadDir.
@@ -200,6 +209,8 @@ func resolveChoiceFileName(choice Choice, title, ext, replaceSpace string) strin
 
 // MoveFile moves src to dst, creating parent directories as needed.
 // Falls back to copy-and-delete when os.Rename fails (e.g. cross-device).
+// If dst already exists it is silently overwritten — use MoveFileChecked
+// when you need conflict detection.
 func MoveFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		return fmt.Errorf("create target dir: %w", err)
@@ -212,6 +223,39 @@ func MoveFile(src, dst string) error {
 		return err
 	}
 	return os.Remove(src)
+}
+
+// FileExists reports whether a file exists at the given path.
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// MoveFileChecked moves src to dst. If dst already exists and force is false,
+// returns ErrFileExists without modifying anything. If force is true (or dst
+// does not exist), behaves like MoveFile.
+func MoveFileChecked(src, dst string, force bool) error {
+	if !force && FileExists(dst) {
+		return ErrFileExists
+	}
+	return MoveFile(src, dst)
+}
+
+// UniquePath returns dst unchanged if no file exists there. If one does,
+// appends a numeric suffix before the extension until a non-existing path
+// is found, e.g. "book.epub" → "book (2).epub" → "book (3).epub".
+func UniquePath(dst string) string {
+	if !FileExists(dst) {
+		return dst
+	}
+	ext := filepath.Ext(dst)
+	base := strings.TrimSuffix(dst, ext)
+	for i := 2; ; i++ {
+		candidate := fmt.Sprintf("%s (%d)%s", base, i, ext)
+		if !FileExists(candidate) {
+			return candidate
+		}
+	}
 }
 
 // CopyFile copies src to dst, creating parent directories as needed.

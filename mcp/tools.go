@@ -506,6 +506,8 @@ If the user said a series or series_index is wrong and should be REMOVED (not ju
 
 If option_id is "custom", provide custom_name (a relative path/filename under the download dir). file_name overrides just the leaf filename for the structured options.
 
+If the destination file already exists, confirm_book returns an error describing the conflict. Set force=true to overwrite the existing file, or choose a different option/name and retry.
+
 Returns the final path relative to the download directory.`),
 			mcp.WithString("staged_id",
 				mcp.Required(),
@@ -541,6 +543,9 @@ Returns the final path relative to the download directory.`),
 			),
 			mcp.WithBoolean("clear_series_index",
 				mcp.Description("If true, remove the series index from the EPUB's OPF (when rewrite_metadata=true). Use when the series name is correct but the index is wrong and should be removed."),
+			),
+			mcp.WithBoolean("force",
+				mcp.Description("If true, overwrite an existing file at the destination path. Use after a conflict error to replace the existing book."),
 			),
 		),
 		confirmBookHandler(src),
@@ -777,6 +782,7 @@ func confirmBookHandler(src bookSource) server.ToolHandlerFunc {
 			RewriteMetadata:  args["rewrite_metadata"] == "true",
 			ClearSeries:      args["clear_series"] == "true",
 			ClearSeriesIndex: args["clear_series_index"] == "true",
+			Force:            args["force"] == "true",
 		}
 
 		relPath, err := src.ConfirmBook(stagedID, choice)

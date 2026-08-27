@@ -30,12 +30,14 @@ func _() {
 	_ = x[HISTORY_LIST-19]
 	_ = x[HISTORY_DELETE-20]
 	_ = x[HISTORY_CLEAR-21]
+	_ = x[SERVER_LIST-22]
+	_ = x[DOWNLOAD_FAILED-23]
+	_ = x[FILE_CONFLICT-24]
 }
 
-const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITrename_promptrename_confirmdownload_waitingdownload_startedpost_process_startedstagd_books_notifystaged_book_resumestaged_queue_laterseries_autocompleteprocess_staged_booksdelete_stagedget_staged_liststaged_books_listprocess_one_stagedhistory_listhistory_deletehistory_clear"
+const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITrename_promptrename_confirmdownload_waitingdownload_startedpost_process_startedstagd_books_notifystaged_book_resumestaged_queue_laterseries_autocompleteprocess_staged_booksdelete_stagedget_staged_liststaged_books_listprocess_one_stagedhistory_listhistory_deletehistory_clearserver_listdownload_failedfile_conflict"
 
-// offsets: ...process_one_staged=272, history_list=284, history_delete=298, history_clear=311
-var _MessageType_index = [...]uint16{0, 6, 13, 19, 27, 36, 49, 63, 79, 95, 115, 133, 151, 169, 188, 208, 221, 236, 253, 272, 284, 298, 311}
+var _MessageType_index = [...]uint16{0, 6, 13, 19, 27, 36, 49, 63, 79, 95, 115, 133, 151, 169, 188, 208, 221, 236, 253, 272, 284, 298, 311, 322, 337, 350}
 
 func (i MessageType) String() string {
 	if i < 0 || i >= MessageType(len(_MessageType_index)-1) {
