@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jeeftor/openbooks/core"
@@ -64,6 +65,10 @@ func (server *server) routeMessage(message Request, c *Client) {
 		obj = new(ProcessOneStagedRequest)
 	case HISTORY_DELETE:
 		obj = new(HistoryDeleteRequest)
+	case IRC_SEND:
+		obj = new(IrcSendRequest)
+	case IRC_SUBSCRIBE:
+		obj = new(IrcSubscribeRequest)
 	default:
 		server.log.Println("Unknown request type received.")
 		return
@@ -94,6 +99,10 @@ func (server *server) routeMessage(message Request, c *Client) {
 		go c.handleProcessOneStaged(obj.(*ProcessOneStagedRequest), server)
 	case HISTORY_DELETE:
 		server.searchHistory.Delete(obj.(*HistoryDeleteRequest).Timestamp)
+	case IRC_SEND:
+		c.handleIrcSend(obj.(*IrcSendRequest), server)
+	case IRC_SUBSCRIBE:
+		c.ircSubscribed.Store(obj.(*IrcSubscribeRequest).Subscribed)
 	}
 }
 
@@ -133,7 +142,15 @@ func (c *Client) startIrcConnection(server *server) {
 			if err != nil {
 				server.log.Println(err)
 			}
-			handler[core.Message] = func(text string) { logger.Println(text) }
+			// Wrap the existing Message handler (which broadcasts to clients)
+			// with file logging so --log still works.
+			broadcast := handler[core.Message]
+			handler[core.Message] = func(text string) {
+				logger.Println(text)
+				if broadcast != nil {
+					broadcast(text)
+				}
+			}
 		}
 
 		go core.StartReader(sess.ctx, sess.irc, handler)
@@ -566,4 +583,20 @@ func (c *Client) sendDownloadRequest(d *DownloadRequest, server *server) {
 		c.send <- newStatusResponse(NOTIFY, "Download request received.")
 	}
 	sess.downloadQueue <- downloadJob{book: d.Book, title: title, author: d.Author}
+}
+
+// handleIrcSend sends a user-typed message to the IRC channel via the session's
+// IRC connection. This powers the live IRC panel.
+func (c *Client) handleIrcSend(req *IrcSendRequest, server *server) {
+	msg := strings.TrimSpace(req.Message)
+	if msg == "" {
+		return
+	}
+	sess := server.getSession(c.uuid)
+	if sess == nil || !sess.irc.IsConnected() {
+		safeSend(c, newErrorResponse("Not connected to IRC."))
+		return
+	}
+	sess.irc.SendMessage(msg)
+	server.logBuf.info(fmt.Sprintf("💬 IRC → #ebooks: %s", msg))
 }

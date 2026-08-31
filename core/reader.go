@@ -68,6 +68,12 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 			switch {
 			case strings.Contains(text, " 001 "): // RPL_WELCOME
 				log.Printf("[IRC] connected: %s", text)
+				// Now that the server has accepted our registration, join the channel.
+				// Sending JOIN before 001 results in "451 You have not registered".
+				if ch := irc.Channel(); ch != "" {
+				irc.JoinChannel(ch)
+				log.Printf("[IRC] joining #%s", ch)
+				}
 			case strings.Contains(text, " 332 "): // RPL_TOPIC — channel topic often mentions bot status
 				log.Printf("[IRC] channel topic: %s", text)
 			case strings.Contains(text, " 372 "): // RPL_MOTD

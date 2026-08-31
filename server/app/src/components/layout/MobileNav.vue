@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import {
   History,
   BookMarked,
@@ -9,19 +9,23 @@ import {
   Moon,
   Sun,
   BadgeCheck,
-  PlugZap
+  PlugZap,
+  Terminal
 } from "lucide-vue-next";
 import { useDark, useToggle } from "@vueuse/core";
 import { useAppStore } from "../../stores/app";
 import { useNotificationStore } from "../../stores/notifications";
 import { useTaskStore } from "../../stores/tasks";
 import { useVersion } from "../../composables/useApi";
+import { sendMessage } from "../../composables/useWebSocket";
+import { MessageType } from "../../types/messages";
 import HistoryPanel from "../sidebar/HistoryPanel.vue";
 import LibraryPanel from "../sidebar/LibraryPanel.vue";
 import ActivityPanel from "../sidebar/ActivityPanel.vue";
+import IrcPanel from "../sidebar/IrcPanel.vue";
 import VersionLink from "./VersionLink.vue";
 
-type Tab = "history" | "books" | "activity";
+type Tab = "history" | "books" | "activity" | "irc";
 
 const activeTab = ref<Tab | null>(null);
 const appStore = useAppStore();
@@ -35,7 +39,8 @@ const toggleDark = useToggle(isDark);
 const TABS = [
   { id: "history" as Tab, label: "History", icon: History },
   { id: "books" as Tab, label: "Downloads", icon: BookMarked },
-  { id: "activity" as Tab, label: "Activity", icon: Activity }
+  { id: "activity" as Tab, label: "Activity", icon: Activity },
+  { id: "irc" as Tab, label: "IRC", icon: Terminal }
 ];
 
 function selectTab(tab: Tab) {
@@ -43,8 +48,29 @@ function selectTab(tab: Tab) {
     appStore.toggleLibrarySortMode();
     return;
   }
+  // Close the desktop IRC overlay when opening the mobile IRC tab.
+  if (tab === "irc" && appStore.showIrcPanel) {
+    appStore.setIrcPanelOpen(false);
+  }
   activeTab.value = activeTab.value === tab ? null : tab;
 }
+
+// Close the mobile IRC tab when the desktop overlay opens.
+watch(() => appStore.showIrcPanel, (open) => {
+  if (open && activeTab.value === "irc") {
+    activeTab.value = null;
+  }
+});
+
+// Subscribe/unsubscribe to IRC line broadcasts when the mobile IRC tab opens/closes.
+watch(activeTab, (tab, oldTab) => {
+  if (tab === "irc") {
+    sendMessage({ type: MessageType.IRC_SUBSCRIBE, payload: { subscribed: true } });
+  } else if (oldTab === "irc") {
+    sendMessage({ type: MessageType.IRC_SUBSCRIBE, payload: { subscribed: false } });
+    appStore.clearIrcMessages();
+  }
+});
 </script>
 
 <template>
@@ -99,7 +125,8 @@ function selectTab(tab: Tab) {
       <div class="flex-1 overflow-hidden">
         <HistoryPanel v-if="activeTab === 'history'" />
         <LibraryPanel v-else-if="activeTab === 'books'" />
-        <ActivityPanel v-else />
+        <ActivityPanel v-else-if="activeTab === 'activity'" />
+        <IrcPanel v-else-if="activeTab === 'irc'" />
       </div>
     </div>
   </Transition>

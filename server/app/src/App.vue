@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useDark } from "@vueuse/core";
 import { Toaster } from "vue-sonner";
-import { useWebSocket } from "./composables/useWebSocket";
+import { useAppStore } from "./stores/app";
+import { useWebSocket, sendMessage } from "./composables/useWebSocket";
+import { MessageType } from "./types/messages";
 import AppHeader from "./components/layout/AppHeader.vue";
 import SearchTabBar from "./components/layout/SearchTabBar.vue";
 import FloatingTaskPanel from "./components/layout/FloatingTaskPanel.vue";
 import SearchView from "./pages/SearchView.vue";
 import LibraryPanel from "./components/sidebar/LibraryPanel.vue";
+import IrcPanel from "./components/sidebar/IrcPanel.vue";
 import NotificationDrawer from "./components/notifications/NotificationDrawer.vue";
 import RenameModal from "./components/RenameModal.vue";
 import StagedBooksListModal from "./components/StagedBooksListModal.vue";
@@ -18,7 +21,14 @@ import MobileNav from "./components/layout/MobileNav.vue";
 useDark({ storageKey: "ob-dark-mode", initialValue: "dark" });
 useWebSocket();
 
+const appStore = useAppStore();
 const showLibrary = ref(false);
+
+// Subscribe/unsubscribe to IRC line broadcasts when the desktop overlay opens/closes.
+watch(() => appStore.showIrcPanel, (open) => {
+  sendMessage({ type: MessageType.IRC_SUBSCRIBE, payload: { subscribed: open } });
+  if (!open) appStore.clearIrcMessages();
+});
 </script>
 
 <template>
@@ -36,6 +46,15 @@ const showLibrary = ref(false);
           v-if="showLibrary"
           class="absolute inset-0 z-10 bg-white dark:bg-slate-900 flex flex-col border-l border-slate-200 dark:border-slate-800">
           <LibraryPanel />
+        </div>
+      </Transition>
+
+      <!-- Live IRC overlay (slides in from right) -->
+      <Transition name="library-slide">
+        <div
+          v-if="appStore.showIrcPanel"
+          class="absolute inset-0 z-10 bg-white dark:bg-slate-900 flex flex-col border-l border-slate-200 dark:border-slate-800">
+          <IrcPanel />
         </div>
       </Transition>
 

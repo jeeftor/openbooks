@@ -16,6 +16,7 @@ import {
   type HistoryListResponse,
   type SeriesAutocompleteResponse,
   type ServerListResponse,
+  type IrcMessageResponse,
   type AppNotification
 } from "../types/messages";
 import { useAppStore } from "../stores/app";
@@ -326,6 +327,10 @@ export function useWebSocket() {
       case MessageType.SERVER_LIST: {
         const { servers, timestamp } = response as ServerListResponse;
         appStore.setServerList(servers, new Date(timestamp).getTime());
+        return;
+      }
+      case MessageType.IRC_MESSAGE: {
+        appStore.addIrcMessage(response as IrcMessageResponse);
         return;
       }
       default:

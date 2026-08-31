@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookMarked, Bell, Moon, Sun, BadgeCheck, PlugZap } from "lucide-vue-next";
+import { BookMarked, Bell, Moon, Sun, BadgeCheck, PlugZap, Terminal } from "lucide-vue-next";
 import { useDark, useToggle } from "@vueuse/core";
 import { useAppStore } from "../../stores/app";
 import { useNotificationStore } from "../../stores/notifications";
@@ -43,6 +43,16 @@ const toggleDark = useToggle(isDark);
       :title="appStore.isConnected ? 'Notifications' : 'Not connected'"
       @click="notifStore.toggleDrawer()">
       <Bell :size="15" />
+    </button>
+
+    <!-- Live IRC panel -->
+    <button
+      class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-30 transition-colors"
+      :class="appStore.showIrcPanel ? 'text-brand-400 bg-brand-50 dark:bg-brand-950/40' : ''"
+      :disabled="!appStore.isConnected"
+      :title="appStore.isConnected ? 'Live IRC' : 'Not connected'"
+      @click="appStore.toggleIrcPanel()">
+      <Terminal :size="15" />
     </button>
 
     <VersionLink v-if="version" :version="version" />

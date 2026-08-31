@@ -33,15 +33,19 @@ func _() {
 	_ = x[SERVER_LIST-22]
 	_ = x[DOWNLOAD_FAILED-23]
 	_ = x[FILE_CONFLICT-24]
+	_ = x[IRC_SEND-25]
+	_ = x[IRC_MESSAGE-26]
+	_ = x[IRC_SUBSCRIBE-27]
 }
 
-const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITrename_promptrename_confirmdownload_waitingdownload_startedpost_process_startedstagd_books_notifystaged_book_resumestaged_queue_laterseries_autocompleteprocess_staged_booksdelete_stagedget_staged_liststaged_books_listprocess_one_stagedhistory_listhistory_deletehistory_clearserver_listdownload_failedfile_conflict"
+const _MessageType_name = "STATUSCONNECTSEARCHDOWNLOADRATELIMITRENAME_PROMPTRENAME_CONFIRMDOWNLOAD_WAITINGDOWNLOAD_STARTEDPOST_PROCESS_STARTEDSTAGED_BOOKS_NOTIFYSTAGED_BOOK_RESUMESTAGED_QUEUE_LATERSERIES_AUTOCOMPLETEPROCESS_STAGED_BOOKSDELETE_STAGEDGET_STAGED_LISTSTAGED_BOOKS_LISTPROCESS_ONE_STAGEDHISTORY_LISTHISTORY_DELETEHISTORY_CLEARSERVER_LISTDOWNLOAD_FAILEDFILE_CONFLICTIRC_SENDIRC_MESSAGEIRC_SUBSCRIBE"
 
-var _MessageType_index = [...]uint16{0, 6, 13, 19, 27, 36, 49, 63, 79, 95, 115, 133, 151, 169, 188, 208, 221, 236, 253, 272, 284, 298, 311, 322, 337, 350}
+var _MessageType_index = [...]uint16{0, 6, 13, 19, 27, 36, 49, 63, 79, 95, 115, 134, 152, 170, 189, 209, 222, 237, 254, 272, 284, 298, 311, 322, 337, 350, 358, 369, 382}
 
 func (i MessageType) String() string {
-	if i < 0 || i >= MessageType(len(_MessageType_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_MessageType_index)-1 {
 		return "MessageType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _MessageType_name[_MessageType_index[i]:_MessageType_index[i+1]]
+	return _MessageType_name[_MessageType_index[idx]:_MessageType_index[idx+1]]
 }

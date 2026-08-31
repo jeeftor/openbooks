@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -59,6 +60,11 @@ type Client struct {
 
 	// renameConfirm receives the user's rename decision from the WebSocket handler.
 	renameConfirm chan RenameChoice
+
+	// ircSubscribed is true when the client's live IRC panel is open.
+	// The IRC reader goroutine checks this to avoid broadcasting every IRC
+	// line to clients that aren't viewing the panel.
+	ircSubscribed atomic.Bool
 }
 
 

@@ -42,6 +42,9 @@ const (
 	SERVER_LIST          // server → client: updated IRC server list with timestamp
 	DOWNLOAD_FAILED      // server → client: book download failed (DCC error or staging failure)
 	FILE_CONFLICT        // server → client: rename destination already exists, awaiting overwrite/rename/cancel
+	IRC_SEND             // client → server: send a raw message to the IRC channel
+	IRC_MESSAGE          // server → client: a raw IRC line (broadcast to subscribed clients)
+	IRC_SUBSCRIBE        // client → server: toggle live IRC line delivery on/off
 )
 
 type NotificationType int
@@ -391,5 +394,29 @@ func newServerListResponse(servers core.IrcServers) ServerListResponse {
 		StatusResponse: StatusResponse{MessageType: SERVER_LIST},
 		Servers:        servers.ElevatedUsers,
 		Timestamp:      time.Now(),
+	}
+}
+
+// IrcSendRequest is sent by the client to send a raw message to the IRC channel.
+type IrcSendRequest struct {
+	Message string `json:"message"`
+}
+
+// IrcSubscribeRequest toggles delivery of raw IRC lines to the client.
+// The client sends this when opening/closing the live IRC panel.
+type IrcSubscribeRequest struct {
+	Subscribed bool `json:"subscribed"`
+}
+
+// IrcMessageResponse carries a single raw IRC line to the client for the live IRC panel.
+type IrcMessageResponse struct {
+	StatusResponse
+	Line string `json:"line"`
+}
+
+func newIrcMessageResponse(line string) IrcMessageResponse {
+	return IrcMessageResponse{
+		StatusResponse: StatusResponse{MessageType: IRC_MESSAGE, NotificationType: NOTIFY},
+		Line:           line,
 	}
 }

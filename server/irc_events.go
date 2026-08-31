@@ -34,6 +34,7 @@ func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 	handler[core.Ping] = sess.pingHandler()
 	handler[core.ServerList] = sess.userListHandler(server)
 	handler[core.Version] = sess.versionHandler(server.config.UserAgent)
+	handler[core.Message] = sess.ircMessageHandler(server)
 	return handler
 }
 
@@ -445,6 +446,24 @@ func (sess *session) pingHandler() core.HandlerFunc {
 func (sess *session) versionHandler(version string) core.HandlerFunc {
 	return func(line string) {
 		core.SendVersionInfo(sess.irc, line, version)
+	}
+}
+
+// ircMessageHandler broadcasts raw IRC lines to clients that have the live IRC
+// panel open. Clients opt in via IRC_SUBSCRIBE; this avoids flooding every
+// websocket with IRC traffic when nobody is watching.
+func (sess *session) ircMessageHandler(srv *server) core.HandlerFunc {
+	return func(text string) {
+		clients := sess.getClients()
+		var subscribed []*Client
+		for _, c := range clients {
+			if c.ircSubscribed.Load() {
+				subscribed = append(subscribed, c)
+			}
+		}
+		if len(subscribed) > 0 {
+			broadcastToClients(subscribed, newIrcMessageResponse(text))
+		}
 	}
 }
 

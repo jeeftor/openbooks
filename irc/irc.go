@@ -82,6 +82,18 @@ func (i *Conn) JoinChannel(channel string) {
 	i.Write([]byte("JOIN #" + channel + "\r\n"))
 }
 
+// SetChannel stores the channel name without sending JOIN.
+// Used by the reader to defer the actual JOIN until the server sends 001 (welcome),
+// avoiding a "451 You have not registered" rejection when JOIN is sent too early.
+func (i *Conn) SetChannel(channel string) {
+	i.channel = channel
+}
+
+// Channel returns the configured channel name (without leading #).
+func (i *Conn) Channel() string {
+	return i.channel
+}
+
 // GetUsers sends a NAMES request to the IRC server
 func (i *Conn) GetUsers(channel string) {
 	if !i.IsConnected() {

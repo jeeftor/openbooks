@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **IRC JOIN timing race condition (root cause of search failures):** The `JOIN #ebooks` command was being sent 2 seconds after `NICK`/`USER`, but some irchighway.net servers take longer than 2s to complete registration. The server would reject the premature JOIN with `451 You have not registered`, leaving the client in a broken state — present in the NAMES list but unable to send messages (`404 Cannot send to channel`). Every search silently failed because `PRIVMSG #ebooks :@Search ...` was rejected. The JOIN is now sent by the IRC reader immediately after receiving the `001 RPL_WELCOME` message, guaranteeing the server has accepted our registration before we try to join.
+
+### Added
+
+- **Live IRC panel:** A new "IRC" tab (mobile bottom nav) and Terminal button (header) opens a live view of the raw IRC channel feed. Every IRC line the server receives is broadcast to the UI in real time — you can see search bot responses, NOTICES, DCC offers, and channel traffic as they happen. An input box at the bottom lets you send messages directly to `#ebooks` (e.g. `@search tolkien` or trying `searchook` manually), making it possible to debug search issues without restarting or using a separate IRC client. The panel auto-scrolls with a pause-on-scroll-up + "new lines" jump button, retains the last 1000 lines, and has a clear button. IRC line delivery is opt-in: the server only broadcasts raw IRC lines to clients that have the panel open (via `IRC_SUBSCRIBE`), so closing the tab stops the traffic immediately and the buffer is cleared.
+
 ## v0.3.10 - 2026-08-31
 
 ### Fixed

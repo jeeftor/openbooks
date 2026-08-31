@@ -1,9 +1,12 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse, StagedBookResumeResponse, StagedBookSummary, FileConflictResponse } from "../types/messages";
+import type { DownloadWaitingResponse, HistoryItem, RenamePromptResponse, StagedBookResumeResponse, StagedBookSummary, FileConflictResponse, IrcMessageResponse } from "../types/messages";
 
 type LibrarySortMode = "newest" | "alpha";
+
+// Maximum number of raw IRC lines retained in the live panel buffer.
+const MAX_IRC_MESSAGES = 1000;
 
 export const useAppStore = defineStore("app", () => {
   const isConnected = ref(false);
@@ -56,6 +59,10 @@ export const useAppStore = defineStore("app", () => {
   // Server list with timestamp for online/offline status (from SERVER_LIST).
   const serverList = ref<string[]>([]);
   const serverListTimestamp = ref<number>(0);
+
+  // Live IRC panel — raw IRC lines broadcast from the server.
+  const ircMessages = ref<IrcMessageResponse[]>([]);
+  const showIrcPanel = ref(false);
 
   function setConnected(connected: boolean) {
     isConnected.value = connected;
@@ -126,6 +133,25 @@ export const useAppStore = defineStore("app", () => {
     serverListTimestamp.value = timestamp;
   }
 
+  function addIrcMessage(msg: IrcMessageResponse) {
+    ircMessages.value.push(msg);
+    if (ircMessages.value.length > MAX_IRC_MESSAGES) {
+      ircMessages.value = ircMessages.value.slice(-MAX_IRC_MESSAGES);
+    }
+  }
+
+  function clearIrcMessages() {
+    ircMessages.value = [];
+  }
+
+  function toggleIrcPanel() {
+    showIrcPanel.value = !showIrcPanel.value;
+  }
+
+  function setIrcPanelOpen(open: boolean) {
+    showIrcPanel.value = open;
+  }
+
   function toggleLibrarySortMode() {
     librarySortMode.value = librarySortMode.value === "newest" ? "alpha" : "newest";
   }
@@ -154,6 +180,8 @@ export const useAppStore = defineStore("app", () => {
     knownSeries,
     serverList,
     serverListTimestamp,
+    ircMessages,
+    showIrcPanel,
     setConnected,
     setConnecting,
     setUsername,
@@ -170,6 +198,10 @@ export const useAppStore = defineStore("app", () => {
     setPendingStagedBook,
     setStagedBooksList,
     setKnownSeries,
-    setServerList
+    setServerList,
+    addIrcMessage,
+    clearIrcMessages,
+    toggleIrcPanel,
+    setIrcPanelOpen
   };
 });

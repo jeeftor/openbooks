@@ -3,23 +3,23 @@ package core
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jeeftor/openbooks/irc"
 )
 
 // Specific irc.irchighway.net commands
 
-// Join connects to the irc.irchighway.net server and joins the #ebooks channel
+// Join connects to the irc.irchighway.net server and registers the nickname.
+// The actual channel JOIN is deferred to the reader, which sends it after
+// receiving the 001 welcome message — sending JOIN before 001 results in
+// "451 You have not registered" on some servers.
 func Join(irc *irc.Conn, address string, enableTLS bool) error {
 	err := irc.Connect(address, enableTLS)
 	if err != nil {
 		return err
 	}
-	// Wait before joining the ebooks room
-	// Often you recieve a private message from the server
-	time.Sleep(time.Second * 2)
-	irc.JoinChannel("ebooks")
+	// Store the channel name; the reader will send JOIN after 001 is received.
+	irc.SetChannel("ebooks")
 	return nil
 }
 

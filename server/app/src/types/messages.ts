@@ -30,7 +30,10 @@ export enum MessageType {
   HISTORY_CLEAR,
   SERVER_LIST,
   DOWNLOAD_FAILED,
-  FILE_CONFLICT
+  FILE_CONFLICT,
+  IRC_SEND,
+  IRC_MESSAGE,
+  IRC_SUBSCRIBE
 }
 
 export interface AppNotification {
@@ -224,5 +227,23 @@ export interface StageQueueLaterRequest {
   type: MessageType.STAGED_QUEUE_LATER;
   payload: {
     stagedId: string;
+  };
+}
+
+export interface IrcMessageResponse extends WsResponse {
+  line: string;
+}
+
+export interface IrcSendRequest {
+  type: MessageType.IRC_SEND;
+  payload: {
+    message: string;
+  };
+}
+
+export interface IrcSubscribeRequest {
+  type: MessageType.IRC_SUBSCRIBE;
+  payload: {
+    subscribed: boolean;
   };
 }
