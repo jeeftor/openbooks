@@ -62,6 +62,26 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 				invoke(text)
 			}
 
+			// Log important IRC numerics for connection diagnostics.
+			// These appear during handshake and channel join; none are handled
+			// as events but they're invaluable when diagnosing search failures.
+			switch {
+			case strings.Contains(text, " 001 "): // RPL_WELCOME
+				log.Printf("[IRC] connected: %s", text)
+			case strings.Contains(text, " 332 "): // RPL_TOPIC — channel topic often mentions bot status
+				log.Printf("[IRC] channel topic: %s", text)
+			case strings.Contains(text, " 372 "): // RPL_MOTD
+				log.Printf("[IRC] MOTD: %s", text)
+			case strings.Contains(text, " 376 "): // RPL_ENDOFMOTD
+				log.Printf("[IRC] MOTD end")
+			case strings.Contains(text, " 433 "): // ERR_NICKNAMEINUSE
+				log.Printf("[IRC] ERROR nick in use: %s", text)
+			case strings.Contains(text, " 474 "): // ERR_BANNEDFROMCHAN
+				log.Printf("[IRC] ERROR banned from channel: %s", text)
+			case strings.HasPrefix(text, "ERROR "): // server-level error / kill
+				log.Printf("[IRC] ERROR: %s", text)
+			}
+
 			event := noOp
 			if strings.Contains(text, sendMessage) {
 				if strings.Contains(text, searchResultIdentifier) {
