@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.4.0 - 2026-08-31
+
 ### Fixed
 
 - **IRC JOIN timing race condition (root cause of search failures):** The `JOIN #ebooks` command was being sent 2 seconds after `NICK`/`USER`, but some irchighway.net servers take longer than 2s to complete registration. The server would reject the premature JOIN with `451 You have not registered`, leaving the client in a broken state — present in the NAMES list but unable to send messages (`404 Cannot send to channel`). Every search silently failed because `PRIVMSG #ebooks :@Search ...` was rejected. The JOIN is now sent by the IRC reader immediately after receiving the `001 RPL_WELCOME` message, guaranteeing the server has accepted our registration before we try to join.
