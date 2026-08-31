@@ -23,6 +23,7 @@ const (
 	ServerList     = event(8)
 	Ping           = event(9)
 	Version        = event(10)
+	ChannelBanned  = event(11)
 )
 
 // Unique identifiers found in the message for various different events.
@@ -89,7 +90,7 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 			case strings.Contains(text, " 473 "): // ERR_INVITEONLYCHAN
 				log.Printf("[IRC] ERROR invite only: %s", text)
 			case strings.Contains(text, " 474 "): // ERR_BANNEDFROMCHAN
-				log.Printf("[IRC] ERROR banned from channel: %s", text)
+			log.Printf("[IRC] ERROR banned from channel: %s", text)
 			case strings.Contains(text, " 475 "): // ERR_BADCHANNELKEY
 				log.Printf("[IRC] ERROR bad channel key: %s", text)
 			case strings.HasPrefix(text, "ERROR "): // server-level error / kill
@@ -138,6 +139,8 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 				event = Ping
 			} else if strings.Contains(text, versionInquiry) {
 				event = Version
+			} else if strings.Contains(text, " 474 ") {
+				event = ChannelBanned
 			}
 
 			if invoke, ok := handler[event]; ok {

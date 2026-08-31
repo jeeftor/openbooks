@@ -35,6 +35,7 @@ func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 	handler[core.ServerList] = sess.userListHandler(server)
 	handler[core.Version] = sess.versionHandler(server.config.UserAgent)
 	handler[core.Message] = sess.ircMessageHandler(server)
+	handler[core.ChannelBanned] = sess.channelBannedHandler(server.logBuf)
 	return handler
 }
 
@@ -420,6 +421,16 @@ func (sess *session) badServerHandler(lb *logBuffer) core.HandlerFunc {
 	return func(_ string) {
 		lb.warn("IRC: server unavailable, try another")
 		broadcastToClients(sess.getClients(), newErrorResponse("Server is not available. Try another one."))
+	}
+}
+
+// channelBannedHandler fires when the IRC server returns 474 ERR_BANNEDFROMCHAN.
+// We surface a clear error to the user and do NOT retry — retrying a banned
+// channel can provoke operators into making the ban permanent.
+func (sess *session) channelBannedHandler(lb *logBuffer) core.HandlerFunc {
+	return func(_ string) {
+		lb.error("IRC: banned from #ebooks (474) — not retrying")
+		broadcastToClients(sess.getClients(), newErrorResponse("You are banned from #ebooks. The app will not retry. Try again later or use a different network."))
 	}
 }
 
