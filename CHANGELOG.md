@@ -11,7 +11,6 @@
 ### Added
 
 - **Live IRC panel:** A new "IRC" tab (mobile bottom nav) and Terminal button (header) opens a live view of the raw IRC channel feed, formatted like a real IRC client with timestamps, color-coded nicks, message type icons (→ join, ← quit, DCC highlight), and smart NOTICE coloring (amber for "search accepted", green for "N matches", red for errors). A chat/all filter toggle hides noisy server numerics in chat mode. Every IRC line the server receives is broadcast to the UI in real time. An input box at the bottom lets you send messages directly to `#ebooks`. The panel auto-scrolls with a pause-on-scroll-up + "new lines" jump button, retains the last 1000 lines, and has a clear button. IRC line delivery is opt-in: the server only broadcasts raw IRC lines to clients that have the panel open (via `IRC_SUBSCRIBE`), so closing the tab stops the traffic immediately and the buffer is cleared.
-- **Live IRC integration tests** (`-tags liveirc`): Connect/join and full search round-trip tests against the real irc.irchighway.net server. CI runs them non-blocking on push to master. Tests use random non-patterned nicks to avoid channel bans.
 
 ## v0.3.10 - 2026-08-31
 

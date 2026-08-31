@@ -37,23 +37,18 @@ The app connects to `irc.irchighway.net` and joins `#ebooks` to search for books
 
 ### What got us banned (August 2026)
 
-During development of the live IRC panel and integration tests, we:
-- Connected and disconnected 15+ times in rapid succession from the same IP
-- Ran automated search tests that sent `@SearchOok tolkien` repeatedly
-- Sent test messages ("test connection") to the channel
-- Used predictable nick patterns (`openbooks_*`, `ob_test_*`)
+During development, we connected and disconnected 15+ times in rapid succession from the same IP, ran automated search tests, sent test messages to the channel, and used predictable nick patterns (`openbooks_*`, `ob_test_*`).
 
 The channel operator `fruitloops` set these bans:
-- `openbooks*!*@*` — bans ALL nicks starting with "openbooks" (affects any user who sets `--name openbooks_*`)
+- `openbooks*!*@*` — bans ALL nicks starting with "openbooks"
 - `ob_test*!*@*` — bans our test nicks
 - `*!*@ihw-<our-IP>` — IP-based ban (blocks everything from that network)
 
 ### Rules to prevent future bans
 
 1. **NEVER use predictable nick prefixes.** The app's guest name generator (`server/guest_names.go`) produces names like `eager_lion` — these are safe. The Makefile no longer sets `--name` by default. Do not change this.
-2. **NEVER send test/noise messages to #ebooks.** Don't write tests that `PRIVMSG #ebooks` with "hello" or "test connection". Only send real search commands (`@SearchOok <query>`).
-3. **Minimize connections.** Each test run = one IRC connection. Don't run live tests repeatedly in quick succession. The server has a session limit (~2-3 per IP) and operators notice rapid connect/disconnect cycles.
-4. **Live IRC tests use the `liveirc` build tag.** They never run in normal `go test`. The CI workflow (`.github/workflows/live-irc.yml`) runs them non-blocking with `continue-on-error: true`.
-5. **Live test nicks must be random.** `core/live_irc_test.go` generates nicks like `calmotter42` — random adjective+animal+number with no fixed prefix. Do NOT change `liveNick()` to use a predictable pattern.
-6. **The MCP server no longer requires `--name`.** If not set, it generates a random nick like `reader1a2b3c4d`. Do not re-add the `log.Fatal("--name is required")` check.
-7. **E2e Playwright tests must not match `openbooks_` text.** The username is a random guest name. Tests should wait for the header connection indicator (non-empty `span.truncate`) instead.
+2. **NEVER send test/noise messages to #ebooks.** Don't write tests or scripts that `PRIVMSG #ebooks` with "hello" or "test connection". Only real user-initiated searches should go to the channel.
+3. **NEVER write live IRC integration tests.** We removed `core/live_irc_test.go` and the `liveirc` build tag because automated connections to #ebooks risk getting us banned again. Do NOT re-add them. Use the mock IRC server (`cmd/mock_server`) for testing instead.
+4. **Minimize connections.** The IRC server has a session limit (~2-3 per IP). Don't start multiple OpenBooks instances from the same IP simultaneously.
+5. **The MCP server no longer requires `--name`.** If not set, it generates a random nick like `reader1a2b3c4d`. Do not re-add the `log.Fatal("--name is required")` check.
+6. **E2e Playwright tests must not match `openbooks_` text.** The username is a random guest name. Tests should wait for the header connection indicator (non-empty `span.truncate`) instead.
