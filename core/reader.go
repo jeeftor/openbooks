@@ -74,10 +74,18 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 				log.Printf("[IRC] MOTD: %s", text)
 			case strings.Contains(text, " 376 "): // RPL_ENDOFMOTD
 				log.Printf("[IRC] MOTD end")
+			case strings.Contains(text, " JOIN "): // channel join confirmation
+				log.Printf("[IRC] JOIN: %s", text)
 			case strings.Contains(text, " 433 "): // ERR_NICKNAMEINUSE
 				log.Printf("[IRC] ERROR nick in use: %s", text)
+			case strings.Contains(text, " 471 "): // ERR_CHANNELISFULL
+				log.Printf("[IRC] ERROR channel full: %s", text)
+			case strings.Contains(text, " 473 "): // ERR_INVITEONLYCHAN
+				log.Printf("[IRC] ERROR invite only: %s", text)
 			case strings.Contains(text, " 474 "): // ERR_BANNEDFROMCHAN
 				log.Printf("[IRC] ERROR banned from channel: %s", text)
+			case strings.Contains(text, " 475 "): // ERR_BADCHANNELKEY
+				log.Printf("[IRC] ERROR bad channel key: %s", text)
 			case strings.HasPrefix(text, "ERROR "): // server-level error / kill
 				log.Printf("[IRC] ERROR: %s", text)
 			}

@@ -453,6 +453,11 @@ func (sess *session) userListHandler(srv *server) core.HandlerFunc {
 		servers := core.ParseServers(text)
 		sess.setServerList(servers)
 
+		// Log to stdout so channel membership is visible in Docker logs.
+		// This is the key diagnostic: if 'search' or 'searchook' isn't in this
+		// list, that's why searches never get a response.
+		srv.log.Printf("CLIENT (%s): #ebooks — elevated: %v | regular: %v\n", sess.username, servers.ElevatedUsers, servers.RegularUsers)
+
 		// Notify all connected clients of updated server list with timestamp.
 		broadcastToClients(sess.getClients(), newServerListResponse(servers))
 	}
