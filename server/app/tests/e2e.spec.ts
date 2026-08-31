@@ -17,9 +17,23 @@ const BASE = 'http://localhost:5173';
 const CONNECT_TIMEOUT = 60_000;   // IRC re-handshake can be slow after prior runs
 const SEARCH_TIMEOUT  = 150_000;  // 2.5 min — covers cold IRC searches
 
-/** Wait for the WebSocket to connect (username appears in header). */
+/** Wait for the WebSocket to connect (connected indicator appears in header).
+ *  The username is a random guest name (e.g. "eager_lion") so we can't match
+ *  a fixed prefix — instead we wait for the BadgeCheck icon that only renders
+ *  when appStore.username is set (i.e. connected to IRC). */
 async function waitConnected(page: Page) {
-  await page.waitForSelector('text=openbooks_', { timeout: CONNECT_TIMEOUT });
+  // The header shows a BadgeCheck SVG icon when connected, PlugZap when not.
+  // Wait for any text to appear in the username span (non-empty = connected).
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('header span.truncate');
+      return el && el.textContent && el.textContent.trim() !== '' &&
+             el.textContent.trim() !== 'Connecting…' &&
+             el.textContent.trim() !== 'Disconnected';
+    },
+    null,
+    { timeout: CONNECT_TIMEOUT }
+  );
 }
 
 
@@ -66,9 +80,9 @@ test.describe('Connection', () => {
   test('username appears in header and main area after connect', async ({ page }) => {
     await page.goto(BASE);
     await waitConnected(page);
-    // At least one element containing the username is visible
-    const els = page.locator('text=openbooks_');
-    await expect(els.first()).toBeVisible();
+    // The header span should contain a non-empty username (guest name like "eager_lion")
+    const headerSpan = page.locator('header span.truncate');
+    await expect(headerSpan).not.toBeEmpty();
   });
 
   test('search input is enabled when connected', async ({ page }) => {

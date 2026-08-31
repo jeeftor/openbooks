@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"os/signal"
 	"syscall"
@@ -51,12 +52,23 @@ control filename spacing, matching the web server flags.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		logger := obsmcp.DefaultLogger()
 
+		// Fall back to a random nick if --name is not set.
+		// Generates a random hex string that doesn't match any predictable
+		// pattern — avoids the openbooks*!*@* ban on #ebooks.
+		userName := globalFlags.UserName
+		if userName == "" && !mcpMock {
+			b := make([]byte, 4)
+			rand.Read(b)
+			userName = "reader" + hex.EncodeToString(b)
+			logger.Info("no --name set, using generated nick", "nick", userName)
+		}
+
 		cfg := obsmcp.ServerConfig{
 			Mock: mcpMock,
 			Port: mcpPort,
 			Host: mcpHost,
 			IRC: obsmcp.Config{
-				UserName:       globalFlags.UserName,
+				UserName:       userName,
 				UserAgent:      globalFlags.UserAgent,
 				Server:         globalFlags.Server,
 				EnableTLS:      globalFlags.EnableTLS,
@@ -67,10 +79,6 @@ control filename spacing, matching the web server flags.`,
 				ReplaceSpace:   mcpReplaceSpace,
 				Log:            logger,
 			},
-		}
-
-		if !mcpMock && cfg.IRC.UserName == "" {
-			log.Fatal("--name is required (unless using --mock)")
 		}
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

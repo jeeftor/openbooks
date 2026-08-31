@@ -52,7 +52,7 @@ help:
 	@echo "  make docker-dev-calibre  Build + run calibre image locally on :8080"
 	@echo "  make clean             Remove build artifacts"
 	@echo ""
-	@echo "  Override username: make dev NAME=myuser  (default: openbooks_abs_dev)"
+	@echo "  Override username: make dev NAME=myuser  (default: random guest name)"
 	@echo ""
 
 # ─── Setup ───────────────────────────────────────────────────────────────────
@@ -82,8 +82,13 @@ install-npm:
 #       The frontend Vite dev server proxies WS to :5228 automatically.
 # =============================================================================
 
-# Default username (override with: make dev NAME=myname)
-NAME ?= openbooks_abs_dev
+# Default username: empty = random guest name (e.g. "eager_lion").
+# Override with: make dev NAME=myname
+# IMPORTANT: Do NOT use "openbooks_*" as a name prefix — the #ebooks channel
+# has banned openbooks*!*@* nicks. Guest names are safe and random.
+NAME ?=
+# Expands to --name $(NAME) if NAME is set, empty otherwise.
+NAME_FLAG = $(if $(NAME),--name $(NAME),)
 
 # ── All-in-one: Real IRC ──────────────────────────────────────────────────────
 dev: build-frontend install-npm
@@ -91,10 +96,10 @@ dev: build-frontend install-npm
 	@echo "  IRC:      irc.irchighway.net:6697"
 	@echo "  Backend:  http://localhost:5228"
 	@echo "  Frontend: http://localhost:5173  ← open in browser"
-	@echo "  Username: $(NAME)"
+	@echo "  Username: $(if $(NAME),$(NAME),<random guest name>)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads --dev 2>&1 | sed 's/^/[backend] /') & \
+	(cd cmd/openbooks && go build && ./openbooks server $(NAME_FLAG) --dir $(CURDIR)/books --organize-downloads --dev 2>&1 | sed 's/^/[backend] /') & \
 	sleep 2 && (cd server/app && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -105,10 +110,10 @@ dev-mobile: build-frontend install-npm
 	echo "  IRC:      irc.irchighway.net:6697"; \
 	echo "  Backend:  http://$$LOCAL_IP:5228"; \
 	echo "  Frontend: http://$$LOCAL_IP:5173  ← open on your phone/tablet"; \
-	echo "  Username: $(NAME)"; \
+	echo "  Username: $(if $(NAME),$(NAME),<random guest name>)"; \
 	echo ""; \
 	trap 'kill 0' EXIT; \
-	(cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads --dev 2>&1 | sed 's/^/[backend] /') & \
+	(cd cmd/openbooks && go build && ./openbooks server $(NAME_FLAG) --dir $(CURDIR)/books --organize-downloads --dev 2>&1 | sed 's/^/[backend] /') & \
 	sleep 2 && (cd server/app && npm run dev -- --host 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -118,11 +123,11 @@ dev-mock: build-frontend install-npm
 	@echo "  Mock IRC: localhost:6667  (offline, no IRC account needed)"
 	@echo "  Backend:  http://localhost:5228"
 	@echo "  Frontend: http://localhost:5173  ← open in browser"
-	@echo "  Username: $(NAME)"
+	@echo "  Username: $(if $(NAME),$(NAME),<random guest name>)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
 	(cd cmd/mock_server && go run . 2>&1 | sed 's/^/[mock]     /') & \
-	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 --dev 2>&1 | sed 's/^/[backend]  /') & \
+	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server $(NAME_FLAG) --tls=false --server localhost:6667 --dev 2>&1 | sed 's/^/[backend]  /') & \
 	sleep 3 && (cd server/app && npm run dev 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
@@ -133,19 +138,19 @@ dev-mock-mobile: build-frontend install-npm
 	echo "  Mock IRC: localhost:6667  (offline, no IRC account needed)"; \
 	echo "  Backend:  http://$$LOCAL_IP:5228"; \
 	echo "  Frontend: http://$$LOCAL_IP:5173  ← open on your phone/tablet"; \
-	echo "  Username: $(NAME)"; \
+	echo "  Username: $(if $(NAME),$(NAME),<random guest name>)"; \
 	echo ""; \
 	trap 'kill 0' EXIT; \
 	(cd cmd/mock_server && go run . 2>&1 | sed 's/^/[mock]     /') & \
-	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 --dev 2>&1 | sed 's/^/[backend]  /') & \
+	sleep 2 && (cd cmd/openbooks && go build && ./openbooks server $(NAME_FLAG) --tls=false --server localhost:6667 --dev 2>&1 | sed 's/^/[backend]  /') & \
 	sleep 3 && (cd server/app && npm run dev -- --host 2>&1 | sed 's/^/[frontend] /') & \
 	wait
 
 # ── Separate terminals: Real IRC ──────────────────────────────────────────────
 dev1: build-frontend
-	@echo "Backend → :5228  (username: $(NAME))"
+	@echo "Backend → :5228  (username: $(if $(NAME),$(NAME),<random guest name>))"
 	@echo "Run 'make dev2' in another terminal once backend is ready."
-	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --dir $(CURDIR)/books --organize-downloads --dev
+	cd cmd/openbooks && go build && ./openbooks server $(NAME_FLAG) --dir $(CURDIR)/books --organize-downloads --dev
 
 dev2: install-npm
 	@echo "Frontend → :5173  (http://localhost:5173)"
@@ -158,9 +163,9 @@ dev-mock1:
 	cd cmd/mock_server && go run .
 
 dev-mock2: build-frontend
-	@echo "Backend → :5228  (mock IRC, username: $(NAME))"
+	@echo "Backend → :5228  (mock IRC, username: $(if $(NAME),$(NAME),<random guest name>))"
 	@echo "Run 'make dev2' in another terminal once backend is ready."
-	cd cmd/openbooks && go build && ./openbooks server --name $(NAME) --tls=false --server localhost:6667 --dev
+	cd cmd/openbooks && go build && ./openbooks server $(NAME_FLAG) --tls=false --server localhost:6667 --dev
 
 # ─── Build ───────────────────────────────────────────────────────────────────
 build: build-frontend build-backend
@@ -227,7 +232,7 @@ docker-dev-calibre: docker-calibre
 	docker run --rm -p 8080:80 \
 	  -v $(PWD)/books:/books \
 	  openbooks-abs-calibre \
-	  server --name $(NAME) --dir /books --port 80 --dev \
+	  server $(NAME_FLAG) --dir /books --port 80 --dev \
 	  --post-process-cmd "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--compress-images"
 
 # ─── Clean ───────────────────────────────────────────────────────────────────

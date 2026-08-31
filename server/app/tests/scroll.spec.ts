@@ -3,8 +3,18 @@ import { test, expect } from '@playwright/test';
 test('search for "fire" and verify results table is scrollable', async ({ page }) => {
   await page.goto('http://localhost:5173');
 
-  // Wait for WebSocket connection (username appears in header)
-  await page.waitForSelector('text=openbooks_', { timeout: 20000 });
+  // Wait for WebSocket connection — username is a random guest name,
+  // so wait for the header span to be non-empty (not "Connecting…" / "Disconnected")
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('header span.truncate');
+      return el && el.textContent && el.textContent.trim() !== '' &&
+             el.textContent.trim() !== 'Connecting…' &&
+             el.textContent.trim() !== 'Disconnected';
+    },
+    null,
+    { timeout: 20000 }
+  );
 
   // Type and submit search
   const input = page.locator('input[type="search"]');
