@@ -31,24 +31,21 @@ This is a solo-user app. No gitflow, no feature branches, no PRs for normal work
 - Use `rg` for content searches and `fd` or `find` for file discovery.
 - Run the relevant repo-native checks before committing. If a check cannot be run or has known unrelated failures, document that clearly.
 
-## CRITICAL: IRC #ebooks Channel Rules
+## IRC #ebooks Channel Rules
 
-The app connects to `irc.irchighway.net` and joins `#ebooks` to search for books. This is a real IRC channel run by human operators who **will ban you** if you abuse it. The channel topic literally says "Don't test scripts here!"
+The app connects to `irc.irchighway.net` and joins `#ebooks` to search for books. This is a real IRC channel run by human operators. The channel topic says "Don't test scripts here!" — be respectful.
 
-### What got us banned (August 2026)
+### Incident history (August 2026)
 
-During development, we connected and disconnected 15+ times in rapid succession from the same IP, ran automated search tests, sent test messages to the channel, and used predictable nick patterns (`openbooks_*`, `ob_test_*`).
+During development, we connected/disconnected 15+ times rapidly from the same IP, ran automated search tests, sent test messages to the channel, and used predictable nick patterns (`openbooks_*`, `ob_test_*`). The channel operator `fruitloops` set nick-pattern and IP bans. The IP ban became moot after switching ISPs. These bans may or may not still be active — check with `MODE #ebooks +b` from a fresh connection if you need to know.
 
-The channel operator `fruitloops` set these bans:
-- `openbooks*!*@*` — bans ALL nicks starting with "openbooks"
-- `ob_test*!*@*` — bans our test nicks
-- `*!*@ihw-<our-IP>` — IP-based ban (blocks everything from that network)
+### Permanent best practices
 
-### Rules to prevent future bans
+These rules apply regardless of whether any bans are currently active:
 
-1. **NEVER use predictable nick prefixes.** The app's guest name generator (`server/guest_names.go`) produces names like `eager_lion` — these are safe. The Makefile no longer sets `--name` by default. Do not change this.
-2. **NEVER send test/noise messages to #ebooks.** Don't write tests or scripts that `PRIVMSG #ebooks` with "hello" or "test connection". Only real user-initiated searches should go to the channel.
-3. **NEVER write live IRC integration tests.** We removed `core/live_irc_test.go` and the `liveirc` build tag because automated connections to #ebooks risk getting us banned again. Do NOT re-add them. Use the mock IRC server (`cmd/mock_server`) for testing instead.
-4. **Minimize connections.** The IRC server has a session limit (~2-3 per IP). Don't start multiple OpenBooks instances from the same IP simultaneously.
-5. **The MCP server no longer requires `--name`.** If not set, it generates a random nick like `reader1a2b3c4d`. Do not re-add the `log.Fatal("--name is required")` check.
+1. **Prefer random guest names over fixed `--name` prefixes.** The app's guest name generator (`server/guest_names.go`) produces names like `eager_lion`. The Makefile defaults to no `--name` (random guest name). You can override with `make dev NAME=myuser` but avoid `openbooks_*` patterns.
+2. **Don't send test/noise messages to #ebooks.** Only real user-initiated searches should go to the channel. No "hello", "test", or probe messages.
+3. **Don't write live IRC integration tests.** Automated connections to #ebooks risk bans. Use the mock IRC server (`cmd/mock_server`) for testing instead. If live tests are ever truly needed, use random non-patterned nicks and minimize connection count — but they were removed deliberately in Aug 2026 and should not be re-added lightly.
+4. **Minimize simultaneous connections.** The IRC server has a session limit (~2-3 per IP). Don't start multiple OpenBooks instances from the same IP at the same time.
+5. **The MCP server doesn't require `--name`.** If not set, it generates a random nick like `reader1a2b3c4d`. Do not re-add a hard `log.Fatal` requirement.
 6. **E2e Playwright tests must not match `openbooks_` text.** The username is a random guest name. Tests should wait for the header connection indicator (non-empty `span.truncate`) instead.
