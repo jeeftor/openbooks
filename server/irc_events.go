@@ -27,10 +27,10 @@ func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 	handler := core.EventHandler{}
 	handler[core.SearchResult] = sess.searchResultHandler(server.config.DownloadDir, server.logBuf, server)
 	handler[core.BookResult] = sess.bookResultHandler(*server.config, server.logBuf, server.stagedBooks, server.seriesRegistry, server)
-	handler[core.NoResults] = sess.noResultsHandler()
-	handler[core.BadServer] = sess.badServerHandler()
-	handler[core.SearchAccepted] = sess.searchAcceptedHandler()
-	handler[core.MatchesFound] = sess.matchesFoundHandler()
+	handler[core.NoResults] = sess.noResultsHandler(server.logBuf)
+	handler[core.BadServer] = sess.badServerHandler(server.logBuf)
+	handler[core.SearchAccepted] = sess.searchAcceptedHandler(server.logBuf)
+	handler[core.MatchesFound] = sess.matchesFoundHandler(server.logBuf)
 	handler[core.Ping] = sess.pingHandler()
 	handler[core.ServerList] = sess.userListHandler(server)
 	handler[core.Version] = sess.versionHandler(server.config.UserAgent)
@@ -40,9 +40,17 @@ func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 // searchResultHandler downloads from DCC server, parses data, and sends data to client.
 func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer, srv *server) core.HandlerFunc {
 	return func(text string) {
+		if d, parseErr := dcc.ParseString(text); parseErr == nil {
+			lb.info(fmt.Sprintf("DCC SEND: %s -> %s:%s (%d bytes)", d.Filename, d.IP, d.Port, d.Size))
+			srv.log.Printf("CLIENT (%s): search DCC SEND -> %s:%s (%d bytes)\n", sess.username, d.IP, d.Port, d.Size)
+		} else {
+			lb.warn(fmt.Sprintf("Search DCC string unreadable (%v) — attempting download anyway", parseErr))
+		}
+
 		extractedPath, err := core.DownloadExtractDCCString(downloadDir, text, nil)
 		if err != nil {
 			lb.error(fmt.Sprintf("Search download failed: %v", err))
+			srv.log.Printf("CLIENT (%s): search DCC download failed: %v\n", sess.username, err)
 			broadcastToClients(sess.getClients(), newErrorResponse("Error when downloading search results."))
 			srv.resultCache.CancelInFlight(sess.query)
 			return
@@ -57,7 +65,7 @@ func (sess *session) searchResultHandler(downloadDir string, lb *logBuffer, srv 
 		rawResults, _ := os.ReadFile(extractedPath)
 
 		if len(bookResults) == 0 && len(parseErrors) == 0 {
-			sess.noResultsHandler()(text)
+			sess.noResultsHandler(lb)(text)
 			srv.resultCache.CancelInFlight(sess.query)
 			return
 		}
@@ -400,26 +408,30 @@ func finalizeRename(
 	broadcastToClients(sess.getClients(), newDownloadResponse(finalPath, dir))
 }
 
-func (sess *session) noResultsHandler() core.HandlerFunc {
+func (sess *session) noResultsHandler(lb *logBuffer) core.HandlerFunc {
 	return func(_ string) {
+		lb.info("IRC: no results returned for query")
 		broadcastToClients(sess.getClients(), newErrorResponse("No results found for the query."))
 	}
 }
 
-func (sess *session) badServerHandler() core.HandlerFunc {
+func (sess *session) badServerHandler(lb *logBuffer) core.HandlerFunc {
 	return func(_ string) {
+		lb.warn("IRC: server unavailable, try another")
 		broadcastToClients(sess.getClients(), newErrorResponse("Server is not available. Try another one."))
 	}
 }
 
-func (sess *session) searchAcceptedHandler() core.HandlerFunc {
+func (sess *session) searchAcceptedHandler(lb *logBuffer) core.HandlerFunc {
 	return func(_ string) {
+		lb.info("IRC: search accepted by bot")
 		broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY, "Search accepted into the queue."))
 	}
 }
 
-func (sess *session) matchesFoundHandler() core.HandlerFunc {
+func (sess *session) matchesFoundHandler(lb *logBuffer) core.HandlerFunc {
 	return func(num string) {
+		lb.info(fmt.Sprintf("IRC: %s matches found", num))
 		broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY, fmt.Sprintf("Found %s results for your query.", num)))
 	}
 }

@@ -1,10 +1,15 @@
 # Changelog
 
-## Unreleased
+## v0.3.10 - 2026-08-31
 
 ### Fixed
 
 - **File conflict prompt on rename:** Downloading a book whose rename destination already exists no longer silently overwrites the existing file. The web UI now shows a conflict banner with the existing file path and offers three options: edit the name to save elsewhere, overwrite the existing file, or save for later. The auto-rename mode automatically picks a unique filename (e.g. `book (2).epub`) and logs a warning. The MCP `confirm_book` tool returns a descriptive error when the destination exists; set `force=true` to overwrite.
+
+### Changed
+
+- **Improved IRC event logging:** All significant IRC events (search accepted, matches found, no results, server unavailable, DCC SEND) now log to stdout immediately — visible in Docker logs without needing `--log`. When a search result DCC arrives, the filename, IP, port, and byte size are logged to both stdout and the server log UI. Download failures also now appear in stdout.
+- **IRC connection diagnostics:** Welcome (001), channel topic (332), MOTD (372/376), nick-in-use (433), banned (474), and server ERROR messages now all log to stdout on connect, making it possible to diagnose IRC-level issues without enabling `--log`.
 
 ## v0.3.5 - 2026-08-18
 

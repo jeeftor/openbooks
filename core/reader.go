@@ -66,21 +66,27 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 			if strings.Contains(text, sendMessage) {
 				if strings.Contains(text, searchResultIdentifier) {
 					event = SearchResult
+					log.Printf("[IRC] <- DCC SEND: search results file")
 				} else {
 					event = BookResult
+					log.Printf("[IRC] <- DCC SEND: book file")
 				}
 			} else if strings.Contains(text, noticeMessage) {
 				if strings.Contains(text, noResults) {
 					event = NoResults
+					log.Printf("[IRC] <- NOTICE: no results")
 				} else if strings.Contains(text, serverUnavailable) {
 					event = BadServer
+					log.Printf("[IRC] <- NOTICE: server unavailable")
 				} else if strings.Contains(text, searchAccepted) {
 					event = SearchAccepted
+					log.Printf("[IRC] <- NOTICE: search accepted")
 				} else if strings.Contains(text, numMatches) {
 					start := strings.LastIndex(text, "returned") + 9
 					end := strings.LastIndex(text, "matches") - 1
 					text = text[start:end]
 					event = MatchesFound
+					log.Printf("[IRC] <- NOTICE: %s matches found", text)
 				}
 			} else if strings.Contains(text, beginUserList) {
 				// RPL_NAMREPLY (353) can span multiple lines for large
