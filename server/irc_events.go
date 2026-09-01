@@ -36,6 +36,10 @@ func (server *server) NewIrcEventHandler(sess *session) core.EventHandler {
 	handler[core.Version] = sess.versionHandler(server.config.UserAgent)
 	handler[core.Message] = sess.ircMessageHandler(server)
 	handler[core.ChannelBanned] = sess.channelBannedHandler(server.logBuf)
+	handler[core.ChannelFull] = sess.channelErrorHandler(server.logBuf, "#ebooks is full. Try again later.")
+	handler[core.InviteOnly] = sess.channelErrorHandler(server.logBuf, "#ebooks is invite-only. You cannot join.")
+	handler[core.BadChannelKey] = sess.channelErrorHandler(server.logBuf, "Bad channel key for #ebooks. The channel may require a password.")
+	handler[core.NickInUse] = sess.channelErrorHandler(server.logBuf, "IRC nickname is already in use. Try setting a different --name.")
 	return handler
 }
 
@@ -431,6 +435,17 @@ func (sess *session) channelBannedHandler(lb *logBuffer) core.HandlerFunc {
 	return func(_ string) {
 		lb.error("IRC: banned from #ebooks (474) — not retrying")
 		broadcastToClients(sess.getClients(), newErrorResponse("You are banned from #ebooks. The app will not retry. Try again later or use a different network."))
+	}
+}
+
+// channelErrorHandler is the generic handler for channel join errors
+// (471 full, 473 invite-only, 475 bad key, 433 nick in use). These are
+// surfaced as error toasts so the user knows why the connection failed
+// instead of seeing the app hang silently.
+func (sess *session) channelErrorHandler(lb *logBuffer, message string) core.HandlerFunc {
+	return func(_ string) {
+		lb.error(fmt.Sprintf("IRC: channel error — %s", message))
+		broadcastToClients(sess.getClients(), newErrorResponse(message))
 	}
 }
 

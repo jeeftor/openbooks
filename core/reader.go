@@ -24,6 +24,10 @@ const (
 	Ping           = event(9)
 	Version        = event(10)
 	ChannelBanned  = event(11)
+	ChannelFull    = event(12)
+	InviteOnly     = event(13)
+	BadChannelKey  = event(14)
+	NickInUse      = event(15)
 )
 
 // Unique identifiers found in the message for various different events.
@@ -141,6 +145,14 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 				event = Version
 			} else if strings.Contains(text, " 474 ") {
 				event = ChannelBanned
+			} else if strings.Contains(text, " 471 ") {
+				event = ChannelFull
+			} else if strings.Contains(text, " 473 ") {
+				event = InviteOnly
+			} else if strings.Contains(text, " 475 ") {
+				event = BadChannelKey
+			} else if strings.Contains(text, " 433 ") {
+				event = NickInUse
 			}
 
 			if invoke, ok := handler[event]; ok {
