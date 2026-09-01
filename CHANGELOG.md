@@ -10,6 +10,7 @@
 - **Stop using predictable `openbooks_*` IRC nicks.** The Makefile no longer defaults `--name` to `openbooks_abs_dev` — when no name is set, the app generates random guest names (e.g. `eager_lion`). The MCP server no longer requires `--name` and generates a random nick if not provided. This prevents matching ban masks that channel operators have set on #ebooks.
 - **E2e tests no longer match `openbooks_` text.** Playwright tests now wait for the connection indicator (non-empty header span) instead of matching a specific username prefix, since usernames are now random guest names.
 - **Detect IRC channel ban (474) and surface clear error.** Previously, a 474 ERR_BANNEDFROMCHAN was logged to stdout but the UI hung silently at "Connecting...". Now the ban is detected as a `ChannelBanned` event and the user sees a toast: "You are banned from #ebooks. The app will not retry. Try again later or use a different network." No retry loop — retrying a banned channel can provoke operators into making the ban permanent.
+- **Fix mock IRC server handshake.** The mock server was not sending `001 RPL_WELCOME`, which broke after the JOIN timing fix (the reader now waits for 001 before joining). The mock server now sends a proper handshake (001, MOTD, NAMES). Added `--ban` flag to simulate a 474 channel ban for testing the ban UI locally (`make dev-mock1-ban`). Also fixed NOTICE messages to include proper sender prefix so the IRC panel formats them correctly.
 
 ### Added
 

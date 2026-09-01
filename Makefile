@@ -28,6 +28,7 @@ help:
 	@echo "  make dev-mock          Mock + backend + frontend in one terminal"
 	@echo "  make dev-mock-mobile   Same, but LAN-accessible (for phone testing)"
 	@echo "  make dev-mock1         Mock IRC server  (Terminal 1)"
+	@echo "  make dev-mock1-ban     Mock IRC server simulating channel ban (474)"
 	@echo "  make dev-mock2         Backend          (Terminal 2)"
 	@echo "  make dev2              Frontend         (Terminal 3)"
 	@echo ""
@@ -161,6 +162,12 @@ dev-mock1:
 	@echo "Mock IRC → :6667"
 	@echo "Run 'make dev-mock2' in another terminal once mock is ready."
 	cd cmd/mock_server && go run .
+
+# Mock IRC in ban mode — simulates 474 ERR_BANNEDFROMCHAN for testing the ban UI.
+dev-mock1-ban:
+	@echo "Mock IRC (BAN mode) → :6667"
+	@echo "Run 'make dev-mock2' in another terminal once mock is ready."
+	cd cmd/mock_server && go run . --ban
 
 dev-mock2: build-frontend
 	@echo "Backend → :5228  (mock IRC, username: $(if $(NAME),$(NAME),<random guest name>))"
