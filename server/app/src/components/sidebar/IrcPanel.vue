@@ -40,6 +40,8 @@ const visibleMessages = computed<ParsedIrcLine[]>(() => {
       case "error":
       case "welcome":
       case "topic":
+      case "ban":        // 474 — always show ban errors
+      case "chan_error": // 471/473/475/433 — always show channel errors
         return true;
       // Hide MOTD, NAMES, numerics, ping in chat mode
       case "motd":
@@ -169,8 +171,8 @@ onMounted(() => scrollToBottom());
         @scroll="onScroll">
 
         <div
-          v-for="(msg, i) in visibleMessages"
-          :key="i"
+          v-for="msg in visibleMessages"
+          :key="msg.timestamp + msg.raw"
           class="px-1.5 py-0.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800/40 break-all whitespace-pre-wrap">
 
           <!-- PRIVMSG: <nick> content -->
@@ -299,6 +301,20 @@ onMounted(() => scrollToBottom());
             <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-red-500 dark:text-red-400 font-semibold">ERROR:</span>
             <span class="text-red-500 dark:text-red-400"> {{ msg.content }}</span>
+          </template>
+
+          <!-- BAN (474) -->
+          <template v-else-if="msg.type === 'ban'">
+            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
+            <span class="text-red-500 dark:text-red-400 font-semibold">BANNED:</span>
+            <span class="text-red-500 dark:text-red-400"> Cannot join #ebooks — you are banned from this channel.</span>
+          </template>
+
+          <!-- Channel error (471/473/475/433) -->
+          <template v-else-if="msg.type === 'chan_error'">
+            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
+            <span class="text-amber-600 dark:text-amber-400 font-semibold">{{ msg.numeric }}:</span>
+            <span class="text-amber-600 dark:text-amber-400"> {{ msg.content }}</span>
           </template>
 
           <!-- PING -->

@@ -17,6 +17,8 @@ export type IrcLineType =
   | "welcome"    // 001 — registration confirmed
   | "motd"       // 372 — MOTD line
   | "motd_end"   // 376 — end of MOTD
+  | "ban"        // 474 — banned from channel
+  | "chan_error" // 471/473/475/433 — channel join errors
   | "numeric"    // other server numerics (251, 252, etc.)
   | "dcc"        // DCC SEND/CHAT offer
   | "ping"       // PING from server
@@ -99,7 +101,7 @@ export function parseIrcLine(raw: string): ParsedIrcLine {
 
   // Server numeric replies: :server NICK NUMERIC target :content
   // e.g. :zathras.mo.us.irchighway.net 332 openbooks_a_cde7 #ebooks :Topic text
-  if (line.startsWith(":") && !line.startsWith(":") === false) {
+  if (line.startsWith(":")) {
     const spaceIdx = line.indexOf(" ");
     if (spaceIdx > 0) {
       const afterServer = line.slice(spaceIdx + 1);
@@ -192,6 +194,11 @@ function numericType(code: string): IrcLineType {
     case "372": return "motd";
     case "375": return "motd"; // MOTD start
     case "376": return "motd_end";
+    case "474": return "ban";       // ERR_BANNEDFROMCHAN
+    case "471": return "chan_error"; // ERR_CHANNELISFULL
+    case "473": return "chan_error"; // ERR_INVITEONLYCHAN
+    case "475": return "chan_error"; // ERR_BADCHANNELKEY
+    case "433": return "chan_error"; // ERR_NICKNAMEINUSE
     default: return "numeric";
   }
 }
