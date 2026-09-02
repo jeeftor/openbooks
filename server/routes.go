@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jeeftor/openbooks/core"
 )
 
 //go:embed app/dist
@@ -243,17 +244,59 @@ func (server *server) versionHandler() http.HandlerFunc {
 	}
 }
 
-func (server *server) getAllBooksHandler() http.HandlerFunc {
-	type download struct {
-		Name         string    `json:"name"`
-		Path         string    `json:"path"`
-		DownloadLink string    `json:"downloadLink"`
-		Time         time.Time `json:"time"`
+type libraryFile struct {
+	Name         string    `json:"name"`
+	Path         string    `json:"path"`
+	DownloadLink string    `json:"downloadLink"`
+	Time         time.Time `json:"time"`
+	Format       string    `json:"format"`
+	Author       string    `json:"author"`
+	Title        string    `json:"title"`
+	Series       string    `json:"series,omitempty"`
+	SeriesIndex  string    `json:"seriesIndex,omitempty"`
+}
+
+func libraryFileFromPath(filePath, relPath string, modified time.Time) libraryFile {
+	name := filepath.Base(filePath)
+	ext := filepath.Ext(name)
+	parts := strings.Split(filepath.ToSlash(relPath), "/")
+	title := strings.TrimSuffix(name, ext)
+	author := "Unknown author"
+	if len(parts) > 1 {
+		title = parts[len(parts)-2]
+	}
+	if len(parts) > 2 {
+		author = parts[0]
 	}
 
+	book := libraryFile{
+		Name:         name,
+		Path:         filepath.ToSlash(relPath),
+		DownloadLink: path.Join("library", filepath.ToSlash(relPath)),
+		Time:         modified,
+		Format:       strings.TrimPrefix(strings.ToLower(ext), "."),
+		Author:       author,
+		Title:        title,
+	}
+	if strings.EqualFold(ext, ".epub") {
+		if metadata, err := core.ReadEPUBMetadata(filePath); err == nil && metadata != nil {
+			if metadata.Author != "" {
+				book.Author = metadata.Author
+			}
+			if metadata.Title != "" {
+				book.Title = metadata.Title
+			}
+			book.Series = metadata.Series
+			book.SeriesIndex = metadata.SeriesIndex
+		}
+	}
+	return book
+}
+
+func (server *server) getAllBooksHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		libraryDir := server.config.DownloadDir
-		output := make([]download, 0)
+		output := make([]libraryFile, 0)
 
 		err := filepath.WalkDir(libraryDir, func(p string, d os.DirEntry, err error) error {
 			if err != nil {
@@ -276,13 +319,12 @@ func (server *server) getAllBooksHandler() http.HandlerFunc {
 				return nil
 			}
 			// relPath is relative to DownloadDir, e.g. "Author/Series/Title/file.epub"
-			relPath, _ := filepath.Rel(libraryDir, p)
-			output = append(output, download{
-				Name:         name,
-				Path:         filepath.ToSlash(relPath),
-				DownloadLink: path.Join("library", filepath.ToSlash(relPath)),
-				Time:         info.ModTime(),
-			})
+			relPath, err := filepath.Rel(libraryDir, p)
+			if err != nil {
+				server.log.Println(err)
+				return nil
+			}
+			output = append(output, libraryFileFromPath(p, relPath, info.ModTime()))
 			return nil
 		})
 		if err != nil {

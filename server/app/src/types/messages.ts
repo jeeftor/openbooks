@@ -84,6 +84,11 @@ export interface Book {
   path: string;
   downloadLink: string;
   time: string;
+  format: string;
+  author: string;
+  title: string;
+  series?: string;
+  seriesIndex?: string;
 }
 
 export interface LogEntry {

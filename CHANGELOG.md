@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Improved
+
+- **Redesign the downloaded library as metadata-driven book cards.** EPUB author, title, and series metadata now identify logical books; alternate files and formats are grouped under one responsive card with per-file download and delete actions. Organized folders reconcile minor metadata title differences, while non-EPUB files retain path-based fallbacks.
+
 ### Fixed
 
 - **Align the live IRC feed and prevent search UI bleed-through.** Timestamps now use a fixed column, wrapped messages align beneath their content, and the IRC and library overlays render above sticky search controls and table headers.
