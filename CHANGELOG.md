@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.4.5 - 2026-09-02
+
 ### Fixed
 
 - **IRC panel now shows ban and channel error messages in chat mode.** Previously, 474 (banned), 471 (channel full), 473 (invite-only), 475 (bad key), and 433 (nick in use) were categorized as generic "numeric" and hidden by the chat filter, making the panel look empty when the real issue was a ban or join error. These numerics now have dedicated types (`ban`, `chan_error`) that are always visible in chat mode, with red/amber styling and clear labels.
