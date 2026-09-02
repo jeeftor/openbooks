@@ -44,7 +44,7 @@ watch(() => appStore.showIrcPanel, (open) => {
       <Transition name="library-slide">
         <div
           v-if="showLibrary"
-          class="absolute inset-0 z-10 bg-white dark:bg-slate-900 flex flex-col border-l border-slate-200 dark:border-slate-800">
+          class="absolute inset-0 z-30 bg-white dark:bg-slate-900 flex flex-col border-l border-slate-200 dark:border-slate-800">
           <LibraryPanel />
         </div>
       </Transition>
@@ -53,7 +53,7 @@ watch(() => appStore.showIrcPanel, (open) => {
       <Transition name="library-slide">
         <div
           v-if="appStore.showIrcPanel"
-          class="absolute inset-0 z-10 bg-white dark:bg-slate-900 flex flex-col border-l border-slate-200 dark:border-slate-800">
+          class="absolute inset-0 z-30 bg-white dark:bg-slate-900 flex flex-col border-l border-slate-200 dark:border-slate-800">
           <IrcPanel />
         </div>
       </Transition>

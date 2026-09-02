@@ -173,11 +173,12 @@ onMounted(() => scrollToBottom());
         <div
           v-for="msg in visibleMessages"
           :key="msg.timestamp + msg.raw"
-          class="px-1.5 py-0.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800/40 break-all whitespace-pre-wrap">
+          class="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-x-2 px-1.5 py-0.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <span class="text-right text-slate-400 dark:text-slate-600 select-none tabular-nums">{{ formatIrcTime(msg.timestamp) }}</span>
+          <div class="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">
 
           <!-- PRIVMSG: <nick> content -->
           <template v-if="msg.type === 'privmsg'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600 select-none">&lt;</span>
             <span class="font-semibold" :style="nickStyle(msg.nick)">{{ msg.nick }}</span>
             <span class="text-slate-400 dark:text-slate-600 select-none">&gt; </span>
@@ -186,7 +187,6 @@ onMounted(() => scrollToBottom());
 
           <!-- NOTICE: -nick- content (highlighted for search responses) -->
           <template v-else-if="msg.type === 'notice'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600 select-none">-</span>
             <span class="font-semibold" :style="nickStyle(msg.nick)">{{ msg.nick }}</span>
             <span class="text-slate-400 dark:text-slate-600 select-none">- </span>
@@ -203,7 +203,6 @@ onMounted(() => scrollToBottom());
 
           <!-- DCC SEND: highlighted -->
           <template v-else-if="msg.type === 'dcc'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-purple-600 dark:text-purple-400 font-semibold">DCC</span>
             <span class="text-slate-400 dark:text-slate-600"> from </span>
             <span class="font-semibold" :style="nickStyle(msg.nick)">{{ msg.nick }}</span>
@@ -213,7 +212,6 @@ onMounted(() => scrollToBottom());
 
           <!-- JOIN -->
           <template v-else-if="msg.type === 'join'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-green-600 dark:text-green-500">→</span>
             <span class="text-slate-400 dark:text-slate-500"> </span>
             <span class="font-semibold" :style="nickStyle(msg.nick)">{{ msg.nick }}</span>
@@ -222,7 +220,6 @@ onMounted(() => scrollToBottom());
 
           <!-- QUIT -->
           <template v-else-if="msg.type === 'quit'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-500">←</span>
             <span class="text-slate-400 dark:text-slate-500"> </span>
             <span class="font-semibold text-slate-500 dark:text-slate-500">{{ msg.nick }}</span>
@@ -232,7 +229,6 @@ onMounted(() => scrollToBottom());
 
           <!-- PART -->
           <template v-else-if="msg.type === 'part'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-500">←</span>
             <span class="text-slate-400 dark:text-slate-500"> </span>
             <span class="font-semibold text-slate-500 dark:text-slate-500">{{ msg.nick }}</span>
@@ -242,7 +238,6 @@ onMounted(() => scrollToBottom());
 
           <!-- NICK change -->
           <template v-else-if="msg.type === 'nick'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="font-semibold" :style="nickStyle(msg.nick)">{{ msg.nick }}</span>
             <span class="text-slate-400 dark:text-slate-500"> is now known as </span>
             <span class="font-semibold" :style="nickStyle(msg.content)">{{ msg.content }}</span>
@@ -250,7 +245,6 @@ onMounted(() => scrollToBottom());
 
           <!-- KICK -->
           <template v-else-if="msg.type === 'kick'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-red-500 dark:text-red-400 font-semibold">!</span>
             <span class="text-slate-400 dark:text-slate-500"> </span>
             <span class="font-semibold" :style="nickStyle(msg.nick)">{{ msg.nick }}</span>
@@ -260,72 +254,61 @@ onMounted(() => scrollToBottom());
 
           <!-- Welcome (001) -->
           <template v-else-if="msg.type === 'welcome'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-green-600 dark:text-green-400 font-semibold">✓ Connected:</span>
             <span class="text-slate-500 dark:text-slate-400"> {{ msg.content }}</span>
           </template>
 
           <!-- Topic (332) -->
           <template v-else-if="msg.type === 'topic'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-brand-500 dark:text-brand-400 font-semibold">Topic:</span>
             <span class="text-slate-500 dark:text-slate-400"> {{ msg.content }}</span>
           </template>
 
           <!-- NAMES (353) — collapsed -->
           <template v-else-if="msg.type === 'names'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600 italic">NAMES: {{ msg.content.split(' ').filter(Boolean).length }} users</span>
           </template>
 
           <!-- NAMES end (366) -->
           <template v-else-if="msg.type === 'names_end'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600 italic">End of NAMES list.</span>
           </template>
 
           <!-- MOTD -->
           <template v-else-if="msg.type === 'motd'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600 italic">{{ msg.content }}</span>
           </template>
 
           <!-- MOTD end -->
           <template v-else-if="msg.type === 'motd_end'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600 italic">End of MOTD.</span>
           </template>
 
           <!-- ERROR -->
           <template v-else-if="msg.type === 'error'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-red-500 dark:text-red-400 font-semibold">ERROR:</span>
             <span class="text-red-500 dark:text-red-400"> {{ msg.content }}</span>
           </template>
 
           <!-- BAN (474) -->
           <template v-else-if="msg.type === 'ban'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-red-500 dark:text-red-400 font-semibold">BANNED:</span>
             <span class="text-red-500 dark:text-red-400"> Cannot join #ebooks — you are banned from this channel.</span>
           </template>
 
           <!-- Channel error (471/473/475/433) -->
           <template v-else-if="msg.type === 'chan_error'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-amber-600 dark:text-amber-400 font-semibold">{{ msg.numeric }}:</span>
             <span class="text-amber-600 dark:text-amber-400"> {{ msg.content }}</span>
           </template>
 
           <!-- PING -->
           <template v-else-if="msg.type === 'ping'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600 italic">PING {{ msg.content }}</span>
           </template>
 
           <!-- MODE -->
           <template v-else-if="msg.type === 'mode'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-500">mode: </span>
             <span class="font-semibold" :style="nickStyle(msg.nick)">{{ msg.nick }}</span>
             <span class="text-slate-400 dark:text-slate-500"> sets {{ msg.content }}</span>
@@ -333,15 +316,14 @@ onMounted(() => scrollToBottom());
 
           <!-- Generic numeric -->
           <template v-else-if="msg.type === 'numeric'">
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600">{{ msg.numeric }} {{ msg.target }} {{ msg.content }}</span>
           </template>
 
           <!-- Raw fallback -->
           <template v-else>
-            <span class="text-slate-400 dark:text-slate-600 select-none">{{ formatIrcTime(msg.timestamp) }} </span>
             <span class="text-slate-400 dark:text-slate-600">{{ msg.raw }}</span>
           </template>
+          </div>
         </div>
       </div>
 

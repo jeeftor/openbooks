@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Align the live IRC feed and prevent search UI bleed-through.** Timestamps now use a fixed column, wrapped messages align beneath their content, and the IRC and library overlays render above sticky search controls and table headers.
+
 ## v0.4.5 - 2026-09-02
 
 ### Fixed
