@@ -54,7 +54,7 @@ func (server *server) serveWs() http.HandlerFunc {
 				Secure:   false,
 				HttpOnly: true,
 				Expires:  time.Now().Add(time.Hour * 24 * 7),
-				SameSite: http.SameSiteStrictMode,
+				SameSite: http.SameSiteLaxMode,
 			}
 			w.Header().Add("Set-Cookie", cookie.String())
 		}

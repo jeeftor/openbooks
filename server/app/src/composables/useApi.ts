@@ -5,7 +5,7 @@ import type { Book, LogEntry, VersionInfo } from "../types/messages";
 
 export function useVersion() {
   const version = ref<VersionInfo | undefined>(undefined);
-  fetch(getApiUrl("/version"))
+  fetch(getApiUrl("/version"), { credentials: "include" })
     .then((r) => r.json())
     .then((v: string | VersionInfo) => {
       version.value = normalizeVersion(v);
@@ -43,7 +43,7 @@ export function useServers() {
 
   async function fetchServers() {
     try {
-      const res = await fetch(getApiUrl("/servers"));
+      const res = await fetch(getApiUrl("/servers"), { credentials: "include" });
       if (res.ok) {
         const data = (await res.json()) as {
           servers?: string[];
@@ -75,7 +75,7 @@ export function useBooks(libraryVersion: { readonly value: number }) {
   async function fetchBooks() {
     loading.value = true;
     try {
-      const res = await fetch(getApiUrl("/library"));
+      const res = await fetch(getApiUrl("/library"), { credentials: "include" });
       books.value = res.ok ? ((await res.json()) as Book[]) : [];
     } catch {
       books.value = [];
@@ -93,7 +93,8 @@ export function useBooks(libraryVersion: { readonly value: number }) {
 export async function deleteBook(path: string): Promise<boolean> {
   try {
     const res = await fetch(getApiUrl("/library/" + path), {
-      method: "DELETE"
+      method: "DELETE",
+      credentials: "include"
     });
     return res.ok;
   } catch {
@@ -108,7 +109,7 @@ export function useLogs() {
   async function fetchLogs() {
     loading.value = true;
     try {
-      const res = await fetch(getApiUrl("/logs"));
+      const res = await fetch(getApiUrl("/logs"), { credentials: "include" });
       if (res.ok) logs.value = (await res.json()) as LogEntry[];
     } catch {
       /* network error */

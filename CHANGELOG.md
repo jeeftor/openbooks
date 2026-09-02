@@ -7,6 +7,7 @@
 - **IRC panel now shows ban and channel error messages in chat mode.** Previously, 474 (banned), 471 (channel full), 473 (invite-only), 475 (bad key), and 433 (nick in use) were categorized as generic "numeric" and hidden by the chat filter, making the panel look empty when the real issue was a ban or join error. These numerics now have dedicated types (`ban`, `chan_error`) that are always visible in chat mode, with red/amber styling and clear labels.
 - **Fix tautological guard in ircParser.** `!line.startsWith(":") === false` was always true — simplified to `line.startsWith(":")`.
 - **Fix unstable list keys in IrcPanel.** Using array index as `:key` caused rendering glitches when the message buffer was trimmed. Now uses `timestamp + raw` as a stable key.
+- **Fix library panel showing empty in dev mode.** API `fetch` calls were missing `credentials: "include"`, so the `OpenBooks` auth cookie wasn't sent for cross-origin requests (vite on :5173, API on :5228). All fetch calls now include credentials. Also changed cookie `SameSite` from `Strict` to `Lax` so it's sent on cross-origin navigations and downloads.
 
 ## v0.4.0 - 2026-08-31
 
