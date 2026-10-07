@@ -3,41 +3,15 @@ package server
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jeeftor/openbooks/core"
-	"github.com/jeeftor/openbooks/irc"
 )
 
-// concurrentDownloads is the maximum number of simultaneous IRC DCC transfers per session.
+// concurrentDownloads is the maximum number of simultaneous IRC DCC transfers.
 const concurrentDownloads = 2
-
-// slotHandle coordinates the one-time release of a download semaphore slot.
-// Both the per-job timeout goroutine and bookResultHandler hold a reference;
-// sync.Once ensures exactly one of them actually releases the slot.
-type slotHandle struct {
-	once sync.Once
-	done chan struct{} // closed after release so the timeout goroutine can exit early
-	sess *session
-}
-
-func newSlotHandle(sess *session) *slotHandle {
-	return &slotHandle{done: make(chan struct{}), sess: sess}
-}
-
-func (h *slotHandle) release() {
-	h.once.Do(func() {
-		h.sess.downloadSlots <- struct{}{}
-		close(h.done)
-	})
-}
-
-// searchJob holds a queued search request.
-type searchJob struct {
-	query string
-}
 
 // serverListSnapshot holds the IRC server list with freshness timestamp.
 type serverListSnapshot struct {
@@ -45,102 +19,80 @@ type serverListSnapshot struct {
 	timestamp time.Time
 }
 
-// session represents a long-lived IRC session that persists beyond WebSocket connections.
-// One session is created per browser UUID (persisted via cookie). Downloads continue
-// in the background even when the browser tab is closed.
+// session represents a long-lived browser session that persists beyond WebSocket
+// connections. One session is created per browser UUID (persisted via cookie).
+// IRC is now shared via ircHub; sessions are thin WebSocket-routing structs.
 type session struct {
 	username string
 
-	// IRC connection for this session.
-	irc *irc.Conn
-
-	// ctx/cancel govern the lifetime of the session itself (not tied to any browser connection).
+	// ctx/cancel govern the lifetime of the session itself.
+	// Used by bookResultHandler to detect session eviction (saveToStaged path).
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// searchQueue holds pending search requests. Processed one at a time with a
-	// cooldown between each to avoid hammering the IRC search bot.
-	searchQueue chan searchJob
-
-	// downloadQueue holds pending download requests.
-	downloadQueue chan downloadJob
-
-	// downloadSlots is a semaphore (capacity = concurrentDownloads, pre-filled).
-	// processDownloadQueue drains one token before starting each IRC request;
-	// bookResultHandler returns the token once the file is on disk.
-	downloadSlots chan struct{}
-
-	// pendingSlots is a FIFO queue of slotHandles, one per in-flight IRC request.
-	// bookResultHandler pops one handle to coordinate slot release with the timeout goroutine.
-	pendingSlots chan *slotHandle
-
-	// renameMu is a mutex (capacity-1 channel, pre-filled) that serialises the rename
-	// dialog. When two downloads finish close together, only one RENAME_PROMPT is sent
-	// at a time so the frontend never receives two overlapping rename dialogs.
+	// renameMu is a mutex (capacity-1 channel, pre-filled) that serialises the
+	// rename dialog. Only one RENAME_PROMPT is shown at a time per session.
 	renameMu chan struct{}
 
-	// mu protects the clients map below.
+	// mu protects the clients map and lastSeen.
 	mu sync.RWMutex
 
 	// clients holds all attached WebSocket clients for this session.
 	// Multiple browser windows/tabs can share the same session via the same cookie.
 	clients map[*Client]struct{}
 
-	// query is the most recently dispatched IRC search term.
+	// query is the most recently dispatched IRC search term (for logging).
 	query string
 
 	// serverMu protects serverSnapshot.
 	serverMu sync.RWMutex
 
 	// serverSnapshot holds the last received IRC server list with timestamp.
-	// This is per-session to avoid race conditions between multiple users.
 	serverSnapshot serverListSnapshot
+
+	// lastSeen is updated whenever a client attaches or detaches.
+	// Used by the session reaper to determine idle TTL.
+	lastSeen time.Time
+
+	// inFlightDownloads tracks downloads currently in the hub's pipeline for
+	// this session. The reaper will not evict a session with in-flight downloads.
+	inFlightDownloads atomic.Int32
 }
 
-// newSession creates a new IRC session with its own connection and download queue.
-func newSession(username, userAgent string) *session {
+// newSession creates a new lightweight session.
+func newSession(username string) *session {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	slots := make(chan struct{}, concurrentDownloads)
-	for i := 0; i < concurrentDownloads; i++ {
-		slots <- struct{}{}
-	}
 
 	renameMu := make(chan struct{}, 1)
 	renameMu <- struct{}{}
 
 	return &session{
-		username:      username,
-		irc:           irc.New(username, userAgent),
-		ctx:           ctx,
-		cancel:        cancel,
-		searchQueue:   make(chan searchJob, 20),
-		downloadQueue: make(chan downloadJob, 50),
-		downloadSlots: slots,
-		pendingSlots:  make(chan *slotHandle, concurrentDownloads),
-		renameMu:      renameMu,
-		clients:       make(map[*Client]struct{}),
+		username: username,
+		ctx:      ctx,
+		cancel:   cancel,
+		renameMu: renameMu,
+		clients:  make(map[*Client]struct{}),
+		lastSeen: time.Now(),
 	}
 }
 
 // attachClient adds a WebSocket client to this session.
-// Multiple browser windows/tabs can share the same session via the same cookie.
 func (sess *session) attachClient(c *Client) {
 	sess.mu.Lock()
 	sess.clients[c] = struct{}{}
+	sess.lastSeen = time.Now()
 	sess.mu.Unlock()
 }
 
 // detachClient removes a WebSocket client from this session.
-// Called when a browser window/tab disconnects.
 func (sess *session) detachClient(c *Client) {
 	sess.mu.Lock()
 	delete(sess.clients, c)
+	sess.lastSeen = time.Now()
 	sess.mu.Unlock()
 }
 
-// getClients returns a snapshot of all attached clients.
-// Returns nil if no clients are connected.
+// getClients returns a snapshot of all attached clients, or nil if none.
 func (sess *session) getClients() []*Client {
 	sess.mu.RLock()
 	defer sess.mu.RUnlock()
@@ -155,7 +107,6 @@ func (sess *session) getClients() []*Client {
 }
 
 // getAnyClient returns an arbitrary attached client, or nil if none connected.
-// Useful for operations that only need to notify one client (e.g., rename prompt).
 func (sess *session) getAnyClient() *Client {
 	sess.mu.RLock()
 	defer sess.mu.RUnlock()
@@ -163,6 +114,22 @@ func (sess *session) getAnyClient() *Client {
 		return c
 	}
 	return nil
+}
+
+// hasInFlightDownload reports whether this session has downloads in progress.
+func (sess *session) hasInFlightDownload() bool {
+	return sess.inFlightDownloads.Load() > 0
+}
+
+// idleSince returns how long the session has been idle (no attached clients).
+// Returns 0 if clients are currently attached.
+func (sess *session) idleSince() time.Duration {
+	sess.mu.RLock()
+	defer sess.mu.RUnlock()
+	if len(sess.clients) > 0 {
+		return 0
+	}
+	return time.Since(sess.lastSeen)
 }
 
 // setServerList updates the session's server list snapshot with the current time.
@@ -176,7 +143,7 @@ func (sess *session) setServerList(servers core.IrcServers) {
 }
 
 // getServerList returns the session's server list and the timestamp it was last updated.
-// If the list is older than maxAge, the second return value is false (stale data).
+// If the list is older than maxAge, the third return value is false (stale data).
 func (sess *session) getServerList(maxAge time.Duration) (core.IrcServers, time.Time, bool) {
 	sess.serverMu.RLock()
 	defer sess.serverMu.RUnlock()
@@ -185,124 +152,6 @@ func (sess *session) getServerList(maxAge time.Duration) (core.IrcServers, time.
 	return snapshot.servers, snapshot.timestamp, fresh
 }
 
-// processSearchQueue drains searchQueue one at a time, enforcing a cooldown between
-// each IRC search request. This replaces the old server-global rate-limit rejection;
-// searches are now queued and fired automatically rather than dropped.
-func (sess *session) processSearchQueue(srv *server) {
-	var lastSearch time.Time
-	cooldown := srv.config.SearchTimeout
-
-	for {
-		select {
-		case job, ok := <-sess.searchQueue:
-			if !ok {
-				return
-			}
-
-			// Wait out any remaining cooldown from the previous search.
-			if wait := cooldown - time.Since(lastSearch); wait > 0 {
-				pending := len(sess.searchQueue)
-				if pending > 0 {
-					broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY,
-						fmt.Sprintf("Search queued (%d pending) — sending in %.0fs…", pending+1, wait.Seconds())))
-				} else {
-					broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY,
-						fmt.Sprintf("Search queued — sending in %.0fs…", wait.Seconds())))
-				}
-				select {
-				case <-time.After(wait):
-				case <-sess.ctx.Done():
-					return
-				}
-			}
-
-			srv.logBuf.info(fmt.Sprintf("CLIENT (%s): 🔍 IRC SEARCH → %q", sess.username, job.query))
-			srv.log.Printf("CLIENT (%s): IRC SEARCH → %q\n", sess.username, job.query)
-			broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY, fmt.Sprintf("Searching for %q…", job.query)))
-			sess.query = job.query
-			core.SearchBook(sess.irc, srv.config.SearchBot, job.query)
-			lastSearch = time.Now()
-
-		case <-sess.ctx.Done():
-			return
-		}
-	}
-}
-
-// processDownloadQueue drains downloadQueue up to concurrentDownloads at a time.
-// It acquires a semaphore slot before sending each IRC request, then immediately
-// moves on to the next job. bookResultHandler releases the slot once the file lands
-// on disk — not after the user finishes the rename dialog — so downloads pipeline
-// while the user processes previously downloaded books.
-func (sess *session) processDownloadQueue(server *server) {
-	for {
-		select {
-		case job, ok := <-sess.downloadQueue:
-			if !ok {
-				return
-			}
-
-			// Acquire a download slot — blocks only when concurrentDownloads are already
-			// in-flight waiting for a DCC offer from an IRC bot.
-			select {
-			case <-sess.downloadSlots:
-			case <-sess.ctx.Done():
-				return
-			}
-
-			pending := len(sess.downloadQueue)
-			if pending > 0 {
-				server.logBuf.info(fmt.Sprintf("📋 Queued: %s (%d more pending)", job.title, pending))
-			}
-			botName := job.book
-			if idx := strings.Index(job.book, " "); idx > 1 {
-				botName = job.book[1:idx]
-			}
-			server.logBuf.info(fmt.Sprintf("📡 Requesting from %s — waiting for IRC bot to send file…", botName))
-			broadcastToClients(sess.getClients(), newDownloadWaitingResponse(botName, job.title))
-
-			// Push a handle into the FIFO before firing the IRC request so
-			// bookResultHandler can pop it in order.
-			handle := newSlotHandle(sess)
-			sess.pendingSlots <- handle
-
-			core.DownloadBook(sess.irc, job.book)
-
-			// Per-job timeout goroutine: if the bot never sends a DCC SEND offer,
-			// release the slot so the queue doesn't stall forever.
-			go func(h *slotHandle, bot, title string) {
-				select {
-				case <-time.After(5 * time.Minute):
-					broadcastToClients(sess.getClients(), newDownloadWaitingClear())
-					server.logBuf.warn(fmt.Sprintf("⏱️  Timed out waiting for %s — bot may be offline or throttling. Skipping.", bot))
-					h.release()
-				case <-h.done:
-					// bookResultHandler already handled this slot — exit cleanly.
-				case <-sess.ctx.Done():
-					h.release()
-				}
-			}(handle, botName, job.title)
-
-		case <-sess.ctx.Done():
-			return
-		}
-	}
-}
-
-// refreshServerList periodically requests the names list from IRC to keep
-// the server list up to date. This runs in its own goroutine.
-func (sess *session) refreshServerList() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			if sess.irc.IsConnected() {
-				sess.irc.GetUsers("ebooks")
-			}
-		case <-sess.ctx.Done():
-			return
-		}
-	}
+func (sess *session) String() string {
+	return fmt.Sprintf("%s", sess.username)
 }

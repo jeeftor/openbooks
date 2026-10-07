@@ -9,9 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jeeftor/openbooks/core"
 	"github.com/jeeftor/openbooks/staging"
-	"github.com/jeeftor/openbooks/util"
 )
 
 // errQueueLater is a sentinel returned by processStagedBookChoice when the user
@@ -106,8 +104,8 @@ func (server *server) routeMessage(message Request, c *Client) {
 	}
 }
 
-// startIrcConnection handles the CONNECT message. For new sessions it connects to IRC;
-// for reconnecting sessions the IRC is already running so we just send the welcome response.
+// startIrcConnection handles the CONNECT message. The shared IRC hub is already
+// running; this function just sends the welcome response and bootstraps the UI.
 func (c *Client) startIrcConnection(server *server) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -121,44 +119,9 @@ func (c *Client) startIrcConnection(server *server) {
 		return
 	}
 
-	if !sess.irc.IsConnected() {
-		// First connection for this session — connect to IRC.
-		if err := core.Join(sess.irc, server.config.Server, server.config.EnableTLS); err != nil {
-			c.log.Println(err)
-			server.logBuf.error(fmt.Sprintf("IRC connect failed: %v", err))
-			safeSend(c, newErrorResponse("Unable to connect to IRC server."))
-			// Still notify about any staged books — they're available regardless of IRC.
-			if count := server.stagedBooks.Count(); count > 0 {
-				safeSend(c, newStagedBooksNotifyResponse(count))
-			}
-			return
-		}
-
-		server.logBuf.info(fmt.Sprintf("🔌 IRC connected: %s", sess.username))
-		handler := server.NewIrcEventHandler(sess)
-
-		if server.config.Log {
-			logger, _, err := util.CreateLogFile(sess.username, server.config.DownloadDir)
-			if err != nil {
-				server.log.Println(err)
-			}
-			// Wrap the existing Message handler (which broadcasts to clients)
-			// with file logging so --log still works.
-			broadcast := handler[core.Message]
-			handler[core.Message] = func(text string) {
-				logger.Println(text)
-				if broadcast != nil {
-					broadcast(text)
-				}
-			}
-		}
-
-		go core.StartReader(sess.ctx, sess.irc, handler)
-		go sess.processSearchQueue(server)
-		go sess.processDownloadQueue(server)
-		go sess.refreshServerList()
+	if server.ircHub == nil || !server.ircHub.isConnected() {
+		server.logBuf.warn("IRC hub not connected — library access only")
 	}
-	// else: reconnecting — IRC and both queues are already running.
 
 	safeSend(c, ConnectionResponse{
 		StatusResponse: StatusResponse{
@@ -254,8 +217,13 @@ func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 		return
 	}
 
-	// New query — enqueue to IRC.
-	pending := len(sess.searchQueue)
+	// New query — enqueue to hub.
+	if server.ircHub == nil {
+		server.resultCache.CancelInFlight(s.Query)
+		c.send <- newStatusResponse(WARNING, "IRC not available.")
+		return
+	}
+	pending := len(server.ircHub.searchQueue)
 	if pending > 0 {
 		c.log.Printf("Search queued (position %d): %q\n", pending+1, s.Query)
 		c.send <- newStatusResponse(NOTIFY, fmt.Sprintf("Search queued (position %d).", pending+1))
@@ -265,7 +233,7 @@ func (c *Client) sendSearchRequest(s *SearchRequest, server *server) {
 	}
 
 	select {
-	case sess.searchQueue <- searchJob{query: s.Query}:
+	case server.ircHub.searchQueue <- sharedSearchJob{query: s.Query, session: sess}:
 	default:
 		// Queue is full — cancel the in-flight mark so subscribers aren't left waiting.
 		server.resultCache.CancelInFlight(s.Query)
@@ -559,10 +527,14 @@ func (c *Client) handleStagedRenameConfirm(req *RenameConfirmRequest, server *se
 	server.broadcastStagedCount()
 }
 
-// sendDownloadRequest queues a book download in the session's download queue.
+// sendDownloadRequest queues a book download in the shared hub's download queue.
 func (c *Client) sendDownloadRequest(d *DownloadRequest, server *server) {
 	sess := server.getSession(c.uuid)
 	if sess == nil {
+		return
+	}
+	if server.ircHub == nil {
+		c.send <- newStatusResponse(WARNING, "IRC not available.")
 		return
 	}
 
@@ -570,7 +542,7 @@ func (c *Client) sendDownloadRequest(d *DownloadRequest, server *server) {
 	if title == "" {
 		title = d.Book
 	}
-	pending := len(sess.downloadQueue)
+	pending := len(server.ircHub.downloadQueue)
 	if pending > 0 {
 		server.logBuf.info(fmt.Sprintf("Queued: %s (position %d)", title, pending+1))
 		c.send <- newStatusResponse(NOTIFY, fmt.Sprintf("Download queued (position %d).", pending+1))
@@ -582,21 +554,21 @@ func (c *Client) sendDownloadRequest(d *DownloadRequest, server *server) {
 		}
 		c.send <- newStatusResponse(NOTIFY, "Download request received.")
 	}
-	sess.downloadQueue <- downloadJob{book: d.Book, title: title, author: d.Author}
+	sess.inFlightDownloads.Add(1)
+	server.ircHub.downloadQueue <- sharedDownloadJob{book: d.Book, title: title, author: d.Author, session: sess}
 }
 
-// handleIrcSend sends a user-typed message to the IRC channel via the session's
-// IRC connection. This powers the live IRC panel.
+// handleIrcSend sends a user-typed message to the IRC channel via the shared hub.
+// This powers the live IRC panel.
 func (c *Client) handleIrcSend(req *IrcSendRequest, server *server) {
 	msg := strings.TrimSpace(req.Message)
 	if msg == "" {
 		return
 	}
-	sess := server.getSession(c.uuid)
-	if sess == nil || !sess.irc.IsConnected() {
+	if server.ircHub == nil || !server.ircHub.isConnected() {
 		safeSend(c, newErrorResponse("Not connected to IRC."))
 		return
 	}
-	sess.irc.SendMessage(msg)
+	server.ircHub.irc.SendMessage(msg)
 	server.logBuf.info(fmt.Sprintf("💬 IRC → #ebooks: %s", msg))
 }

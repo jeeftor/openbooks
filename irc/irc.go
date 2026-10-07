@@ -2,15 +2,18 @@ package irc
 
 import (
 	"crypto/tls"
+	"log"
 	"net"
+	"sync/atomic"
 )
 
 // Conn represents an IRC connection to a server
 type Conn struct {
 	net.Conn
-	channel  string
-	Username string
-	realname string
+	channel      string
+	Username     string
+	realname     string
+	disconnected atomic.Bool
 }
 
 // New creates a new IRC connection to the server using the supplied username and realname
@@ -39,21 +42,31 @@ func (i *Conn) Connect(address string, enableTLS bool) error {
 	}
 
 	i.Conn = conn
+	i.disconnected.Store(false)
 
 	user := "USER " + i.Username + " 0 * :" + i.Username + "\r\n"
 	nick := "NICK " + i.Username + "\r\n"
 
-	i.Write([]byte(user))
-	i.Write([]byte(nick))
+	i.write([]byte(user))
+	i.write([]byte(nick))
 	return nil
+}
+
+// write sends bytes to the IRC server and marks the connection dead on error.
+func (i *Conn) write(data []byte) {
+	if _, err := i.Conn.Write(data); err != nil {
+		log.Printf("[IRC] write error: %v", err)
+		i.disconnected.Store(true)
+	}
 }
 
 // Disconnect closes connection to the IRC server
 func (i *Conn) Disconnect() {
-	if !i.IsConnected() {
+	i.disconnected.Store(true)
+	if i.Conn == nil {
 		return
 	}
-	i.Write([]byte("QUIT :Goodbye\r\n"))
+	i.Conn.Write([]byte("QUIT :Goodbye\r\n")) //nolint:errcheck — closing anyway
 	i.Conn.Close()
 }
 
@@ -62,7 +75,7 @@ func (i *Conn) SendMessage(message string) {
 	if !i.IsConnected() {
 		return
 	}
-	i.Write([]byte("PRIVMSG #" + i.channel + " :" + message + "\r\n"))
+	i.write([]byte("PRIVMSG #" + i.channel + " :" + message + "\r\n"))
 }
 
 // SendNotice sends a notice message to the specified user
@@ -70,7 +83,7 @@ func (i *Conn) SendNotice(user string, message string) {
 	if !i.IsConnected() {
 		return
 	}
-	i.Write([]byte("NOTICE " + user + " :" + message + "\r\n"))
+	i.write([]byte("NOTICE " + user + " :" + message + "\r\n"))
 }
 
 // JoinChannel joins the channel given by channel string
@@ -79,7 +92,7 @@ func (i *Conn) JoinChannel(channel string) {
 		return
 	}
 	i.channel = channel
-	i.Write([]byte("JOIN #" + channel + "\r\n"))
+	i.write([]byte("JOIN #" + channel + "\r\n"))
 }
 
 // SetChannel stores the channel name without sending JOIN.
@@ -99,7 +112,7 @@ func (i *Conn) GetUsers(channel string) {
 	if !i.IsConnected() {
 		return
 	}
-	i.Write([]byte("NAMES #" + channel + "\r\n"))
+	i.write([]byte("NAMES #" + channel + "\r\n"))
 }
 
 // Pong sends a Pong message to the server, often used after a PING request
@@ -107,10 +120,16 @@ func (i *Conn) Pong(server string) {
 	if !i.IsConnected() {
 		return
 	}
-	i.Write([]byte("PONG " + server + "\r\n"))
+	i.write([]byte("PONG " + server + "\r\n"))
 }
 
-// IsConnected returns true if the IRC connection is not null
+// IsConnected returns true if the IRC connection is established and not known to be dead.
 func (i *Conn) IsConnected() bool {
-	return i.Conn != nil
+	return i.Conn != nil && !i.disconnected.Load()
+}
+
+// MarkDisconnected marks the connection as dead without closing it.
+// Called by the reader after EOF so IsConnected() returns false immediately.
+func (i *Conn) MarkDisconnected() {
+	i.disconnected.Store(true)
 }

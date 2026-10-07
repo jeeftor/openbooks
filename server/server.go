@@ -22,6 +22,9 @@ type server struct {
 	// Shared app configuration
 	config *Config
 
+	// ircHub owns the single shared IRC connection for all frontend sessions.
+	ircHub *ircHub
+
 	// Registered clients (active WebSocket connections).
 	clients map[uuid.UUID]*Client
 
@@ -148,7 +151,7 @@ func (server *server) getOrCreateSession(userID uuid.UUID) *session {
 		return sess
 	}
 	username := server.generateUniqueUsernameUnsafe(userID)
-	sess := newSession(username, server.config.UserAgent)
+	sess := newSession(username)
 	server.sessions[userID] = sess
 	return sess
 }
@@ -189,6 +192,11 @@ func Start(config Config) {
 	go srv.startClientHub(ctx)
 	srv.registerGracefulShutdown(cancel)
 	router.Mount(config.Basepath, routes)
+
+	// Start the shared IRC hub. Runs the connect+reconnect loop in the background.
+	srv.ircHub = newIrcHub(srv, ctx)
+	go srv.ircHub.connectAndRun()
+	go srv.startSessionReaper(ctx)
 
 	if config.EnableMCP {
 		mcpSession, err := mcp.Connect(ctx, mcp.Config{
@@ -290,5 +298,38 @@ func createBooksDirectory(config Config) {
 	err := os.MkdirAll(config.DownloadDir, os.FileMode(0755))
 	if err != nil {
 		panic(err)
+	}
+}
+
+// startSessionReaper periodically removes sessions that have been idle too long.
+func (server *server) startSessionReaper(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			server.reapIdleSessions()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// reapIdleSessions removes sessions that have no attached clients, no in-flight
+// downloads, and have been idle longer than idleTTL.
+func (server *server) reapIdleSessions() {
+	const idleTTL = 15 * time.Minute
+	server.sessionsMu.Lock()
+	defer server.sessionsMu.Unlock()
+	for id, sess := range server.sessions {
+		if sess.idleSince() < idleTTL {
+			continue
+		}
+		if sess.hasInFlightDownload() {
+			continue
+		}
+		sess.cancel()
+		server.log.Printf("SESSION: reaped idle session %s (%s)", id, sess.username)
+		delete(server.sessions, id)
 	}
 }

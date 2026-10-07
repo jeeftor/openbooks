@@ -55,12 +55,10 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
+			irc.MarkDisconnected()
 			return
 		default:
 			text := scanner.Text()
-			if err := scanner.Err(); err != nil {
-				log.Println(err)
-			}
 
 			// Send raw message if they want to recieve it (logging purposes)
 			if invoke, ok := handler[Message]; ok {
@@ -81,11 +79,9 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 				}
 			case strings.Contains(text, " 332 "): // RPL_TOPIC — channel topic often mentions bot status
 				log.Printf("[IRC] channel topic: %s", text)
-			case strings.Contains(text, " 372 "): // RPL_MOTD
-				log.Printf("[IRC] MOTD: %s", text)
 			case strings.Contains(text, " 376 "): // RPL_ENDOFMOTD
 				log.Printf("[IRC] MOTD end")
-			case strings.Contains(text, " JOIN "): // channel join confirmation
+			case strings.Contains(text, " JOIN ") && strings.HasPrefix(text, ":"+irc.Username+"!"): // our own JOIN confirmation
 				log.Printf("[IRC] JOIN: %s", text)
 			case strings.Contains(text, " 433 "): // ERR_NICKNAMEINUSE
 				log.Printf("[IRC] ERROR nick in use: %s", text)
@@ -160,4 +156,12 @@ func StartReader(ctx context.Context, irc *irc.Conn, handler EventHandler) {
 			}
 		}
 	}
+
+	// Scanner exited — either EOF (server closed connection) or a read error.
+	if err := scanner.Err(); err != nil {
+		log.Printf("[IRC] reader error: %v", err)
+	} else {
+		log.Printf("[IRC] reader: EOF — connection closed by server")
+	}
+	irc.MarkDisconnected()
 }
