@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **Stop flooding stdout with the full #ebooks nicklist every 30s.** The IRC hub refreshes NAMES on a 30-second ticker to track which download bots are online, and was logging all ~350 elevated + regular nicks on every refresh (~25 MB/day of identical log lines). The server list is now only logged when the elevated (bot) roster actually changes, and the regular-user list is no longer dumped to stdout.
 - **Align the live IRC feed and prevent search UI bleed-through.** Timestamps now use a fixed column, wrapped messages align beneath their content, and the IRC and library overlays render above sticky search controls and table headers.
 
 ## v0.4.5 - 2026-09-02

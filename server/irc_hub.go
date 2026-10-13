@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,11 @@ type ircHub struct {
 	currentSearch *session
 	currentQuery  string
 	currentMu     sync.Mutex
+
+	// lastElevated is the previously logged elevated-user list; used to
+	// dedupe the periodic NAMES refresh so logs only change on diff.
+	lastElevated []string
+	serverListMu sync.Mutex
 
 	srv *server
 	log *log.Logger
@@ -637,8 +643,16 @@ func (h *ircHub) matchesFoundHandler() core.HandlerFunc {
 func (h *ircHub) serverListHandler() core.HandlerFunc {
 	return func(text string) {
 		servers := core.ParseServers(text)
-		h.srv.log.Printf("IRC hub: #ebooks — elevated: %v | regular: %v\n", servers.ElevatedUsers, servers.RegularUsers)
-		h.srv.logBuf.info(fmt.Sprintf("📋 Server list updated: %d elevated, %d regular", len(servers.ElevatedUsers), len(servers.RegularUsers)))
+
+		h.serverListMu.Lock()
+		changed := !slices.Equal(h.lastElevated, servers.ElevatedUsers)
+		h.lastElevated = servers.ElevatedUsers
+		h.serverListMu.Unlock()
+
+		if changed {
+			h.srv.log.Printf("IRC hub: #ebooks — elevated: %v\n", servers.ElevatedUsers)
+			h.srv.logBuf.info(fmt.Sprintf("📋 Server list updated: %d elevated, %d regular", len(servers.ElevatedUsers), len(servers.RegularUsers)))
+		}
 
 		h.srv.sessionsMu.RLock()
 		defer h.srv.sessionsMu.RUnlock()
