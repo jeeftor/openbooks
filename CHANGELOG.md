@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Bundle audiobook-organizer (abo) in the `-calibre` image.** The calibre Dockerfile now fetches the static `audiobook-organizer` binary (`ABO_VERSION` build arg, defaults to v0.13.2) and ships a new `abo-pipeline` post-process script: each completed download is polished with `ebook-polish`, then organized into `/books` as `Author/Title/` via abo's flat mode. The default `CMD` now uses `abo-pipeline` for `--post-process-cmd`.
+
 ### Improved
 
 - **Redesign the downloaded library as metadata-driven book cards.** EPUB author, title, and series metadata now identify logical books; alternate files and formats are grouped under one responsive card with per-file download and delete actions. Organized folders reconcile minor metadata title differences, while non-EPUB files retain path-based fallbacks.

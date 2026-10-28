@@ -32,10 +32,21 @@ RUN go build \
 FROM debian:bookworm-slim AS app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     calibre \
+    curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# audiobook-organizer (abo): static binary used by the post-process pipeline
+ARG ABO_VERSION=v0.13.2
+RUN curl -fsSL -o /tmp/abo.tgz \
+      "https://github.com/jeeftor/audiobook-organizer/releases/download/${ABO_VERSION}/audiobook-organizer_Linux_x86_64.tar.gz" \
+    && tar xzf /tmp/abo.tgz -C /usr/local/bin audiobook-organizer \
+    && rm /tmp/abo.tgz
 
 WORKDIR /app
 COPY --from=build /go/src/openbooks .
+COPY scripts/abo-pipeline.sh /usr/local/bin/abo-pipeline
+RUN chmod +x /usr/local/bin/abo-pipeline
 
 EXPOSE 80
 VOLUME ["/books"]
@@ -43,4 +54,4 @@ ENV BASE_PATH=/
 
 ENTRYPOINT ["./openbooks"]
 CMD ["server", "--dir", "/books", "--port", "80", "--dev", \
-     "--post-process-cmd", "ebook-polish,--embed-fonts,--subset-fonts,--smarten-punctuation,--upgrade-book,--remove-unused-css,--compress-images,--add-soft-hyphens"]
+     "--post-process-cmd", "abo-pipeline"]
