@@ -37,6 +37,26 @@ func resolveCurrent(h *ircHub) bool {
 	return h.recordSearchOutcome(st)
 }
 
+// rescuedSearch simulates one full search cycle in which the primary bot
+// times out and the query is rescued by the fallback: dispatch to primary,
+// watchdog fires (auto-retries to fallback), fallback resolves the search.
+// The primary failure streak is preserved — fallback resolution does not
+// reset it.
+func rescuedSearch(t *testing.T, h *ircHub, sess *session, query string) {
+	t.Helper()
+	st, _ := h.prepareSearch(sess, query)
+	if st.bot != "search" {
+		t.Fatalf("expected primary bot 'search', got %q", st.bot)
+	}
+	if !h.searchTimedOut(st) {
+		t.Fatal("expected primary timeout to re-arm onto fallback")
+	}
+	if st.bot != "searchook" || !st.retried {
+		t.Fatalf("expected retried fallback search, got bot=%q retried=%v", st.bot, st.retried)
+	}
+	resolveCurrent(h)
+}
+
 func TestPrepareSearchUsesPrimaryWhenHealthy(t *testing.T) {
 	h := newTestHub(t)
 	sess := newSession("test")
@@ -53,28 +73,65 @@ func TestPrepareSearchUsesPrimaryWhenHealthy(t *testing.T) {
 	}
 }
 
-func TestSearchTimeoutDegradesToFallback(t *testing.T) {
+func TestPrimaryTimeoutRetriesFallback(t *testing.T) {
 	h := newTestHub(t)
 	sess := newSession("test")
 
-	for i := 0; i < searchDegradedThreshold; i++ {
-		st, _ := h.prepareSearch(sess, "q")
-		if st.bot != "search" {
-			t.Fatalf("search %d: expected primary bot before degradation, got %q", i, st.bot)
-		}
-		h.searchTimedOut(st) // clears h.current itself
+	st, _ := h.prepareSearch(sess, "dune")
+	if !h.searchTimedOut(st) {
+		t.Fatal("expected retry onto fallback, got final failure")
 	}
+	if st.bot != "searchook" || !st.retried || st.phase != searchAwaitingResponse {
+		t.Fatalf("unexpected retry state: bot=%q retried=%v phase=%v", st.bot, st.retried, st.phase)
+	}
+	if h.current != st {
+		t.Fatal("in-flight search should survive the retry")
+	}
+	if h.searchDegraded {
+		t.Fatal("single timeout must not degrade")
+	}
+}
 
-	if !h.searchDegraded {
-		t.Fatal("expected hub to be degraded after consecutive timeouts")
-	}
+func TestRetriedSearchFailsAfterFallbackTimeout(t *testing.T) {
+	h := newTestHub(t)
+	sess := newSession("test")
 
 	st, _ := h.prepareSearch(sess, "q")
+	h.searchTimedOut(st) // → retry onto fallback
 	if st.bot != "searchook" {
-		t.Fatalf("expected fallback bot 'searchook' while degraded, got %q", st.bot)
+		t.Fatalf("expected fallback after retry, got %q", st.bot)
 	}
-	if st.probe {
-		t.Fatal("fallback search must not be marked as a primary probe")
+	// Fallback attempt times out → final failure, no further retry.
+	if h.searchTimedOut(st) {
+		t.Fatal("fallback timeout must be final, not another retry")
+	}
+	if h.peekCurrentSearch() != nil {
+		t.Fatal("expected in-flight search cleared after final timeout")
+	}
+}
+
+func TestRescuedSearchesDegradeToFallback(t *testing.T) {
+	h := newTestHub(t)
+	sess := newSession("test")
+
+	// First rescued search must not degrade.
+	rescuedSearch(t, h, sess, "q")
+	if h.searchDegraded {
+		t.Fatal("single rescued timeout must not degrade")
+	}
+
+	// Remaining strikes → degraded.
+	for i := 1; i < searchDegradedThreshold; i++ {
+		rescuedSearch(t, h, sess, "q")
+	}
+	if !h.searchDegraded {
+		t.Fatal("expected degraded after consecutive primary timeouts")
+	}
+
+	// Degraded → straight to fallback, no wasted primary attempt.
+	st, _ := h.prepareSearch(sess, "q")
+	if st.bot != "searchook" || st.probe {
+		t.Fatalf("expected fallback while degraded, got bot=%q probe=%v", st.bot, st.probe)
 	}
 }
 
@@ -82,41 +139,47 @@ func TestDegradedCooldownProbesPrimaryAndRecovers(t *testing.T) {
 	h := newTestHub(t)
 	sess := newSession("test")
 
-	// Drive into degraded state.
+	// Drive into degraded state (each search rescued by fallback).
 	for i := 0; i < searchDegradedThreshold; i++ {
-		st, _ := h.prepareSearch(sess, "q")
-		h.searchTimedOut(st)
+		rescuedSearch(t, h, sess, "q")
+	}
+	if !h.searchDegraded {
+		t.Fatal("expected degraded")
 	}
 
-	// During cooldown → fallback.
+	// During cooldown → fallback directly; fallback success keeps degraded.
 	st, _ := h.prepareSearch(sess, "q")
 	if st.bot != "searchook" {
 		t.Fatalf("expected fallback during cooldown, got %q", st.bot)
 	}
+	resolveCurrent(h)
+	if !h.searchDegraded {
+		t.Fatal("fallback resolution must not clear degraded state")
+	}
 
-	// Expire the cooldown → next search probes primary.
+	// Cooldown expires → probe primary.
 	expireCooldown(h)
 	probe, _ := h.prepareSearch(sess, "q")
 	if probe.bot != "search" || !probe.probe {
 		t.Fatalf("expected primary probe after cooldown, got bot=%q probe=%v", probe.bot, probe.probe)
 	}
 
-	// Probe times out → immediately re-degraded (no need for 3 more strikes).
-	h.searchTimedOut(probe)
+	// Probe times out → immediate re-degrade, and this search retries fallback.
+	if !h.searchTimedOut(probe) {
+		t.Fatal("expected probe timeout to retry fallback")
+	}
 	if !h.searchDegraded {
 		t.Fatal("expected re-degrade after probe timeout")
 	}
-
-	// Fallback search succeeds → stays degraded.
-	h.prepareSearch(sess, "q")
-	if resolveCurrent(h) {
-		t.Fatal("fallback success must not report recovery")
+	if probe.bot != "searchook" {
+		t.Fatalf("expected probe retry onto fallback, got %q", probe.bot)
 	}
+	resolveCurrent(h)
 	if !h.searchDegraded {
-		t.Fatal("fallback success should not clear degraded state")
+		t.Fatal("fallback resolution after probe must not clear degraded")
 	}
 
-	// Next probe succeeds → recovery.
+	// Next probe resolves on the primary → recovery.
 	expireCooldown(h)
 	probe2, _ := h.prepareSearch(sess, "q")
 	if probe2.bot != "search" || !probe2.probe {
@@ -165,7 +228,7 @@ func TestSupersededSearchIsClosedOut(t *testing.T) {
 	if h.current != st2 {
 		t.Fatal("expected st2 to be current")
 	}
-	// A late timeout for the superseded search must not clear the new one.
+	// A late timeout for the superseded search must not touch the new one.
 	h.searchTimedOut(st1)
 	if h.current != st2 {
 		t.Fatal("superseded search timeout cleared the in-flight search")

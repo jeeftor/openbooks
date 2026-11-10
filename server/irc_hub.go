@@ -78,9 +78,10 @@ const (
 type inflightSearch struct {
 	session *session
 	query   string
-	bot     string        // bot nick the query was sent to
+	bot     string        // bot nick the current attempt was sent to
 	phase   searchPhase   // guarded by hub.currentMu
 	probe   bool          // true when this search probes the primary bot after a degraded cooldown
+	retried bool          // true when the query was already re-sent to the fallback bot
 	done    chan struct{} // closed when the search resolves or is superseded
 	rearm   chan struct{} // signalled (cap 1) when phase advances to searchAwaitingResult
 }
@@ -100,10 +101,12 @@ type ircHub struct {
 	current   *inflightSearch
 	currentMu sync.Mutex
 
-	// Search-bot health state, guarded by currentMu.
-	consecutiveTimeouts int
-	searchDegraded      bool
-	degradedUntil       time.Time
+	// Search-bot health state, guarded by currentMu. primaryTimeouts counts
+	// consecutive timeouts on searches sent to the primary bot; fallback-bot
+	// outcomes neither increment nor reset it.
+	primaryTimeouts  int
+	searchDegraded   bool
+	degradedUntil    time.Time
 
 	// lastElevated is the previously logged elevated-user list; used to
 	// dedupe the periodic NAMES refresh so logs only change on diff.
@@ -430,63 +433,117 @@ func (h *ircHub) watchSearch(st *inflightSearch) {
 			timeout = h.srv.config.SearchResultTimeout
 			continue
 		case <-timer.C:
-			h.searchTimedOut(st)
+			if h.searchTimedOut(st) {
+				// Re-armed onto the fallback bot — keep watching.
+				timeout = h.srv.config.SearchResponseTimeout
+				continue
+			}
 			return
 		}
 	}
 }
 
-// searchTimedOut handles a watchdog expiry: it clears the in-flight search
-// (only if it is still current), updates bot-health state, notifies clients,
-// and releases result-cache waiters.
-func (h *ircHub) searchTimedOut(st *inflightSearch) {
+// searchTimedOut handles a watchdog expiry for st. It returns true when the
+// search was re-armed onto the fallback bot (the caller keeps watching); it
+// returns false when the search reached a final state — resolved as failed,
+// or superseded by a newer search.
+//
+// A timeout on the primary bot always counts toward degradation, even when
+// the fallback retry later rescues the search — otherwise a dead primary
+// would never be learned while fallbacks keep succeeding.
+func (h *ircHub) searchTimedOut(st *inflightSearch) bool {
 	h.currentMu.Lock()
 	if h.current != st {
 		h.currentMu.Unlock()
-		return // superseded by a newer search
+		return false // superseded by a newer search
 	}
-	h.current = nil
 
+	attemptedBot := st.bot
+	attemptedPrimary := strings.EqualFold(attemptedBot, h.srv.config.SearchBot)
 	phase := st.phase
-	h.consecutiveTimeouts++
+	fallback := strings.TrimSpace(h.srv.config.SearchBotFallback)
+
 	enteredDegraded := false
-	if st.probe || h.consecutiveTimeouts >= searchDegradedThreshold {
-		if !h.searchDegraded {
-			enteredDegraded = true
+	if attemptedPrimary {
+		h.primaryTimeouts++
+		if st.probe || h.primaryTimeouts >= searchDegradedThreshold {
+			if !h.searchDegraded {
+				enteredDegraded = true
+			}
+			h.searchDegraded = true
+			h.degradedUntil = time.Now().Add(searchDegradedCooldown)
 		}
-		h.searchDegraded = true
-		h.degradedUntil = time.Now().Add(searchDegradedCooldown)
 	} else if h.searchDegraded {
 		// The fallback timed out too — postpone the primary probe.
 		h.degradedUntil = time.Now().Add(searchDegradedCooldown)
 	}
+
+	// Retry the same query once on the fallback bot when the primary attempt
+	// produced no usable result. The in-flight search stays alive — only the
+	// bot changes — so result-cache waiters keep waiting.
+	canRetry := attemptedPrimary && !st.retried &&
+		fallback != "" && !strings.EqualFold(fallback, h.srv.config.SearchBot)
+	if canRetry {
+		st.bot = fallback
+		st.phase = searchAwaitingResponse
+		st.retried = true
+		h.currentMu.Unlock()
+
+		// Dispatch the same query to the fallback bot. SendMessage is a
+		// no-op when the connection is down; the watchdog will simply time
+		// out again on the fallback attempt.
+		core.SearchBook(h.irc, fallback, st.query)
+		h.srv.logBuf.info(fmt.Sprintf("CLIENT (%s): 🔁 IRC SEARCH retry → %q via %s", st.session.username, st.query, fallback))
+
+		waited := "a response"
+		if phase == searchAwaitingResult {
+			waited = "the results file"
+		}
+		msg := fmt.Sprintf("IRC search timed out waiting for %s from %q — retrying with %q (query: %q)", waited, attemptedBot, fallback, st.query)
+		h.srv.log.Printf("IRC HUB: %s\n", msg)
+		h.srv.logBuf.warn(msg)
+		broadcastToClients(st.session.getClients(), newStatusResponse(NOTIFY,
+			fmt.Sprintf("%s didn't respond — trying %s…", attemptedBot, fallback)))
+		if enteredDegraded {
+			h.announceDegraded()
+		}
+		return true
+	}
+
+	h.current = nil
 	h.currentMu.Unlock()
 
 	waited := "a response"
 	if phase == searchAwaitingResult {
 		waited = "the results file"
 	}
-	msg := fmt.Sprintf("IRC search timed out waiting for %s from %q (query: %q)", waited, st.bot, st.query)
+	msg := fmt.Sprintf("IRC search timed out waiting for %s from %q (query: %q)", waited, attemptedBot, st.query)
 	h.srv.log.Printf("IRC HUB: %s\n", msg)
 	h.srv.logBuf.warn(msg)
-	broadcastToClients(st.session.getClients(), newErrorResponse("Search bot isn't responding — it may be down. Try again later."))
+	broadcastToClients(st.session.getClients(), newErrorResponse(
+		fmt.Sprintf("Search bot %q isn't responding — it may be down. Try again later.", attemptedBot)))
 	h.srv.resultCache.CancelInFlight(st.query)
 
 	if enteredDegraded {
 		h.announceDegraded()
 	}
+	return false
 }
 
 // recordSearchOutcome updates bot-health state after a search reaches a
-// terminal state. It reports whether the primary bot just recovered.
+// terminal state. Only a resolution on the primary bot clears the failure
+// streak (and can trigger recovery); fallback resolutions leave the primary's
+// presumed-down state untouched until a probe proves otherwise.
 func (h *ircHub) recordSearchOutcome(st *inflightSearch) (recovered bool) {
 	h.currentMu.Lock()
 	defer h.currentMu.Unlock()
-	h.consecutiveTimeouts = 0
-	if h.searchDegraded && strings.EqualFold(st.bot, h.srv.config.SearchBot) {
-		h.searchDegraded = false
-		h.degradedUntil = time.Time{}
-		recovered = true
+	if strings.EqualFold(st.bot, h.srv.config.SearchBot) {
+		h.primaryTimeouts = 0
+		if h.searchDegraded {
+			h.searchDegraded = false
+			h.degradedUntil = time.Time{}
+			recovered = true
+		}
 	}
 	return recovered
 }

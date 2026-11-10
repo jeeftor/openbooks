@@ -233,7 +233,7 @@ Because both containers mount `./books`, a book saved by OpenBooks ABS to `./boo
 | `--basepath` | Serve the web UI under a reverse-proxy subpath, such as `/openbooks-abs/`. |
 | `--rate-limit` | Seconds between IRC search requests. Minimum is 10. |
 | `--searchbot` | IRC search bot name. Defaults to `search`; try `searchook` if needed. |
-| `--searchbot-fallback` | Fallback IRC bot used automatically when the primary `--searchbot` stops responding (after 3 consecutive timeouts, for a 30-minute cooldown before re-probing the primary). Defaults to `searchook`; set to empty to disable. |
+| `--searchbot-fallback` | Fallback IRC bot. Each search retries once on it when the primary times out; after 3 consecutive primary timeouts searches route to it directly for a 30-minute cooldown before re-probing the primary. Defaults to `searchook`; set to empty to disable. |
 | `--search-response-timeout` | Max wait for any response from the search bot before a search is declared timed out (default `2m`). |
 | `--search-result-timeout` | Max wait for the results file after the search bot acknowledges a query (default `5m`). |
 

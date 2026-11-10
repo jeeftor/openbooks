@@ -50,7 +50,7 @@ func init() {
 	desktopCmd.PersistentFlags().BoolVar(&globalFlags.EnableTLS, "tls", true, "Connect to server using TLS.")
 	desktopCmd.PersistentFlags().BoolVarP(&globalFlags.Log, "log", "l", false, "Save raw IRC logs for each client connection.")
 	desktopCmd.PersistentFlags().StringVar(&globalFlags.SearchBot, "searchbot", "search", "The IRC bot that handles search queries. Try 'searchook' if 'search' is down.")
-	desktopCmd.PersistentFlags().StringVar(&globalFlags.SearchBotFallback, "searchbot-fallback", "searchook", "Fallback IRC bot used when the primary --searchbot stops responding. Set to empty to disable.")
+	desktopCmd.PersistentFlags().StringVar(&globalFlags.SearchBotFallback, "searchbot-fallback", "searchook", "Fallback IRC bot — each search retries once on it when the primary times out, and it handles searches while the primary is marked down. Set to empty to disable.")
 	desktopCmd.PersistentFlags().DurationVar(&globalFlags.SearchResponseTimeout, "search-response-timeout", 2*time.Minute, "Max wait for any response from the search bot before the search is declared timed out.")
 	desktopCmd.PersistentFlags().DurationVar(&globalFlags.SearchResultTimeout, "search-result-timeout", 5*time.Minute, "Max wait for the results file after the search bot acknowledges a query.")
 	desktopCmd.PersistentFlags().StringVarP(&globalFlags.UserAgent, "useragent", "u", fmt.Sprintf("OpenBooks %s", ircVersion), "UserAgent / Version Reported to IRC Server.")

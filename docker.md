@@ -81,7 +81,7 @@ volumes:
 | `--post-process-cmd` | Command to run after each download, file path appended as last arg. Comma-separated: `cmd,--flag1,--flag2` |
 | `--basepath` | Base path for reverse proxy (e.g. `/openbooks-abs/`) |
 | `--searchbot` | IRC search bot name (default: `search`, fallback: `searchook`) |
-| `--searchbot-fallback` | Fallback bot when the primary stops responding (default: `searchook`, empty disables) |
+| `--searchbot-fallback` | Fallback bot — retried once per search on primary timeout; also takes over after repeated primary failures (default: `searchook`, empty disables) |
 | `--search-response-timeout` / `--search-result-timeout` | Search watchdog timeouts (defaults: `2m` / `5m`) |
 | `--rate-limit` | Seconds between searches (minimum 10) |
 
