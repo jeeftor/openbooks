@@ -11,27 +11,30 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jeeftor/openbooks/core"
+	"github.com/jeeftor/openbooks/dcc"
 	"github.com/jeeftor/openbooks/irc"
 	"github.com/jeeftor/openbooks/staging"
-	"github.com/google/uuid"
 )
 
 // Session holds a persistent IRC connection and bridges async IRC events
 // to synchronous MCP tool calls. Only one search and one download may be
 // in-flight at a time.
 type Session struct {
-	irc            *irc.Conn
-	searchBot      string
-	downloadDir    string
-	formats        []string // file formats to accept, e.g. ["epub"]
-	postProcessCmd []string // command + args; file path appended automatically
-	replaceSpace   string
-	log            *slog.Logger
-	activityLog    func(level, msg string) // optional hook into host log buffer
-	staged         *staging.StagedBookStore
+	irc               *irc.Conn
+	searchBot         string
+	searchBotFallback string
+	downloadDir       string
+	formats           []string // file formats to accept, e.g. ["epub"]
+	postProcessCmd    []string // command + args; file path appended automatically
+	replaceSpace      string
+	log               *slog.Logger
+	activityLog       func(level, msg string) // optional hook into host log buffer
+	staged            *staging.StagedBookStore
 
 	mu              sync.Mutex // serialises search AND download calls
 	searchDone      chan searchOutcome
@@ -41,16 +44,22 @@ type Session struct {
 	serversMu  sync.RWMutex
 	serverList []string
 
-	searchCacheMu    sync.RWMutex
-	lastSearchQuery  string
-	lastSearchResp   searchResponse
-	lastSearchValid  bool
+	searchCacheMu   sync.RWMutex
+	lastSearchQuery string
+	lastSearchResp  searchResponse
+	lastSearchValid bool
+
+	// pendingQuery is the query the in-flight search is waiting for. Stored
+	// as atomic.Value (string) so async IRC handlers can read it without
+	// deadlocking on s.mu, which SearchBooks holds for its whole duration.
+	pendingQuery atomic.Value
 }
 
 type searchOutcome struct {
-	books  []core.BookDetail
-	errors []core.ParseError
-	err    error
+	books    []core.BookDetail
+	errors   []core.ParseError
+	err      error
+	filename string // DCC filename, used to detect stale results
 }
 
 type downloadOutcome struct {
@@ -60,16 +69,17 @@ type downloadOutcome struct {
 
 // Config holds the parameters needed to start an MCP session.
 type Config struct {
-	UserName       string
-	UserAgent      string
-	Server         string
-	EnableTLS      bool
-	SearchBot      string
-	DownloadDir    string
-	Formats        []string // filter; nil or empty means accept all
-	PostProcessCmd []string // command + args; file path appended automatically
-	ReplaceSpace   string   // optional character used to replace spaces in filenames
-	Log            *slog.Logger
+	UserName          string
+	UserAgent         string
+	Server            string
+	EnableTLS         bool
+	SearchBot         string
+	SearchBotFallback string // used once when the primary search bot times out
+	DownloadDir       string
+	Formats           []string // filter; nil or empty means accept all
+	PostProcessCmd    []string // command + args; file path appended automatically
+	ReplaceSpace      string   // optional character used to replace spaces in filenames
+	Log               *slog.Logger
 	// ActivityLog is called for key events (search, download) so callers can
 	// route them into a shared log buffer (e.g. the web UI's log panel).
 	// Optional — if nil, only slog output is produced.
@@ -99,18 +109,19 @@ func Connect(ctx context.Context, cfg Config) (*Session, error) {
 	}
 
 	sess := &Session{
-		irc:            conn,
-		searchBot:      cfg.SearchBot,
-		downloadDir:    cfg.DownloadDir,
-		formats:        formats,
-		postProcessCmd: cfg.PostProcessCmd,
-		replaceSpace:   cfg.ReplaceSpace,
-		log:            logger,
-		activityLog:    cfg.ActivityLog,
-		staged:         stagedStore,
-		searchDone:     make(chan searchOutcome, 1),
-		downloadDone:   make(chan downloadOutcome, 1),
-		downloadStarted: make(chan struct{}, 1),
+		irc:               conn,
+		searchBot:         cfg.SearchBot,
+		searchBotFallback: cfg.SearchBotFallback,
+		downloadDir:       cfg.DownloadDir,
+		formats:           formats,
+		postProcessCmd:    cfg.PostProcessCmd,
+		replaceSpace:      cfg.ReplaceSpace,
+		log:               logger,
+		activityLog:       cfg.ActivityLog,
+		staged:            stagedStore,
+		searchDone:        make(chan searchOutcome, 1),
+		downloadDone:      make(chan downloadOutcome, 1),
+		downloadStarted:   make(chan struct{}, 1),
 	}
 
 	handler := sess.buildHandler()
@@ -156,29 +167,70 @@ func (s *Session) LastSearch() (string, searchResponse, bool) {
 }
 
 // SearchBooks sends a search query and waits for results, serialising
-// concurrent callers so only one search is in-flight at a time.
+// concurrent callers so only one search is in-flight at a time. If the
+// primary search bot does not respond within the timeout, the query is
+// retried once against the configured fallback bot.
 func (s *Session) SearchBooks(ctx context.Context, query string) ([]core.BookDetail, []core.ParseError, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	core.SearchBook(s.irc, s.searchBot, query)
-	s.log.Info("search sent", "query", query)
-	s.logActivity("info", fmt.Sprintf("🤖 MCP search: %q", query))
+	bots := []string{s.searchBot}
+	if fb := strings.TrimSpace(s.searchBotFallback); fb != "" && !strings.EqualFold(fb, s.searchBot) {
+		bots = append(bots, fb)
+	}
 
-	select {
-	case outcome := <-s.searchDone:
-		if outcome.err != nil {
-			s.logActivity("error", fmt.Sprintf("🤖 MCP search failed: %v", outcome.err))
-			return nil, nil, outcome.err
+	var lastErr error
+	for i, bot := range bots {
+		if i > 0 {
+			s.logActivity("warn", fmt.Sprintf("🤖 MCP search: %s timed out — retrying with %q", bots[0], bot))
+		}
+		s.pendingQuery.Store(query)
+		core.SearchBook(s.irc, bot, query)
+		s.log.Info("search sent", "query", query, "bot", bot)
+		s.logActivity("info", fmt.Sprintf("🤖 MCP search: %q", query))
+
+		outcome, err := s.waitSearchOutcome(ctx, 90*time.Second)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, nil, ctx.Err()
+			}
+			lastErr = err
+			continue // try the next bot
 		}
 		filtered := FilterResults(outcome.books, s.formats)
 		s.logActivity("info", fmt.Sprintf("🤖 MCP search results: %d found for %q", len(filtered), query))
 		return filtered, outcome.errors, nil
-	case <-time.After(90 * time.Second):
-		s.logActivity("error", fmt.Sprintf("🤖 MCP search timed out: %q", query))
-		return nil, nil, fmt.Errorf("search timed out after 90s")
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
+	}
+
+	s.logActivity("error", fmt.Sprintf("🤖 MCP search failed: %v", lastErr))
+	return nil, nil, lastErr
+}
+
+// waitSearchOutcome waits for the next search outcome, discarding stale
+// results whose DCC filename query doesn't match the pending query. This
+// prevents a late response to an earlier (timed-out) search — or to the
+// primary bot during a fallback retry — from being attributed to the wrong
+// query.
+func (s *Session) waitSearchOutcome(ctx context.Context, timeout time.Duration) (searchOutcome, error) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	for {
+		select {
+		case outcome := <-s.searchDone:
+			if pq, _ := s.pendingQuery.Load().(string); pq != "" && outcome.filename != "" &&
+				!core.QueryMatchesResultsFilename(pq, outcome.filename) {
+				s.logActivity("warn", fmt.Sprintf("🤖 MCP ignoring stale search result %q (waiting for %q)", outcome.filename, pq))
+				continue
+			}
+			return outcome, outcome.err
+		case <-timer.C:
+			if pq, _ := s.pendingQuery.Load().(string); pq != "" {
+				s.logActivity("error", fmt.Sprintf("🤖 MCP search timed out: %q", pq))
+			}
+			return searchOutcome{}, fmt.Errorf("search timed out after %s", timeout)
+		case <-ctx.Done():
+			return searchOutcome{}, ctx.Err()
+		}
 	}
 }
 
@@ -373,14 +425,18 @@ func (s *Session) buildHandler() core.EventHandler {
 	}
 
 	handler[core.SearchResult] = func(text string) {
+		var filename string
+		if d, err := dcc.ParseString(text); err == nil {
+			filename = d.Filename
+		}
 		path, err := core.DownloadExtractDCCString(s.downloadDir, text, nil)
 		if err != nil {
-			s.searchDone <- searchOutcome{err: fmt.Errorf("search download: %w", err)}
+			s.searchDone <- searchOutcome{err: fmt.Errorf("search download: %w", err), filename: filename}
 			return
 		}
 		books, parseErrs, err := core.ParseSearchFile(path)
 		os.Remove(path)
-		s.searchDone <- searchOutcome{books: books, errors: parseErrs, err: err}
+		s.searchDone <- searchOutcome{books: books, errors: parseErrs, err: err, filename: filename}
 	}
 
 	handler[core.BookResult] = func(text string) {

@@ -14,6 +14,9 @@ func bindGlobalServerFlags(config *server.Config) {
 	config.Log = globalFlags.Log
 	config.Server = globalFlags.Server
 	config.SearchBot = globalFlags.SearchBot
+	config.SearchBotFallback = globalFlags.SearchBotFallback
+	config.SearchResponseTimeout = globalFlags.SearchResponseTimeout
+	config.SearchResultTimeout = globalFlags.SearchResultTimeout
 	config.EnableTLS = globalFlags.EnableTLS
 	config.Version = version
 	config.CommitSHA = commitSHA

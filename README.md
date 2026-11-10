@@ -233,6 +233,9 @@ Because both containers mount `./books`, a book saved by OpenBooks ABS to `./boo
 | `--basepath` | Serve the web UI under a reverse-proxy subpath, such as `/openbooks-abs/`. |
 | `--rate-limit` | Seconds between IRC search requests. Minimum is 10. |
 | `--searchbot` | IRC search bot name. Defaults to `search`; try `searchook` if needed. |
+| `--searchbot-fallback` | Fallback IRC bot used automatically when the primary `--searchbot` stops responding (after 3 consecutive timeouts, for a 30-minute cooldown before re-probing the primary). Defaults to `searchook`; set to empty to disable. |
+| `--search-response-timeout` | Max wait for any response from the search bot before a search is declared timed out (default `2m`). |
+| `--search-result-timeout` | Max wait for the results file after the search bot acknowledges a query (default `5m`). |
 
 ## Post-Processing
 
@@ -314,7 +317,7 @@ The MCP server is a subcommand of the main binary. It requires `--name` (your IR
 | `--formats` | `epub` | Accepted file formats (comma-separated) |
 | `--mock` | false | Use fake data instead of a real IRC connection (for testing) |
 
-The MCP server also inherits the global IRC flags: `--server`, `--searchbot`, `--tls`.
+The MCP server also inherits the global IRC flags: `--server`, `--searchbot`, `--searchbot-fallback`, `--tls`. MCP searches retry once against the fallback bot when the primary times out.
 
 ### MCP Tools
 

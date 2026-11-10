@@ -14,6 +14,9 @@ These options apply to Server mode.
 | `--log`/`-l`     | `false`                   | Save raw IRC logs for each client connection.                        |
 | `--name`/`-n`    | Optional in server mode   | Username prefix used to connect to IRC server.                       |
 | `--searchbot`    | `search`                  | The IRC search operator to use. Try `searchook` if `search` is down. |
+| `--searchbot-fallback` | `searchook`         | Fallback IRC bot used when the primary stops responding (3 consecutive timeouts → 30 min cooldown → re-probe). Empty disables. |
+| `--search-response-timeout` | `2m`        | Max wait for any response from the search bot before a search times out. |
+| `--search-result-timeout` | `5m`          | Max wait for the results file after the bot acknowledges a query. |
 | `--server`/`-s`  | `irc.irchighway.net:6697` | The IRC `server:port` to connect to.                                 |
 | `--tls`          | `true`                    | Connect to IRC server over TLS.                                      |
 | `--useragent/-u` | `OpenBooks v4.5.0`        | UserAgent / Version Reported to IRC Server.                          |

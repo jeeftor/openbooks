@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jeeftor/openbooks/mcp"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/jeeftor/openbooks/mcp"
 	"github.com/rs/cors"
 )
 
@@ -75,20 +75,26 @@ type Config struct {
 	EnableTLS         bool
 	SearchTimeout     time.Duration
 	SearchBot         string
-	UserAgent         string
-	Version           string
-	CommitSHA         string
-	BuildDate         string
-	OrganizeDownloads bool
-	ReplaceSpace      string
-	PostProcessCmd    []string // command + args; file path appended automatically
-	DevMode           bool
-	EnableMCP         bool          // mount MCP server at /mcp
-	MCPFormats        []string      // file format filter for MCP searches (default: epub)
-	ResultCacheTTL    time.Duration // how long cached search results are valid (default: 60m)
-	ResultCacheSize   int           // max number of distinct queries to cache (default: 100)
-	AutoRename        bool          // skip rename prompt and auto-select AutoRenameOption
-	AutoRenameOption  string        // which option to auto-select when AutoRename is on (default: author-title-flat)
+	SearchBotFallback string // used when the primary search bot is marked down
+	// SearchResponseTimeout is the max wait for any bot signal after a query
+	// is sent; SearchResultTimeout is the max wait for the final result once
+	// the bot has acknowledged. Zero values get defaults in New().
+	SearchResponseTimeout time.Duration
+	SearchResultTimeout   time.Duration
+	UserAgent             string
+	Version               string
+	CommitSHA             string
+	BuildDate             string
+	OrganizeDownloads     bool
+	ReplaceSpace          string
+	PostProcessCmd        []string // command + args; file path appended automatically
+	DevMode               bool
+	EnableMCP             bool          // mount MCP server at /mcp
+	MCPFormats            []string      // file format filter for MCP searches (default: epub)
+	ResultCacheTTL        time.Duration // how long cached search results are valid (default: 60m)
+	ResultCacheSize       int           // max number of distinct queries to cache (default: 100)
+	AutoRename            bool          // skip rename prompt and auto-select AutoRenameOption
+	AutoRenameOption      string        // which option to auto-select when AutoRename is on (default: author-title-flat)
 }
 
 func New(config Config) *server {
@@ -99,6 +105,12 @@ func New(config Config) *server {
 	cacheSize := config.ResultCacheSize
 	if cacheSize == 0 {
 		cacheSize = 100
+	}
+	if config.SearchResponseTimeout <= 0 {
+		config.SearchResponseTimeout = 2 * time.Minute
+	}
+	if config.SearchResultTimeout <= 0 {
+		config.SearchResultTimeout = 5 * time.Minute
 	}
 	return &server{
 		config:      &config,
@@ -200,16 +212,17 @@ func Start(config Config) {
 
 	if config.EnableMCP {
 		mcpSession, err := mcp.Connect(ctx, mcp.Config{
-			UserName:       config.UserName + "_mcp",
-			UserAgent:      config.UserAgent,
-			Server:         config.Server,
-			EnableTLS:      config.EnableTLS,
-			SearchBot:      config.SearchBot,
-			DownloadDir:    config.DownloadDir,
-			Formats:        config.MCPFormats,
-			PostProcessCmd: config.PostProcessCmd,
-			ReplaceSpace:   config.ReplaceSpace,
-			Log:            slog.New(slog.NewTextHandler(os.Stderr, nil)),
+			UserName:          config.UserName + "_mcp",
+			UserAgent:         config.UserAgent,
+			Server:            config.Server,
+			EnableTLS:         config.EnableTLS,
+			SearchBot:         config.SearchBot,
+			SearchBotFallback: config.SearchBotFallback,
+			DownloadDir:       config.DownloadDir,
+			Formats:           config.MCPFormats,
+			PostProcessCmd:    config.PostProcessCmd,
+			ReplaceSpace:      config.ReplaceSpace,
+			Log:               slog.New(slog.NewTextHandler(os.Stderr, nil)),
 			ActivityLog: func(level, msg string) {
 				switch level {
 				case "error":
@@ -239,6 +252,9 @@ func Start(config Config) {
 	srv.log.Printf("IRC server:             %s (TLS: %v)", config.Server, config.EnableTLS)
 	srv.log.Printf("Username:               %s", config.UserName)
 	srv.log.Printf("Search bot:             %s", config.SearchBot)
+	if fb := config.SearchBotFallback; fb != "" {
+		srv.log.Printf("Search bot fallback:    %s", fb)
+	}
 	if len(config.PostProcessCmd) > 0 {
 		srv.log.Printf("Post-process command:   %v", config.PostProcessCmd)
 		validatePostProcessCmd(config.PostProcessCmd, srv.log)

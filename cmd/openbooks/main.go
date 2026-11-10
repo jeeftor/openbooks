@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jeeftor/openbooks/desktop"
@@ -27,12 +28,15 @@ var buildDate = "unknown"
 var ircVersion = "4.3.0"
 
 type GlobalFlags struct {
-	UserName  string
-	Server    string
-	Log       bool
-	SearchBot string
-	EnableTLS bool
-	UserAgent string
+	UserName              string
+	Server                string
+	Log                   bool
+	SearchBot             string
+	SearchBotFallback     string
+	SearchResponseTimeout time.Duration
+	SearchResultTimeout   time.Duration
+	EnableTLS             bool
+	UserAgent             string
 }
 
 var debug bool
@@ -46,6 +50,9 @@ func init() {
 	desktopCmd.PersistentFlags().BoolVar(&globalFlags.EnableTLS, "tls", true, "Connect to server using TLS.")
 	desktopCmd.PersistentFlags().BoolVarP(&globalFlags.Log, "log", "l", false, "Save raw IRC logs for each client connection.")
 	desktopCmd.PersistentFlags().StringVar(&globalFlags.SearchBot, "searchbot", "search", "The IRC bot that handles search queries. Try 'searchook' if 'search' is down.")
+	desktopCmd.PersistentFlags().StringVar(&globalFlags.SearchBotFallback, "searchbot-fallback", "searchook", "Fallback IRC bot used when the primary --searchbot stops responding. Set to empty to disable.")
+	desktopCmd.PersistentFlags().DurationVar(&globalFlags.SearchResponseTimeout, "search-response-timeout", 2*time.Minute, "Max wait for any response from the search bot before the search is declared timed out.")
+	desktopCmd.PersistentFlags().DurationVar(&globalFlags.SearchResultTimeout, "search-result-timeout", 5*time.Minute, "Max wait for the results file after the search bot acknowledges a query.")
 	desktopCmd.PersistentFlags().StringVarP(&globalFlags.UserAgent, "useragent", "u", fmt.Sprintf("OpenBooks %s", ircVersion), "UserAgent / Version Reported to IRC Server.")
 
 	homeDir, err := os.UserHomeDir()

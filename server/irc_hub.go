@@ -54,21 +54,56 @@ func (h *sharedSlotHandle) release() {
 	})
 }
 
+const (
+	// searchDegradedThreshold is the number of consecutive search timeouts
+	// after which the primary search bot is marked down.
+	searchDegradedThreshold = 3
+	// searchDegradedCooldown is how long searches route to the fallback bot
+	// before the primary bot is probed again.
+	searchDegradedCooldown = 30 * time.Minute
+)
+
+// searchPhase tracks how far an in-flight search has progressed with the bot.
+type searchPhase int
+
+const (
+	// searchAwaitingResponse: query sent, no bot signal received yet.
+	searchAwaitingResponse searchPhase = iota
+	// searchAwaitingResult: bot acknowledged the query; awaiting the DCC
+	// results file or a terminal notice.
+	searchAwaitingResult
+)
+
+// inflightSearch tracks the one search currently awaiting a bot response.
+type inflightSearch struct {
+	session *session
+	query   string
+	bot     string        // bot nick the query was sent to
+	phase   searchPhase   // guarded by hub.currentMu
+	probe   bool          // true when this search probes the primary bot after a degraded cooldown
+	done    chan struct{} // closed when the search resolves or is superseded
+	rearm   chan struct{} // signalled (cap 1) when phase advances to searchAwaitingResult
+}
+
 // ircHub owns the single shared IRC connection for all frontend sessions.
 // All search and download requests are routed through this hub.
 type ircHub struct {
 	irc           *irc.Conn
 	ctx           context.Context
-	searchQueue   chan sharedSearchJob    // cap 50
-	downloadQueue chan sharedDownloadJob  // cap 100
-	downloadSlots chan struct{}           // semaphore, cap concurrentDownloads
-	pendingSlots  chan *sharedSlotHandle  // FIFO for DCC result routing
+	searchQueue   chan sharedSearchJob   // cap 50
+	downloadQueue chan sharedDownloadJob // cap 100
+	downloadSlots chan struct{}          // semaphore, cap concurrentDownloads
+	pendingSlots  chan *sharedSlotHandle // FIFO for DCC result routing
 
-	// currentSearch is the session waiting for the in-flight search result.
-	// Only processSearchQueue writes it; read under currentMu.
-	currentSearch *session
-	currentQuery  string
-	currentMu     sync.Mutex
+	// current is the search awaiting a bot response. Only processSearchQueue
+	// installs a new one (via prepareSearch); all access is under currentMu.
+	current   *inflightSearch
+	currentMu sync.Mutex
+
+	// Search-bot health state, guarded by currentMu.
+	consecutiveTimeouts int
+	searchDegraded      bool
+	degradedUntil       time.Time
 
 	// lastElevated is the previously logged elevated-user list; used to
 	// dedupe the periodic NAMES refresh so logs only change on diff.
@@ -171,19 +206,22 @@ func (h *ircHub) connectAndRun() {
 	}
 }
 
-// clearAndNotifyCurrentSearch clears currentSearch and notifies its clients that
-// the connection dropped so they don't wait indefinitely.
+// clearAndNotifyCurrentSearch clears the in-flight search and notifies its
+// clients that the connection dropped so they don't wait indefinitely.
 func (h *ircHub) clearAndNotifyCurrentSearch() {
 	h.currentMu.Lock()
-	sess := h.currentSearch
-	query := h.currentQuery
-	h.currentSearch = nil
-	h.currentQuery = ""
+	st := h.current
+	h.current = nil
+	var query string
+	if st != nil {
+		query = st.query
+		close(st.done)
+	}
 	h.currentMu.Unlock()
 
-	if sess != nil {
+	if st != nil {
 		h.srv.resultCache.CancelInFlight(query)
-		broadcastToClients(sess.getClients(), newErrorResponse("IRC connection lost — please retry your search."))
+		broadcastToClients(st.session.getClients(), newErrorResponse("IRC connection lost — please retry your search."))
 	}
 }
 
@@ -219,13 +257,20 @@ func (h *ircHub) processSearchQueue() {
 			h.srv.log.Printf("CLIENT (%s): IRC SEARCH → %q\n", job.session.username, job.query)
 			broadcastToClients(job.session.getClients(), newStatusResponse(NOTIFY, fmt.Sprintf("Searching for %q…", job.query)))
 
-			h.currentMu.Lock()
-			h.currentSearch = job.session
-			h.currentQuery = job.query
-			h.currentMu.Unlock()
+			st, superseded := h.prepareSearch(job.session, job.query)
+			for _, prev := range superseded {
+				broadcastToClients(prev.session.getClients(), newStatusResponse(WARNING, "Search superseded by a newer query."))
+			}
+			if !strings.EqualFold(st.bot, h.srv.config.SearchBot) {
+				broadcastToClients(job.session.getClients(), newStatusResponse(NOTIFY,
+					fmt.Sprintf("Primary search bot unresponsive — trying %q instead.", st.bot)))
+			} else if st.probe {
+				broadcastToClients(job.session.getClients(), newStatusResponse(NOTIFY, "Retrying primary search bot…"))
+			}
 
-			core.SearchBook(h.irc, h.srv.config.SearchBot, job.query)
+			core.SearchBook(h.irc, st.bot, job.query)
 			lastSearch = time.Now()
+			go h.watchSearch(st)
 
 		case <-h.ctx.Done():
 			return
@@ -322,30 +367,247 @@ func (h *ircHub) buildEventHandler() core.EventHandler {
 	return handler
 }
 
-// currentSearchClients returns the clients belonging to the session currently
-// waiting for a search result, and clears the current search state.
-func (h *ircHub) popCurrentSearch() (clients []*Client, sess *session, query string) {
+// prepareSearch selects which bot should receive the query based on the
+// current health state, installs it as the in-flight search, and returns it
+// along with any searches it superseded. A still-pending previous search is
+// closed out and its result-cache waiters released so they don't hang.
+func (h *ircHub) prepareSearch(sess *session, query string) (*inflightSearch, []*inflightSearch) {
 	h.currentMu.Lock()
 	defer h.currentMu.Unlock()
-	sess = h.currentSearch
-	query = h.currentQuery
-	h.currentSearch = nil
-	h.currentQuery = ""
-	if sess != nil {
-		clients = sess.getClients()
+
+	primary := h.srv.config.SearchBot
+	fallback := strings.TrimSpace(h.srv.config.SearchBotFallback)
+	bot := primary
+	probe := false
+	if h.searchDegraded {
+		switch {
+		case time.Now().Before(h.degradedUntil) && fallback != "" && !strings.EqualFold(fallback, primary):
+			bot = fallback
+		case time.Now().Before(h.degradedUntil):
+			// Degraded but no usable fallback — keep trying the primary.
+		default:
+			// Cooldown elapsed — this search probes the primary bot.
+			probe = true
+		}
+	}
+
+	st := &inflightSearch{
+		session: sess,
+		query:   query,
+		bot:     bot,
+		probe:   probe,
+		done:    make(chan struct{}),
+		rearm:   make(chan struct{}, 1),
+	}
+
+	var superseded []*inflightSearch
+	if prev := h.current; prev != nil {
+		close(prev.done)
+		h.srv.resultCache.CancelInFlight(prev.query)
+		superseded = append(superseded, prev)
+	}
+	h.current = st
+	return st, superseded
+}
+
+// watchSearch enforces the two-phase response timeout for an in-flight
+// search: SearchResponseTimeout while awaiting any bot signal, then
+// SearchResultTimeout once the bot has acknowledged. Phase transitions are
+// signalled via st.rearm; resolution closes st.done.
+func (h *ircHub) watchSearch(st *inflightSearch) {
+	timeout := h.srv.config.SearchResponseTimeout
+	for {
+		timer := time.NewTimer(timeout)
+		select {
+		case <-st.done:
+			timer.Stop()
+			return
+		case <-h.ctx.Done():
+			timer.Stop()
+			return
+		case <-st.rearm:
+			timer.Stop()
+			timeout = h.srv.config.SearchResultTimeout
+			continue
+		case <-timer.C:
+			h.searchTimedOut(st)
+			return
+		}
+	}
+}
+
+// searchTimedOut handles a watchdog expiry: it clears the in-flight search
+// (only if it is still current), updates bot-health state, notifies clients,
+// and releases result-cache waiters.
+func (h *ircHub) searchTimedOut(st *inflightSearch) {
+	h.currentMu.Lock()
+	if h.current != st {
+		h.currentMu.Unlock()
+		return // superseded by a newer search
+	}
+	h.current = nil
+
+	phase := st.phase
+	h.consecutiveTimeouts++
+	enteredDegraded := false
+	if st.probe || h.consecutiveTimeouts >= searchDegradedThreshold {
+		if !h.searchDegraded {
+			enteredDegraded = true
+		}
+		h.searchDegraded = true
+		h.degradedUntil = time.Now().Add(searchDegradedCooldown)
+	} else if h.searchDegraded {
+		// The fallback timed out too — postpone the primary probe.
+		h.degradedUntil = time.Now().Add(searchDegradedCooldown)
+	}
+	h.currentMu.Unlock()
+
+	waited := "a response"
+	if phase == searchAwaitingResult {
+		waited = "the results file"
+	}
+	msg := fmt.Sprintf("IRC search timed out waiting for %s from %q (query: %q)", waited, st.bot, st.query)
+	h.srv.log.Printf("IRC HUB: %s\n", msg)
+	h.srv.logBuf.warn(msg)
+	broadcastToClients(st.session.getClients(), newErrorResponse("Search bot isn't responding — it may be down. Try again later."))
+	h.srv.resultCache.CancelInFlight(st.query)
+
+	if enteredDegraded {
+		h.announceDegraded()
+	}
+}
+
+// recordSearchOutcome updates bot-health state after a search reaches a
+// terminal state. It reports whether the primary bot just recovered.
+func (h *ircHub) recordSearchOutcome(st *inflightSearch) (recovered bool) {
+	h.currentMu.Lock()
+	defer h.currentMu.Unlock()
+	h.consecutiveTimeouts = 0
+	if h.searchDegraded && strings.EqualFold(st.bot, h.srv.config.SearchBot) {
+		h.searchDegraded = false
+		h.degradedUntil = time.Time{}
+		recovered = true
+	}
+	return recovered
+}
+
+// searchProgress advances the in-flight search to the result-wait phase when
+// the bot acknowledges the query ("accepted" / "matches found" notices).
+func (h *ircHub) searchProgress() {
+	h.currentMu.Lock()
+	defer h.currentMu.Unlock()
+	st := h.current
+	if st == nil || st.phase != searchAwaitingResponse {
+		return
+	}
+	st.phase = searchAwaitingResult
+	select {
+	case st.rearm <- struct{}{}:
+	default:
+	}
+}
+
+// peekCurrentSearch returns the in-flight search without clearing it.
+func (h *ircHub) peekCurrentSearch() *inflightSearch {
+	h.currentMu.Lock()
+	defer h.currentMu.Unlock()
+	return h.current
+}
+
+// popCurrentSearchForFile clears the in-flight search — stopping its watchdog —
+// only when the results filename plausibly belongs to its query. stale=true
+// means the filename belongs to a different (usually timed-out) query: the
+// in-flight search is left intact so the real response can still resolve it.
+func (h *ircHub) popCurrentSearchForFile(filename string) (clients []*Client, st *inflightSearch, stale bool) {
+	h.currentMu.Lock()
+	defer h.currentMu.Unlock()
+	st = h.current
+	if st == nil {
+		return nil, nil, false
+	}
+	if filename != "" && !core.QueryMatchesResultsFilename(st.query, filename) {
+		return nil, nil, true
+	}
+	h.current = nil
+	close(st.done)
+	clients = st.session.getClients()
+	return clients, st, false
+}
+
+// popCurrentSearch clears the in-flight search state — stopping its watchdog —
+// and returns its clients along with the search record.
+func (h *ircHub) popCurrentSearch() (clients []*Client, st *inflightSearch) {
+	h.currentMu.Lock()
+	defer h.currentMu.Unlock()
+	st = h.current
+	h.current = nil
+	if st != nil {
+		close(st.done)
+		clients = st.session.getClients()
 	}
 	return
 }
 
+// announceDegraded logs and broadcasts the one-time warning emitted when the
+// primary search bot is marked down.
+func (h *ircHub) announceDegraded() {
+	primary := h.srv.config.SearchBot
+	fallback := strings.TrimSpace(h.srv.config.SearchBotFallback)
+	msg := fmt.Sprintf("Search bot %q has not responded to the last %d searches — it may be down.", primary, searchDegradedThreshold)
+	if fallback != "" && !strings.EqualFold(fallback, primary) {
+		msg += fmt.Sprintf(" Routing searches to %q for %s.", fallback, searchDegradedCooldown)
+	}
+	h.srv.log.Printf("IRC HUB: %s\n", msg)
+	h.srv.logBuf.warn(msg)
+	h.broadcastAll(newStatusResponse(WARNING, msg))
+}
+
+// announceRecovery logs and broadcasts the notification emitted when the
+// primary search bot starts responding again.
+func (h *ircHub) announceRecovery() {
+	msg := fmt.Sprintf("Primary search bot %q is responding again.", h.srv.config.SearchBot)
+	h.srv.log.Printf("IRC HUB: %s\n", msg)
+	h.srv.logBuf.info(msg)
+	h.broadcastAll(newStatusResponse(NOTIFY, msg))
+}
+
+// broadcastAll sends a message to every connected client of every session.
+func (h *ircHub) broadcastAll(msg interface{}) {
+	h.srv.sessionsMu.RLock()
+	defer h.srv.sessionsMu.RUnlock()
+	for _, sess := range h.srv.sessions {
+		broadcastToClients(sess.getClients(), msg)
+	}
+}
+
 func (h *ircHub) searchResultHandler() core.HandlerFunc {
 	return func(text string) {
-		clients, sess, query := h.popCurrentSearch()
-
+		var dccFilename string
 		if d, parseErr := dcc.ParseString(text); parseErr == nil {
+			dccFilename = d.Filename
 			h.srv.logBuf.info(fmt.Sprintf("DCC SEND: %s -> %s:%s (%d bytes)", d.Filename, d.IP, d.Port, d.Size))
 		} else {
 			h.srv.logBuf.warn(fmt.Sprintf("Search DCC string unreadable (%v) — attempting download anyway", parseErr))
 		}
+
+		// Stale-result guard + pop, atomically: a results file belonging to a
+		// different (usually timed-out) query must not be attributed to the
+		// in-flight search, and the check must not race a newer dispatch.
+		clients, st, stale := h.popCurrentSearchForFile(dccFilename)
+		if stale {
+			if cur := h.peekCurrentSearch(); cur != nil {
+				h.srv.logBuf.warn(fmt.Sprintf("Ignoring stale search result %q — in-flight search is %q", dccFilename, cur.query))
+			}
+			return
+		}
+		if st == nil {
+			h.srv.logBuf.info("Ignoring late search result — no search in flight")
+			return
+		}
+		if h.recordSearchOutcome(st) {
+			h.announceRecovery()
+		}
+		query := st.query
 
 		extractedPath, err := core.DownloadExtractDCCString(h.srv.config.DownloadDir, text, nil)
 		if err != nil {
@@ -379,9 +641,7 @@ func (h *ircHub) searchResultHandler() core.HandlerFunc {
 			h.srv.searchHistory.Add(query)
 		}
 
-		if sess != nil {
-			sess.query = query
-		}
+		st.session.query = query
 	}
 }
 
@@ -600,42 +860,52 @@ func (h *ircHub) bookResultHandler() core.HandlerFunc {
 
 func (h *ircHub) noResultsHandler() core.HandlerFunc {
 	return func(_ string) {
-		clients, _, query := h.popCurrentSearch()
+		clients, st := h.popCurrentSearch()
+		if st == nil {
+			h.srv.logBuf.info("Ignoring late 'no results' notice — no search in flight")
+			return
+		}
+		if h.recordSearchOutcome(st) {
+			h.announceRecovery()
+		}
 		h.srv.logBuf.info("IRC: no results returned for query")
 		broadcastToClients(clients, newErrorResponse("No results found for the query."))
-		h.srv.resultCache.CancelInFlight(query)
+		h.srv.resultCache.CancelInFlight(st.query)
 	}
 }
 
 func (h *ircHub) badServerHandler() core.HandlerFunc {
 	return func(_ string) {
-		clients, _, query := h.popCurrentSearch()
+		clients, st := h.popCurrentSearch()
+		if st == nil {
+			h.srv.logBuf.info("Ignoring late 'server unavailable' notice — no search in flight")
+			return
+		}
+		if h.recordSearchOutcome(st) {
+			h.announceRecovery()
+		}
 		h.srv.logBuf.warn("IRC: server unavailable, try another")
 		broadcastToClients(clients, newErrorResponse("Server is not available. Try another one."))
-		h.srv.resultCache.CancelInFlight(query)
+		h.srv.resultCache.CancelInFlight(st.query)
 	}
 }
 
 func (h *ircHub) searchAcceptedHandler() core.HandlerFunc {
 	return func(_ string) {
-		h.currentMu.Lock()
-		sess := h.currentSearch
-		h.currentMu.Unlock()
+		h.searchProgress()
 		h.srv.logBuf.info("IRC: search accepted by bot")
-		if sess != nil {
-			broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY, "Search accepted into the queue."))
+		if st := h.peekCurrentSearch(); st != nil {
+			broadcastToClients(st.session.getClients(), newStatusResponse(NOTIFY, "Search accepted into the queue."))
 		}
 	}
 }
 
 func (h *ircHub) matchesFoundHandler() core.HandlerFunc {
 	return func(num string) {
-		h.currentMu.Lock()
-		sess := h.currentSearch
-		h.currentMu.Unlock()
+		h.searchProgress()
 		h.srv.logBuf.info(fmt.Sprintf("IRC: %s matches found", num))
-		if sess != nil {
-			broadcastToClients(sess.getClients(), newStatusResponse(NOTIFY, fmt.Sprintf("Found %s results for your query.", num)))
+		if st := h.peekCurrentSearch(); st != nil {
+			broadcastToClients(st.session.getClients(), newStatusResponse(NOTIFY, fmt.Sprintf("Found %s results for your query.", num)))
 		}
 	}
 }

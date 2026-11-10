@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Search-bot watchdog with automatic fallback.** Searches now have a two-phase response timeout (`--search-response-timeout`, default 2m for any bot signal; `--search-result-timeout`, default 5m after the bot acknowledges). Previously a search that got no bot response hung forever server-side. After 3 consecutive timeouts the hub marks the primary `--searchbot` as down, warns all clients, and routes searches to `--searchbot-fallback` (default `searchook`) for a 30-minute cooldown before probing the primary again; recovery is announced when the primary responds. Set `--searchbot-fallback ""` to disable failover.
+- **Stale search-result detection.** Search-results DCC filenames embed the query (`*_results_for__*`); responses that can't belong to the in-flight query are ignored instead of being misattributed, and searches superseded by a newer query now notify their clients and release result-cache waiters. The MCP server applies the same check and retries once against the fallback bot on timeout.
+- **Unhandled IRC NOTICE logging.** NOTICE lines that don't match known search-response patterns are now logged, making bot format changes visible during diagnosis.
 - **Bundle audiobook-organizer (abo) in the `-calibre` image.** The calibre Dockerfile now fetches the static `audiobook-organizer` binary (`ABO_VERSION` build arg, defaults to v0.13.2) and ships a new `abo-pipeline` post-process script: each completed download is polished with `ebook-polish`, then organized into `/books` as `Author/Title/` via abo's flat mode. The default `CMD` now uses `abo-pipeline` for `--post-process-cmd`.
 
 ### Improved
